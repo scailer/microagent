@@ -13,10 +13,12 @@ from .signal import Signal
 class ResponseContext:
     _responses = {}
 
-    def __init__(self, loop=None, timeout=60):
+    def __init__(self, await_from, loop=None, timeout=60):
         self._loop = loop or asyncio.get_event_loop()
         self.signal_id = uuid.uuid4().hex
+        self.await_from = await_from
         self.timeout = timeout
+        self.response = {}
         self.fut = None
 
     async def __aenter__(self):
@@ -40,8 +42,16 @@ class ResponseContext:
     @classmethod
     def set(cls, signal_id, message):
         resp = cls.get(signal_id)
-        if resp:
-            resp.fut.set_result(message)
+
+        if not resp:
+            return
+
+        if not resp.await_from:
+            return resp.fut.set_result(message)
+
+        resp.response.update(message)
+        if set(resp.await_from) - set(x.split('.')[0] for x in resp.response.keys()):
+            resp.fut.set_result(resp.response)
 
 
 class AbstractSignalBus(abc.ABC):
@@ -89,8 +99,8 @@ class AbstractSignalBus(abc.ABC):
     def receiver(self, *args, **kwargs):
         return NotImplemented
 
-    async def call(self, channel: str, message: str):
-        async with ResponseContext(self._loop, self.RESPONSE_TIMEOUT) as (signal_id, future):
+    async def call(self, channel: str, message: str, await_from: Union[str, List[str]] = None):
+        async with ResponseContext(await_from, self._loop, self.RESPONSE_TIMEOUT) as (signal_id, future):
             await self.send(f'{channel}#{signal_id}', message)
             return await future
 
