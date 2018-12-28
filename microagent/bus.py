@@ -55,19 +55,21 @@ class AbstractSignalBus(abc.ABC):
     def __init__(self, dsn: str, prefix: Optional[str] = 'PUBSUB',
             logger: Optional[logging.Logger] = None):
 
-        self.received_signals = {}
+        self.uid = uuid.uuid4().hex
         self.dsn = dsn
         self.prefix = prefix
         self.log = logger or logging.getLogger('microagent.bus')
         self._loop = asyncio.get_event_loop()
         self._responses = {}
 
-        asyncio.ensure_future(self.bind(Signal(name='response', providing_args=[])))
+        response_signal = Signal(name='response', providing_args=[])
+        self.received_signals = {'response': response_signal}
+        asyncio.ensure_future(self.bind(response_signal.get_channel_name(prefix)))
 
     def __repr__(self):
         return '<Bus {} {}>'.format(self.__class__.__name__, self.prefix)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> 'BoundSignal':
         signal = Signal.get(name)
         return BoundSignal(self, signal)
 
@@ -76,8 +78,12 @@ class AbstractSignalBus(abc.ABC):
         return NotImplemented
 
     @abc.abstractmethod
-    def bind(self, signal: Signal):
+    def bind(self, signal: str):
         return NotImplemented
+
+    def bind_signal(self, signal: Signal):
+        self.received_signals[signal.name] = signal
+        return self.bind(signal.get_channel_name(self.prefix))
 
     @abc.abstractmethod
     def receiver(self, *args, **kwargs):
@@ -132,7 +138,7 @@ class AbstractSignalBus(abc.ABC):
 
         if signal_id:
             responses = {rec.__qualname__: res for rec, res in zip(receivers, responses)}
-            channel = '{}:response:ma#{}'.format(self.prefix, signal_id)
+            channel = f'{self.prefix}:response:{self.uid}#{signal_id}'
             await self.send(channel, ujson.dumps(responses))
 
     async def broadcast(self, receiver: Callable, signal: Signal,

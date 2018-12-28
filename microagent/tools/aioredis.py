@@ -17,12 +17,10 @@ class AIORedisSignalBus(AbstractSignalBus):
             self.transport = await aioredis.create_redis(self.dsn)
         await self.transport.publish(channel, message)
 
-    async def bind(self, signal):
-        self.received_signals[signal.name] = signal
+    async def bind(self, channel):
         if not self.pubsub:
             self.pubsub = await aioredis.create_redis(self.dsn)
-        await self.pubsub.psubscribe(
-            self.mpsc.pattern(signal.get_channel_name(self.prefix)))
+        await self.pubsub.psubscribe(self.mpsc.pattern(channel))
 
     async def receiver(self, mpsc):
         async for chl, msg in mpsc.iter():

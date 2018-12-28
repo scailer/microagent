@@ -27,9 +27,8 @@ class RedisSignalBus(AbstractSignalBus):
     async def send(self, channel, message):
         await self.transport.publish(channel, message)
 
-    async def bind(self, signal):
-        self.received_signals[signal.name] = signal
-        await self.transport.psubscribe(signal.get_channel_name(self.prefix))
+    async def bind(self, channel):
+        await self.transport.psubscribe(channel)
 
     def receiver(self, channel, message):
         self._receiver(channel, message)

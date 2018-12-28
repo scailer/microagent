@@ -87,7 +87,7 @@ class MicroAgent:
 
         return signals
 
-    async def bind_receivers(self, signals: Union[Signal, List[Signal]]):
+    async def bind_receivers(self, signals: List[Signal]):
         ''' Bind signal receivers to bus subscribers '''
         for signal in signals:
-            await self.bus.bind(signal)
+            await self.bus.bind_signal(signal)
