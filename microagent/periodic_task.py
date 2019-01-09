@@ -43,7 +43,6 @@ def periodic(**kwargs):
             ret = _wrap(self, func, *args, **kwargs)
             asyncio.ensure_future(ret, loop=self._loop)
 
-        _call.test_run = func
         _call.origin = func
         _call._start_after = kwargs.get('start_after')
         return _call

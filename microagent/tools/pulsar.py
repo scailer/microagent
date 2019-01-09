@@ -1,6 +1,8 @@
 import asyncio
+import unittest
 import pulsar
 from pulsar.apps.data import create_store
+from pulsar.apps.data.redis import RedisServer
 from ..bus import AbstractSignalBus
 
 
@@ -43,3 +45,18 @@ class MicroAgentApp(pulsar.Application):
         signal_prefix = self.cfg.settings.get('signal_prefix').value
         bus = RedisSignalBus(redis_dsn, prefix=signal_prefix, logger=log)
         worker.agent = self.cfg.agent(bus, log, settings=self.cfg.settings)
+
+
+class AgentTestCase(unittest.TestCase):
+    CHANNEL_PREFIX = 'TEST'
+    REDIS_DSN = 'redis://localhost:6379/5'
+    AGENT_CLASS = None
+    SETTINGS = {'redis_server': RedisServer(), 'signal_prefix': SignalPrefix()}
+
+    @classmethod
+    async def setUpClass(cls):
+        cls.SETTINGS['redis_server'].set(cls.REDIS_DSN)
+        cls.SETTINGS['signal_prefix'].set(cls.CHANNEL_PREFIX)
+        cls.loop = asyncio.get_event_loop()
+        cls.bus = RedisSignalBus(cls.REDIS_DSN, prefix=cls.CHANNEL_PREFIX)
+        cls.agent = cls.AGENT_CLASS(cls.bus, settings=cls.SETTINGS)
