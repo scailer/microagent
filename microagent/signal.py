@@ -34,9 +34,13 @@ class Signal:
 
     _signals = {}
 
+    def __new__(cls, *args, **kwargs):
+        name = kwargs.get('name', args[0] if args else None)
+        return cls._signals[name] if name in cls._signals else super().__new__(cls)
+
     def __init__(self, name: str, providing_args: List[str], serializer=None):
         if name in self._signals:
-            raise SignalException('Signal %s redefinition' % name)
+            return  # raise SignalException('Signal %s redefinition' % name)
 
         self.name = name
         self.providing_args = providing_args
