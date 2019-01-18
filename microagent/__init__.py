@@ -27,7 +27,7 @@ def load_signals(source: str) -> namedtuple:
     return namedtuple('signals', Signal._signals.keys())(*Signal._signals.values())
 
 
-def receiver(signal: Union[Signal, List[Signal], str, List[str]], **kwargs):
+def receiver(signal: Union[Signal, List[Signal], str, List[str]], timeout: int = 60):
     '''
         Decorator binding handler to receiving signals
 
@@ -48,10 +48,11 @@ def receiver(signal: Union[Signal, List[Signal], str, List[str]], **kwargs):
         signal = [signal]
 
     def _decorator(func):
+        func.timeout = timeout
         for _signal in signal:
             if isinstance(_signal, str):
                 _signal = Signal.get(_signal)
-            _signal.connect(func, **kwargs)
+            _signal.connect(func)
         return func
 
     return _decorator

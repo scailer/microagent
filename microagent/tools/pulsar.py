@@ -59,4 +59,10 @@ class AgentTestCase(unittest.TestCase):
         cls.SETTINGS['signal_prefix'].set(cls.CHANNEL_PREFIX)
         cls.loop = asyncio.get_event_loop()
         cls.bus = RedisSignalBus(cls.REDIS_DSN, prefix=cls.CHANNEL_PREFIX)
-        cls.agent = cls.AGENT_CLASS(cls.bus, settings=cls.SETTINGS)
+        cls.agent = cls.AGENT_CLASS(cls.bus, settings=cls.SETTINGS,
+            run_periodic_tasks=False)
+
+    @classmethod
+    def tearDownClass(cls):
+        del cls.agent
+        del cls.bus

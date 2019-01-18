@@ -60,7 +60,6 @@ class AbstractSignalBus(abc.ABC):
     '''
 
     RESPONSE_TIMEOUT = 60  # sec
-    HANDLING_TIMEOUT = 60  # sec
 
     def __init__(self, dsn: str, prefix: Optional[str] = 'PUBSUB',
             logger: Optional[logging.Logger] = None):
@@ -167,7 +166,7 @@ class AbstractSignalBus(abc.ABC):
             timer = datetime.now().timestamp()
 
             try:
-                response = await asyncio.wait_for(response, self.HANDLING_TIMEOUT)
+                response = await asyncio.wait_for(response, receiver.timeout)
                 if isinstance(response, (int, str)):
                     return response
 

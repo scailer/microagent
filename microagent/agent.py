@@ -18,7 +18,7 @@ class MicroAgent:
     '''
 
     def __init__(self, bus: AbstractSignalBus, logger: Optional[logging.Logger] = None,
-            settings: Optional[dict] = None):
+            settings: Optional[dict] = None, run_periodic_tasks: Optional[bool] = True):
 
         self._loop = asyncio.get_event_loop()
         self._periodic_tasks = self._get_periodic_tasks()
@@ -32,8 +32,9 @@ class MicroAgent:
 
         self.setup()
 
-        for method in self._periodic_tasks:
-            self._loop.call_later(getattr(method, '_start_after'), method)
+        if run_periodic_tasks:
+            for method in self._periodic_tasks:
+                self._loop.call_later(getattr(method, '_start_after'), method)
 
     def setup(self):
         pass
