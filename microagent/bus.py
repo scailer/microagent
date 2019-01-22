@@ -73,7 +73,7 @@ class AbstractSignalBus(abc.ABC):
 
         response_signal = Signal(name='response', providing_args=[])
         self.received_signals = {'response': response_signal}
-        asyncio.ensure_future(self.bind(response_signal.get_channel_name(prefix)))
+        asyncio.ensure_future(self.bind(response_signal.make_channel_name(prefix)))
 
     def __repr__(self):
         return '<Bus {} {}>'.format(self.__class__.__name__, self.prefix)
@@ -92,7 +92,7 @@ class AbstractSignalBus(abc.ABC):
 
     def bind_signal(self, signal: Signal):
         self.received_signals[signal.name] = signal
-        return self.bind(signal.get_channel_name(self.prefix))
+        return self.bind(signal.make_channel_name(self.prefix))
 
     @abc.abstractmethod
     def receiver(self, *args, **kwargs):
@@ -185,10 +185,10 @@ class BoundSignal:
 
     async def send(self, sender, **kwargs):
         await self.bus.send(
-            self.signal.get_channel_name(self.bus.prefix, sender),
+            self.signal.make_channel_name(self.bus.prefix, sender),
             self.signal.serialize(kwargs))
 
     async def call(self, sender, **kwargs):
         return await self.bus.call(
-            self.signal.get_channel_name(self.bus.prefix, sender),
+            self.signal.make_channel_name(self.bus.prefix, sender),
             self.signal.serialize(kwargs))

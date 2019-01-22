@@ -54,7 +54,7 @@ class Signal:
         self.receivers = []
 
     def __repr__(self):
-        return '<Signal {}>'.format(self.name)
+        return f'<Signal {self.name}>'
 
     def __eq__(self, other):
         return self.name == other.name
@@ -64,12 +64,12 @@ class Signal:
         lookup_key = _make_lookup_key(receiver, sender)
 
         for (mod, name, _id), _ in self.receivers:
-            if mod == lookup_key[0] and name == lookup_key[1]:
+            if [mod, name] == lookup_key[:-2]:
                 break
         else:
             self.receivers.append((lookup_key, receiver))
 
-    def get_channel_name(self, channel_prefix: str, sender: str = '*') -> str:
+    def make_channel_name(self, channel_prefix: str, sender: str = '*') -> str:
         ''' Make channel name '''
         return '{}:{}:{}'.format(channel_prefix, self.name, _make_id(sender))
 
