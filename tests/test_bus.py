@@ -1,5 +1,4 @@
 import unittest
-import mock
 from microagent.bus import AbstractSignalBus
 
 

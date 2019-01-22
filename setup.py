@@ -14,7 +14,7 @@ setup(
     ],
 
     setup_requires=["pytest-runner"],
-    tests_require=['pytest', 'mock'],
+    tests_require=['pytest'],
 
     url='https://gitlab.com/tamtam-im/pulsar-microserver',
     license='MIT license',
