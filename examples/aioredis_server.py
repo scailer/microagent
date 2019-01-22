@@ -3,8 +3,6 @@ import logging
 import sys
 import os
 
-import aioredis
-
 from microagent import MicroAgent, periodic, receiver, load_signals
 from microagent.tools.aioredis import AIORedisSignalBus
 

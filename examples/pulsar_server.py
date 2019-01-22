@@ -4,7 +4,7 @@ import sys
 import os
 from collections import defaultdict
 
-from microagent import MicroAgent, periodic, receiver, load_signals
+from microagent import MicroAgent, receiver, load_signals
 from microagent.tools.pulsar import MicroAgentApp
 
 
