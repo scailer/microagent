@@ -18,9 +18,11 @@ class MicroAgent:
     '''
     log = logging.getLogger('microagent')
 
-    def __init__(self, bus: AbstractSignalBus, logger: Optional[logging.Logger] = None,
-            settings: Optional[dict] = None, on_periodic_tasks: Optional[bool] = True,
-            on_received_signals: Optional[bool] = True):
+    def __init__(self, bus: AbstractSignalBus,
+            logger: Optional[logging.Logger] = None,
+            settings: Optional[dict] = None,
+            enable_periodic_tasks: Optional[bool] = True,
+            enable_receiving_signals: Optional[bool] = True):
 
         self._loop = asyncio.get_event_loop()
         self._periodic_tasks = self._get_periodic_tasks()
@@ -31,12 +33,12 @@ class MicroAgent:
             self.log = logger
 
         self.received_signals = self._get_received_signals()
-        if on_received_signals and self.received_signals:
+        if enable_receiving_signals and self.received_signals:
             asyncio.ensure_future(self.bind_receivers(self.received_signals.values()))
 
         self.setup()
 
-        if on_periodic_tasks:
+        if enable_periodic_tasks:
             for method in self._periodic_tasks:
                 self._loop.call_later(getattr(method, '_start_after'), method)
 
