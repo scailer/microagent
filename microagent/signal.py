@@ -6,12 +6,12 @@ def _make_id(target):
     if isinstance(target, str):
         return target
     if hasattr(target, 'im_func'):
-        return (id(target.im_self), id(target.im_func))
+        return id(target.im_self), id(target.im_func)
     return id(target)
 
 
 def _make_lookup_key(receiver, sender):
-    return (receiver.__module__, receiver.__qualname__, _make_id(sender))
+    return receiver.__module__, receiver.__qualname__, _make_id(sender)
 
 
 class SignalException(Exception):
@@ -86,3 +86,7 @@ class Signal:
             return cls._signals[name]
         except KeyError:
             raise SignalException(f'No such signal {name}')
+
+    @classmethod
+    def get_all(cls):
+        return cls._signals.values()

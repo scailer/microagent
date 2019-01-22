@@ -77,7 +77,7 @@ class MicroAgent:
     def _get_received_signals(self):
         signals, mod, name = {}, self.__module__, self.__class__.__name__
 
-        for signal in Signal._signals.values():
+        for signal in Signal.get_all():
             receivers = []
 
             for key, _ in signal.receivers:

@@ -9,7 +9,7 @@ from .periodic_task import periodic
 __all__ = ['Signal', 'MicroAgent', 'load_signals', 'receiver', 'periodic']
 
 
-def load_signals(source: str) -> namedtuple:
+def load_signals(source: str):
     '''
         Init signals from json-file loaded from disk or http request
     '''
