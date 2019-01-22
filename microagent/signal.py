@@ -1,5 +1,5 @@
-import ujson
 from typing import List, Callable
+import ujson
 
 
 def _make_id(target):
@@ -10,7 +10,12 @@ def _make_id(target):
     return id(target)
 
 
+def _make_lookup_key(receiver, sender):
+    return (receiver.__module__, receiver.__qualname__, _make_id(sender))
+
+
 class SignalException(Exception):
+    ''' Base signal exception '''
     pass
 
 
@@ -40,7 +45,7 @@ class Signal:
 
     def __init__(self, name: str, providing_args: List[str], serializer=None):
         if name in self._signals:
-            return  # raise SignalException('Signal %s redefinition' % name)
+            return
 
         self.name = name
         self.providing_args = providing_args
@@ -51,11 +56,12 @@ class Signal:
     def __repr__(self):
         return '<Signal {}>'.format(self.name)
 
-    def _make_lookup_key(self, receiver, sender):
-        return (receiver.__module__, receiver.__qualname__, _make_id(sender))
+    def __eq__(self, other):
+        return self.name == other.name
 
     def connect(self, receiver: Callable, sender: str = None) -> None:
-        lookup_key = self._make_lookup_key(receiver, sender)
+        ''' Bind method to signal '''
+        lookup_key = _make_lookup_key(receiver, sender)
 
         for (mod, name, _id), _ in self.receivers:
             if mod == lookup_key[0] and name == lookup_key[1]:
@@ -64,6 +70,7 @@ class Signal:
             self.receivers.append((lookup_key, receiver))
 
     def get_channel_name(self, channel_prefix: str, sender: str = '*') -> str:
+        ''' Make channel name '''
         return '{}:{}:{}'.format(channel_prefix, self.name, _make_id(sender))
 
     def serialize(self, data: dict) -> str:
@@ -74,6 +81,7 @@ class Signal:
 
     @classmethod
     def get(cls, name: str):
+        ''' Get signal instance by name '''
         try:
             return cls._signals[name]
         except KeyError:
