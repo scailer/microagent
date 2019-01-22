@@ -16,23 +16,27 @@ class MicroAgent:
         - rpc
         - periodic
     '''
+    log = logging.getLogger('microagent')
 
     def __init__(self, bus: AbstractSignalBus, logger: Optional[logging.Logger] = None,
-            settings: Optional[dict] = None, run_periodic_tasks: Optional[bool] = True):
+            settings: Optional[dict] = None, on_periodic_tasks: Optional[bool] = True,
+            on_received_signals: Optional[bool] = True):
 
         self._loop = asyncio.get_event_loop()
         self._periodic_tasks = self._get_periodic_tasks()
-        self.log = logger or logging.getLogger('microagent')
         self.settings = settings or {}
         self.bus = bus
 
+        if logger:
+            self.log = logger
+
         self.received_signals = self._get_received_signals()
-        if self.received_signals:
+        if on_received_signals and self.received_signals:
             asyncio.ensure_future(self.bind_receivers(self.received_signals.values()))
 
         self.setup()
 
-        if run_periodic_tasks:
+        if on_periodic_tasks:
             for method in self._periodic_tasks:
                 self._loop.call_later(getattr(method, '_start_after'), method)
 
