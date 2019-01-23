@@ -65,11 +65,8 @@ class MicroAgent:
         _periodic_tasks = []
 
         for method_name in dir(self):
-            if method_name.startswith('_'):
-                continue
-
             method = getattr(self, method_name)
-            if isinstance(getattr(method, '_start_after', None), int):
+            if isinstance(getattr(method, '_start_after', None), (int, float)):
                 _periodic_tasks.append(method)
 
         return _periodic_tasks

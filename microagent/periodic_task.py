@@ -1,29 +1,30 @@
 import asyncio
+import inspect
 
 
-async def _wrap(self, func, *args, **kwargs):
+async def _wrap(self, func):
     response = None
 
     try:
-        response = func(self, *args, **kwargs)
+        response = func(self)
     except Exception as e:
-        self.log.fatal('Periodic Exception: {}'.format(e), exc_info=True)
+        self.log.fatal(f'Periodic Exception: {e}', exc_info=True)
 
-    if asyncio.iscoroutine(response):
+    if inspect.isawaitable(response):
         try:
             response = await asyncio.wait_for(response, func._timeout)
         except asyncio.TimeoutError:
-            self.log.fatal('TimeoutError: {}'.format(func.__qualname__))
+            self.log.fatal(f'TimeoutError: {func.__qualname__}')
         except Exception as e:
-            self.log.fatal('Periodic Exception: {}'.format(e), exc_info=True)
+            self.log.fatal(f'Periodic Exception: {e}', exc_info=True)
 
     self._loop.call_later(
         func._period,
-        lambda *args, **kwargs: asyncio.ensure_future(_wrap(*args, **kwargs)),
-        self, func, *args, **kwargs)
+        lambda *args: asyncio.ensure_future(_wrap(*args)),
+        self, func)
 
 
-def periodic(**kwargs):
+def periodic(period, timeout=1, start_after=None):
     '''
         Decorator for periodical task for Agent object
 
@@ -35,16 +36,20 @@ def periodic(**kwargs):
             print('PCALL')
     '''
 
-    def _decorator(func):
-        func._period = kwargs.get('period', 1)
-        func._timeout = kwargs.get('timeout', 1)
+    assert period > 0.001, 'period must be more than 0.001 s'
+    assert timeout > 0.001, 'timeout must be more than 0.001 s'
+    if start_after:
+        assert start_after >= 0, 'start_after must be a positive'
 
-        def _call(self, *args, **kwargs):
-            ret = _wrap(self, func, *args, **kwargs)
-            asyncio.ensure_future(ret, loop=self._loop)
+    def _decorator(func):
+        func._period = period
+        func._timeout = timeout
+
+        def _call(self):
+            asyncio.ensure_future(_wrap(self, func), loop=self._loop)
 
         _call.origin = func
-        _call._start_after = kwargs.get('start_after')
+        _call._start_after = start_after
         return _call
 
     return _decorator
