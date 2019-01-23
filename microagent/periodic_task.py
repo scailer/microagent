@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import functools
+from typing import Union, Optional
 
 
 async def _wrap(self, func):
@@ -25,7 +26,8 @@ async def _wrap(self, func):
         self, func)
 
 
-def periodic(period, timeout=1, start_after=None):
+def periodic(period: Union[int, float], timeout: Optional[Union[int, float]] = 1,
+        start_after: Union[int, float] = None):
     '''
         Decorator for periodical task for Agent object
 
