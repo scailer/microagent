@@ -37,7 +37,8 @@ class Signal:
 
     '''
 
-    _signals = {}
+    _signals: dict = {}
+    receivers: list
 
     def __new__(cls, *args, **kwargs):
         name = kwargs.get('name', args[0] if args else None)

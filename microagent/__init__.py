@@ -27,7 +27,7 @@ def load_signals(source: str):
     return namedtuple('signals', Signal.get_all().keys())(*Signal._signals.values())
 
 
-def receiver(signal: Union[Signal, List[Signal], str, List[str]], timeout: int = 60):
+def receiver(*signals, timeout: int = 60):
     '''
         Decorator binding handler to receiving signals
 
@@ -44,12 +44,9 @@ def receiver(signal: Union[Signal, List[Signal], str, List[str]], timeout: int =
             log.info('Called handler 3 %s', kwargs)
     '''
 
-    if not isinstance(signal, (list, tuple)):
-        signal = [signal]
-
     def _decorator(func):
         func.timeout = timeout
-        for _signal in signal:
+        for _signal in signals:
             if isinstance(_signal, str):
                 _signal = Signal.get(_signal)
             _signal.connect(func)

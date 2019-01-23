@@ -43,6 +43,7 @@ def periodic(period, timeout=1, start_after=None):
         assert start_after >= 0, 'start_after must be a positive'
 
     def _decorator(func):
+        func.__periodic__ = True
         func._period = period
         func._timeout = timeout
 

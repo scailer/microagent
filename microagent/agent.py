@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import Optional, List
+from inspect import getmembers, ismethod
 
 from copy import copy
 
@@ -53,25 +54,22 @@ class MicroAgent:
             'periodic': [
                 {'name': func.origin.__name__, 'period': func.origin._period,
                  'timeout': func.origin._timeout, 'start_after': func._start_after}
-                 for func in self._periodic_tasks
+                for func in self._periodic_tasks
             ],
             'receivers': [
                 {'signal': signal, 'receivers': [
                     {'name': receiver[1].__name__, 'key': receiver[0]}
-                     for receiver in val.receivers
+                    for receiver in val.receivers
                 ]} for signal, val in self.received_signals.items()
             ]
         }
 
     def _get_periodic_tasks(self):
-        _periodic_tasks = []
-
-        for method_name in dir(self):
-            method = getattr(self, method_name)
-            if isinstance(getattr(method, '_start_after', None), (int, float)):
-                _periodic_tasks.append(method)
-
-        return _periodic_tasks
+        return tuple(
+            method
+            for name, method in getmembers(self, ismethod)
+            if hasattr(method, '__periodic__')
+        )
 
     def _get_received_signals(self):
         signals = {}

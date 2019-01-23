@@ -11,7 +11,7 @@ from .signal import Signal
 
 
 class ResponseContext:
-    _responses = {}
+    _responses: dict = {}
 
     def __init__(self, await_from, loop=None, timeout=60):
         self._loop = loop or asyncio.get_event_loop()
@@ -128,7 +128,7 @@ class AbstractSignalBus(abc.ABC):
         diff_args = set(signal.providing_args) ^ set(message.keys())
 
         if diff_args:
-            self.log.warn('Pubsub mismatch arguments %s %s', channel, diff_args)
+            self.log.warning('Pubsub mismatch arguments %s %s', channel, diff_args)
 
         asyncio.ensure_future(
             self.handle_signal(signal, sender, signal_id, message),
