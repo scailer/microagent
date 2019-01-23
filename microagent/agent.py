@@ -78,12 +78,12 @@ class MicroAgent:
         for signal in Signal.get_all().values():
             receivers = []
 
-            for (_mod, _func, _id), _ in signal.receivers:
-                if _mod == mod and _func.startswith(name):
-                    funcname = _func.replace(name, '')[1:]
+            for lookup_key, _ in signal.receivers:
+                if lookup_key.mod == mod and lookup_key.name.startswith(name):
+                    funcname = lookup_key.name.replace(name, '')[1:]
                     func = getattr(self, funcname, None)
                     if func:
-                        receivers.append(((_mod, _func, _id), func))
+                        receivers.append((lookup_key, func))
 
             if receivers:
                 signal = copy(signal)

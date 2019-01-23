@@ -1,5 +1,9 @@
 from typing import List, Callable
+from collections import namedtuple
 import ujson
+
+
+LookupKey = namedtuple('LookupKey', ['mod', 'name', 'id'])
 
 
 def _make_id(target):
@@ -11,7 +15,7 @@ def _make_id(target):
 
 
 def _make_lookup_key(receiver, sender):
-    return receiver.__module__, receiver.__qualname__, _make_id(sender)
+    return LookupKey(mod=receiver.__module__, name=receiver.__qualname__, id=_make_id(sender))
 
 
 class SignalException(Exception):
@@ -62,10 +66,11 @@ class Signal:
 
     def connect(self, receiver: Callable, sender: str = None) -> None:
         ''' Bind method to signal '''
-        lookup_key = _make_lookup_key(receiver, sender)
+        lookup_key = LookupKey(
+            mod=receiver.__module__, name=receiver.__qualname__, id=_make_id(sender))
 
-        for (mod, name, _id), _ in self.receivers:
-            if [mod, name] == lookup_key[:-2]:
+        for key, _ in self.receivers:
+            if (key.mod, key.name) == (lookup_key.mod, lookup_key.name):
                 break
         else:
             self.receivers.append((lookup_key, receiver))

@@ -24,10 +24,10 @@ def load_signals(source: str):
     for _data in data['signals']:
         Signal(name=_data['name'], providing_args=_data['providing_args'])
 
-    return namedtuple('signals', Signal.get_all().keys())(*Signal._signals.values())
+    return namedtuple('signals', Signal.get_all().keys())(*Signal.get_all().values())
 
 
-def receiver(*signals, timeout: int = 60):
+def receiver(*signals: Union[Signal, str], timeout: int = 60):
     '''
         Decorator binding handler to receiving signals
 

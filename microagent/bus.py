@@ -69,7 +69,6 @@ class AbstractSignalBus(abc.ABC):
         self.prefix = prefix
         self.log = logger or logging.getLogger('microagent.bus')
         self._loop = asyncio.get_event_loop()
-        self._responses = {}
 
         response_signal = Signal(name='response', providing_args=[])
         self.received_signals = {'response': response_signal}
@@ -143,7 +142,7 @@ class AbstractSignalBus(abc.ABC):
         receivers = [x[1] for x in signal.receivers]
         responses = await asyncio.gather(
             *[self.broadcast(receiver, signal, sender, message)
-              for receiver in receivers], loop=self._loop)
+            for receiver in receivers], loop=self._loop)
 
         if signal_id:
             responses = {rec.__qualname__: res for rec, res in zip(receivers, responses)}
