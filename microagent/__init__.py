@@ -24,7 +24,7 @@ def load_signals(source: str):
     for _data in data['signals']:
         Signal(name=_data['name'], providing_args=_data['providing_args'])
 
-    return namedtuple('signals', Signal._signals.keys())(*Signal._signals.values())
+    return namedtuple('signals', Signal.get_all().keys())(*Signal._signals.values())
 
 
 def receiver(signal: Union[Signal, List[Signal], str, List[str]], timeout: int = 60):

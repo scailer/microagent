@@ -46,7 +46,7 @@ APPS = {
 
 ```bash
 $ mkvirtualenv -p python3.6 microagent
-$ python3 setup.py develop
+$ pip install -e .
 $ pip install -r examples/requirements.txt
 ```
 

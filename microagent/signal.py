@@ -89,4 +89,4 @@ class Signal:
 
     @classmethod
     def get_all(cls):
-        return cls._signals.values()
+        return cls._signals

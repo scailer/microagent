@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Optional, List, Union
+from typing import Optional, List
 
 from copy import copy
 
@@ -19,8 +19,8 @@ class MicroAgent:
     log = logging.getLogger('microagent')
 
     def __init__(self, bus: AbstractSignalBus,
-            logger: Optional[logging.Logger] = None,
-            settings: Optional[dict] = None,
+            logger: logging.Logger = None,
+            settings: dict = None,
             enable_periodic_tasks: Optional[bool] = True,
             enable_receiving_signals: Optional[bool] = True):
 
@@ -34,7 +34,8 @@ class MicroAgent:
 
         self.received_signals = self._get_received_signals()
         if enable_receiving_signals and self.received_signals:
-            asyncio.ensure_future(self.bind_receivers(self.received_signals.values()))
+            asyncio.ensure_future(
+                self.bind_receivers(list(self.received_signals.values())))
 
         self.setup()
 
@@ -50,14 +51,15 @@ class MicroAgent:
             'name': self.__class__.__name__,
             'bus': str(self.bus),
             'periodic': [
-                {'name': x.origin.__name__, 'period': x.origin._period,
-                 'timeout': x.origin._timeout, 'start_after': x._start_after}
-                 for x in self._periodic_tasks
+                {'name': func.origin.__name__, 'period': func.origin._period,
+                 'timeout': func.origin._timeout, 'start_after': func._start_after}
+                 for func in self._periodic_tasks
             ],
             'receivers': [
-                {'signal': k, 'receivers': [
-                    {'name': x[1].__name__, 'key': x[0]} for x in v.receivers
-                ]} for k, v in self.received_signals.items()
+                {'signal': signal, 'receivers': [
+                    {'name': receiver[1].__name__, 'key': receiver[0]}
+                     for receiver in val.receivers
+                ]} for signal, val in self.received_signals.items()
             ]
         }
 
@@ -72,17 +74,18 @@ class MicroAgent:
         return _periodic_tasks
 
     def _get_received_signals(self):
-        signals, mod, name = {}, self.__module__, self.__class__.__name__
+        signals = {}
+        mod, name = self.__module__, self.__class__.__name__
 
-        for signal in Signal.get_all():
+        for signal in Signal.get_all().values():
             receivers = []
 
-            for key, _ in signal.receivers:
-                if key[0] == mod and key[1].startswith(name):
-                    funcname = key[1].replace(name, '')[1:]
+            for (_mod, _func, _id), _ in signal.receivers:
+                if _mod == mod and _func.startswith(name):
+                    funcname = _func.replace(name, '')[1:]
                     func = getattr(self, funcname, None)
                     if func:
-                        receivers.append((key, func))
+                        receivers.append(((_mod, _func, _id), func))
 
             if receivers:
                 signal = copy(signal)

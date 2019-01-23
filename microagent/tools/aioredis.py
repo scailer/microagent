@@ -9,7 +9,8 @@ class AIORedisSignalBus(AbstractSignalBus):
     def __init__(self, dsn, prefix='PUBSUB', logger=None):
         super().__init__(dsn, prefix, logger)
         self.mpsc = aioredis.pubsub.Receiver(loop=self._loop)
-        self.transport, self.pubsub = None, None
+        self.transport = None
+        self.pubsub = None
         asyncio.ensure_future(self.receiver(self.mpsc))
 
     async def send(self, channel, message):

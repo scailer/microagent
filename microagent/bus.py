@@ -25,7 +25,7 @@ class ResponseContext:
         self.fut = self._loop.create_future()
         self._responses[self.signal_id] = self
         self._loop.call_later(self.timeout, self.close)
-        return (self.signal_id, self.fut)
+        return self.signal_id, self.fut
 
     async def __aexit__(self, exc_type, exc, traceback):
         self.close()

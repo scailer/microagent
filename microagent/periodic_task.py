@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import functools
 
 
 async def _wrap(self, func):
@@ -12,7 +13,7 @@ async def _wrap(self, func):
 
     if inspect.isawaitable(response):
         try:
-            response = await asyncio.wait_for(response, func._timeout)
+            await asyncio.wait_for(response, func._timeout)
         except asyncio.TimeoutError:
             self.log.fatal(f'TimeoutError: {func.__qualname__}')
         except Exception as e:
@@ -45,6 +46,7 @@ def periodic(period, timeout=1, start_after=None):
         func._period = period
         func._timeout = timeout
 
+        @functools.wraps(func)
         def _call(self):
             asyncio.ensure_future(_wrap(self, func), loop=self._loop)
 
