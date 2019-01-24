@@ -19,11 +19,14 @@ class MicroAgent:
     '''
     log = logging.getLogger('microagent')
 
-    def __init__(self, bus: AbstractSignalBus,
+    def __init__(
+            self,
+            bus: AbstractSignalBus,
             logger: logging.Logger = None,
             settings: dict = None,
             enable_periodic_tasks: Optional[bool] = True,
-            enable_receiving_signals: Optional[bool] = True):
+            enable_receiving_signals: Optional[bool] = True
+        ):
 
         self._loop = asyncio.get_event_loop()
         self._periodic_tasks = self._get_periodic_tasks()
