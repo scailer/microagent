@@ -7,7 +7,7 @@ class TestAgent(unittest.TestCase):
     def test_init(self):
         ma = MicroAgent(Mock())
         self.assertEqual(ma.settings, {})
-        self.assertEqual(ma._periodic_tasks, [])
+        self.assertEqual(ma._periodic_tasks, ())
         self.assertEqual(ma.received_signals, {})
 
     def test_info(self):

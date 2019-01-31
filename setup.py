@@ -11,10 +11,16 @@ setup(
     include_package_data=True,
     install_requires=[
         'ujson',
+        'requests',
     ],
 
     setup_requires=["pytest-runner"],
     tests_require=['pytest'],
+
+    extras_require={
+        'pulsar': ['pulsar==1.6.4'],
+        'aioredis': ['aioredis'],
+    },
 
     url='https://gitlab.com/tamtam-im/pulsar-microserver',
     license='MIT license',

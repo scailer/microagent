@@ -89,9 +89,12 @@ class AbstractSignalBus(abc.ABC):
     def bind(self, signal: str):
         return NotImplemented
 
-    def bind_signal(self, signal: Signal):
-        self.received_signals[signal.name] = signal
-        return self.bind(signal.make_channel_name(self.prefix))
+    async def bind_signal(self, signal: Signal):
+        if signal.name in self.received_signals:
+            self.received_signals[signal.name].receivers.extend(signal.receivers)
+        else:
+            self.received_signals[signal.name] = signal
+            await self.bind(signal.make_channel_name(self.prefix))
 
     @abc.abstractmethod
     def receiver(self, *args, **kwargs):
