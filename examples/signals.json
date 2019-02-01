@@ -1,10 +1,14 @@
 {
     "version": 1,
-    "signals":[
+    "signals": [
         {"name": "started", "providing_args": []},
         {"name": "user_created", "providing_args": ["user_id"]},
         {"name": "user_comment", "providing_args": ["user_id"]},
         {"name": "rpc_comments_count", "providing_args": ["user_id"]},
         {"name": "comment_created", "providing_args": ["comment_id", "user_id"]}
+    ],
+    "queues": [
+        {"name": "mailer"},
+        {"name": "emailer"}
     ]
 }

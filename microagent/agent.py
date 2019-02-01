@@ -7,6 +7,7 @@ from copy import copy
 
 from .signal import Signal
 from .bus import AbstractSignalBus
+from .broker import AbstractQueueBroker
 
 
 class MicroAgent:
@@ -16,21 +17,25 @@ class MicroAgent:
         - reactive
         - rpc
         - periodic
+        - queue
     '''
     log = logging.getLogger('microagent')
 
     def __init__(
             self,
-            bus: AbstractSignalBus,
+            bus: AbstractSignalBus = None,
+            broker: AbstractQueueBroker = None,
             logger: logging.Logger = None,
             settings: dict = None,
             enable_periodic_tasks: Optional[bool] = True,
-            enable_receiving_signals: Optional[bool] = True
+            enable_receiving_signals: Optional[bool] = True,
+            enable_consuming_messages: Optional[bool] = True
         ):
 
         self._loop = asyncio.get_event_loop()
         self._periodic_tasks = self._get_periodic_tasks()
         self.settings = settings or {}
+        self.broker = broker
         self.bus = bus
 
         if logger:
@@ -38,8 +43,15 @@ class MicroAgent:
 
         self.received_signals = self._get_received_signals()
         if enable_receiving_signals and self.received_signals:
+            assert self.bus, 'Bus required'
             asyncio.ensure_future(
                 self.bind_receivers(list(self.received_signals.values())))
+
+        self.queue_consumers = self._get_queue_consumers()
+        if enable_consuming_messages and self.queue_consumers:
+            assert self.broker, 'Broker required'
+            asyncio.ensure_future(
+                self.bind_consumers(list(self.queue_consumers)))
 
         self.setup()
 
@@ -74,6 +86,13 @@ class MicroAgent:
             if hasattr(method, '__periodic__')
         )
 
+    def _get_queue_consumers(self):
+        return tuple(
+            method
+            for name, method in getmembers(self, ismethod)
+            if hasattr(method, '__consumer__')
+        )
+
     def _get_received_signals(self):
         signals = {}
         mod, name = self.__module__, self.__class__.__name__
@@ -99,3 +118,7 @@ class MicroAgent:
         ''' Bind signal receivers to bus subscribers '''
         for signal in signals:
             await self.bus.bind_signal(signal)
+
+    async def bind_consumers(self, consumers):
+        for consumer in consumers:
+            await self.broker.bind_consumer(consumer)

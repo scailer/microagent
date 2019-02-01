@@ -4,13 +4,13 @@ import sys
 import os
 from collections import defaultdict
 
-from microagent import MicroAgent, receiver, load_signals
+from microagent import MicroAgent, receiver, loadcfg, consumer
 from microagent.tools.pulsar import MicroAgentApp
 
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-signals = load_signals('file://' + os.path.join(cur_dir, 'signals.json'))
+signals, queues = loadcfg('file://' + os.path.join(cur_dir, 'signals.json'))
 
 
 class CommentAgent(MicroAgent):
@@ -22,12 +22,18 @@ class CommentAgent(MicroAgent):
     async def comment_handler(self, user_id, **kwargs):
         self.log.info('Catch signal %s', kwargs)
         self.comments_cache[user_id] += 1
+        await self.broker.emailer.send({'data': 'asdasd', 'asd': 123})
+        await self.broker.emailer.length()
 
     @receiver(signals.rpc_comments_count)
     async def count_handler(self, user_id, **kwargs):
         self.log.info('Catch signal %s', kwargs)
         await asyncio.sleep(1)
         return self.comments_cache[user_id]
+
+    @consumer(queues.mailer)
+    async def mail_handler(self, **kwargs):
+        self.log.info('Mailer %s %s', self, kwargs)
 
 
 def main():

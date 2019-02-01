@@ -1,9 +1,16 @@
 import asyncio
+import logging
 import unittest
+from typing import Optional
+
 import pulsar
 from pulsar.apps.data import create_store
 from pulsar.apps.data.redis import RedisServer
+from pulsar.utils.config import Global
+
 from ..bus import AbstractSignalBus
+from .redis import RedisBroker
+from .amqp import AMQPBroker
 
 
 class MicroAgentSetting(pulsar.Setting):
@@ -17,6 +24,24 @@ class SignalPrefix(MicroAgentSetting):
     flags = ['--signal-prefix']
     default = 'PUBSUB'
     desc = ''
+
+
+class SignalBus(MicroAgentSetting):
+    is_global = True
+    name = 'signal_bus'
+    flags = ['--signal-bus']
+    meta = "CONNECTION_STRING"
+    default = 'redis://127.0.0.1:6379/7'
+    desc = 'DSN signal bus'
+
+
+class QueueBroker(MicroAgentSetting):
+    is_global = True
+    name = 'queue_broker'
+    flags = ['--queue-broker']
+    meta = "CONNECTION_STRING"
+    default = ''
+    desc = 'DSN queue broker'
 
 
 class RedisSignalBus(AbstractSignalBus):
@@ -36,26 +61,60 @@ class RedisSignalBus(AbstractSignalBus):
         self._receiver(channel, message)
 
 
+class PulsarRedisBroker(RedisBroker):
+    def __init__(self, dsn: str, logger: Optional[logging.Logger] = None):
+        super().__init__(dsn, logger)
+        self.redis_store = create_store(dsn, decode_responses=True, loop=self._loop)
+        self.transport = self.redis_store.client()
+
+    async def new_connection(self):
+        return self.redis_store.client()
+
+    async def send(self, name: str, message: str):
+        await self.transport.rpush(name, message)
+
+    async def queue_length(self, name: str):
+        return int(await self.transport.llen(name))
+
+
 class MicroAgentApp(pulsar.Application):
     cfg = pulsar.Config(apps=['microagent'])
 
     def worker_start(self, worker, exc=None):
         log = self.cfg.configured_logger()
-        redis_dsn = self.cfg.settings.get('redis_server').value
+
+        signal_bus_dsn = self.cfg.settings.get('signal_bus').value
         signal_prefix = self.cfg.settings.get('signal_prefix').value
-        bus = RedisSignalBus(redis_dsn, prefix=signal_prefix, logger=log)
-        worker.agent = self.cfg.agent(bus, log, settings=self.cfg.settings)
+        bus = RedisSignalBus(signal_bus_dsn, prefix=signal_prefix, logger=log)
+
+        queue_broker_dsn = self.cfg.settings.get('queue_broker').value
+        if queue_broker_dsn.startswith('amqp'):
+            broker = AMQPBroker(queue_broker_dsn)
+        elif queue_broker_dsn.startswith('redis'):
+            broker = PulsarRedisBroker(queue_broker_dsn)
+        else:
+            broker = None
+
+        worker.agent = self.cfg.agent(
+            bus=bus, broker=broker, logger=log, settings=self.cfg.settings)
 
 
 class AgentTestCase(unittest.TestCase):
     CHANNEL_PREFIX = 'TEST'
     REDIS_DSN = 'redis://localhost:6379/5'
     AGENT_CLASS = None
-    SETTINGS = {'redis_server': RedisServer(), 'signal_prefix': SignalPrefix()}
+    SETTINGS = {
+        'redis_server': RedisServer(),
+        'signal_prefix': SignalPrefix(),
+        'signal_bus': SignalBus(),
+        'queue_broker': QueueBroker(),
+    }
 
     @classmethod
     async def setUpClass(cls):
         cls.SETTINGS['redis_server'].set(cls.REDIS_DSN)
+        cls.SETTINGS['signal_bus'].set(cls.REDIS_DSN)
+        cls.SETTINGS['queue_broker'].set(cls.REDIS_DSN)
         cls.SETTINGS['signal_prefix'].set(cls.CHANNEL_PREFIX)
         cls.loop = asyncio.get_event_loop()
         cls.bus = RedisSignalBus(cls.REDIS_DSN, prefix=cls.CHANNEL_PREFIX)

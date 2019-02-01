@@ -3,6 +3,7 @@ import asyncio
 import aioredis
 
 from ..bus import AbstractSignalBus
+from .redis import RedisBroker
 
 
 class AIORedisSignalBus(AbstractSignalBus):
@@ -27,3 +28,18 @@ class AIORedisSignalBus(AbstractSignalBus):
         async for chl, msg in mpsc.iter():
             channel, message = map(functools.partial(str, encoding='utf8'), msg)
             self._receiver(channel, message)
+
+
+class AIORedisBroker(RedisBroker):
+    async def new_connection(self):
+        return await aioredis.create_redis(self.dsn)
+
+    async def send(self, name: str, message: str):
+        if not self.transport:
+            self.transport = await self.new_connection()
+        await self.transport.rpush(name, message)
+
+    async def queue_length(self, name: str):
+        if not self.transport:
+            self.transport = await self.new_connection()
+        return int(await self.transport.llen(name))
