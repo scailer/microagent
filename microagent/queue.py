@@ -12,7 +12,7 @@ class Queue:
         name = kwargs.get('name', args[0] if args else None)
         return cls._queues[name] if name in cls._queues else super().__new__(cls)
 
-    def __init__(self, name, serializer=None):
+    def __init__(self, name: str, serializer=None):
         if name in self._queues:
             return
 

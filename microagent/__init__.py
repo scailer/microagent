@@ -8,7 +8,7 @@ from .agent import MicroAgent
 from .periodic_task import periodic, cron
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'loadcfg', 'receiver', 'consumer',
-           'periodic']
+           'periodic', 'cron']
 
 
 def loadcfg(source: str):
@@ -66,7 +66,7 @@ def receiver(*signals: Union[Signal, str], timeout: int = 60):
     return _decorator
 
 
-def consumer(queue, timeout=60, **options):
+def consumer(queue: Queue, timeout: int = 60, **options):
     '''
         Decorator binding handler to consume messages from queue
     '''

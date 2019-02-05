@@ -31,7 +31,7 @@ class AbstractQueueBroker(abc.ABC):
         self.log = logger or logging.getLogger('microagent.queue')
         self._loop = asyncio.get_event_loop()
 
-    def __getattr__(self, name: str) -> 'BoundSignal':
+    def __getattr__(self, name: str):
         return BoundQueue(self, Queue.get(name))
 
     @abc.abstractmethod
