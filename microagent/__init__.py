@@ -5,7 +5,7 @@ import ujson
 from .signal import Signal
 from .queue import Queue
 from .agent import MicroAgent
-from .periodic_task import periodic
+from .periodic_task import periodic, cron
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'loadcfg', 'receiver', 'consumer',
            'periodic']

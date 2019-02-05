@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import Optional, List
 from inspect import getmembers, ismethod
+from datetime import datetime, timedelta
 
 from copy import copy
 
@@ -57,7 +58,15 @@ class MicroAgent:
 
         if enable_periodic_tasks:
             for method in self._periodic_tasks:
-                self._loop.call_later(getattr(method, '_start_after'), method)
+                start_after = getattr(method, '_start_after')
+                if start_after > 100:
+                    start_at = datetime.now() + timedelta(seconds=start_after)
+                    self.log.debug('Set periodic task %s at %02d:%02d:%02d', method,
+                        int(start_at.hour), int(start_at.minute), int(start_at.second))
+                else:
+                    self.log.debug('Set periodic task %s after %s sec',
+                        method, int(start_after))
+                self._loop.call_later(start_after, method)
 
     def setup(self):
         pass
