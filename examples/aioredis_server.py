@@ -3,14 +3,14 @@ import logging
 import sys
 import os
 
-from microagent import MicroAgent, periodic, receiver, loadcfg, consumer
+from microagent import MicroAgent, periodic, receiver, consumer, load_stuff
 from microagent.tools.aioredis import AIORedisSignalBus, AIORedisBroker
 from microagent.tools.amqp import AMQPBroker
 
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-signals, queues = loadcfg('file://' + os.path.join(cur_dir, 'signals.json'))
+signals, queues = load_stuff('file://' + os.path.join(cur_dir, 'signals.json'))
 
 
 class UserAgent(MicroAgent):
