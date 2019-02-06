@@ -7,11 +7,11 @@ from .queue import Queue
 from .agent import MicroAgent
 from .periodic_task import periodic, cron
 
-__all__ = ['Signal', 'Queue', 'MicroAgent', 'loadcfg', 'receiver', 'consumer',
-           'periodic', 'cron']
+__all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer',
+           'periodic', 'cron', 'load_stuff', 'load_signals', 'load_queues']
 
 
-def loadcfg(source: str):
+def load_stuff(source: str):
     '''
         Init signals from json-file loaded from disk or http request
     '''
@@ -33,6 +33,14 @@ def loadcfg(source: str):
         namedtuple('signals', Signal.get_all().keys())(*Signal.get_all().values()),
         namedtuple('queues', Queue.get_all().keys())(*Queue.get_all().values())
     )
+
+
+def load_signals(source: str):
+    return load_stuff(source)[0]
+
+
+def load_queues(source: str):
+    return load_stuff(source)[1]
 
 
 def receiver(*signals: Union[Signal, str], timeout: int = 60):
