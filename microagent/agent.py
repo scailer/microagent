@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Optional, List
+from typing import Optional, Iterable
 from inspect import getmembers, ismethod
 from datetime import datetime, timedelta
 
@@ -45,27 +45,25 @@ class MicroAgent:
         self.received_signals = self._get_received_signals()
         if enable_receiving_signals and self.received_signals:
             assert self.bus, 'Bus required'
-            asyncio.ensure_future(
-                self.bind_receivers(list(self.received_signals.values())))
+            asyncio.ensure_future(self.bind_receivers(self.received_signals.values()))
 
         self.queue_consumers = self._get_queue_consumers()
         if enable_consuming_messages and self.queue_consumers:
             assert self.broker, 'Broker required'
-            asyncio.ensure_future(
-                self.bind_consumers(list(self.queue_consumers)))
+            asyncio.ensure_future(self.bind_consumers(self.queue_consumers))
 
         self.setup()
 
         if enable_periodic_tasks:
             for method in self._periodic_tasks:
-                start_after = getattr(method, '_start_after')
+                start_after = getattr(method, '_start_after', 0) or 0
+
                 if start_after > 100:
                     start_at = datetime.now() + timedelta(seconds=start_after)
-                    self.log.debug('Set periodic task %s at %02d:%02d:%02d', method,
-                        int(start_at.hour), int(start_at.minute), int(start_at.second))
+                    self.log.debug('Set periodic task %s at %s', method, f'{start_at:%H:%M:%S}')
                 else:
-                    self.log.debug('Set periodic task %s after %s sec',
-                        method, int(start_after))
+                    self.log.debug('Set periodic task %s after %d sec', method, start_after)
+
                 self._loop.call_later(start_after, method)
 
     def setup(self):
@@ -123,11 +121,11 @@ class MicroAgent:
 
         return signals
 
-    async def bind_receivers(self, signals: List[Signal]):
+    async def bind_receivers(self, signals: Iterable[Signal]):
         ''' Bind signal receivers to bus subscribers '''
         for signal in signals:
             await self.bus.bind_signal(signal)
 
-    async def bind_consumers(self, consumers):
+    async def bind_consumers(self, consumers: Iterable):
         for consumer in consumers:
             await self.broker.bind_consumer(consumer)

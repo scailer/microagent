@@ -37,7 +37,8 @@ class AMQPBroker(AbstractQueueBroker):
             try:
                 _, self.protocol = await aioamqp.from_url(self.dsn)
             except aioamqp.AmqpClosedConnection:
-                return self.log.fatal('AmqpClosedConnection')
+                self.log.fatal('AmqpClosedConnection')
+                raise
         return await self.protocol.channel()
 
     def _amqp_wrapper(self, handler):
@@ -53,14 +54,14 @@ class AMQPBroker(AbstractQueueBroker):
             try:
                 response = handler(**data)
             except TypeError:
-                self.log.error('Call %s failed', handler.queue.name, exc_info=True)
+                self.log.error('Call %s failed', handler.__qualname__, exc_info=True)
                 return
 
             if asyncio.iscoroutine(response):
                 timer = datetime.now().timestamp()
 
                 try:
-                    response = await asyncio.wait_for(response, handler.timeout)
+                    await asyncio.wait_for(response, handler.timeout)
                 except asyncio.TimeoutError:
                     self.log.fatal('TimeoutError: %s %.2f', handler.__qualname__,
                         datetime.now().timestamp() - timer)

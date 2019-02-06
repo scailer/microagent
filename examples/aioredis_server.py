@@ -17,6 +17,10 @@ class UserAgent(MicroAgent):
     def setup(self):
         self.log.info('Run ...\n %s', self.info())
 
+    @periodic(period=5)
+    async def periodic_hand(self):
+        self.log.info('QQQQQQQQQQQQQQQQQ')
+
     @periodic(period=15, timeout=10, start_after=3)
     async def periodic_handler(self):
         self.log.info('Run periodic task')
@@ -40,8 +44,8 @@ class UserAgent(MicroAgent):
 
 async def _main():
     bus = AIORedisSignalBus('redis://localhost/7')
-    broker = AMQPBroker('amqp://user:31415@localhost:5672/prod')
-    #broker = AIORedisBroker('redis://localhost/7')
+    #broker = AMQPBroker('amqp://user:31415@localhost:5672/prod')
+    broker = AIORedisBroker('redis://localhost/7')
     print('Broker', broker)
     await broker.mailer.declare()
     await broker.emailer.declare()

@@ -6,11 +6,10 @@ from typing import Optional
 import pulsar
 from pulsar.apps.data import create_store
 from pulsar.apps.data.redis import RedisServer
-from pulsar.utils.config import Global
 
 from ..bus import AbstractSignalBus
-from .redis import RedisBroker
-from .amqp import AMQPBroker
+from ..broker import AbstractQueueBroker
+from .redis import RedisBrokerMixin
 
 
 class MicroAgentSetting(pulsar.Setting):
@@ -61,7 +60,7 @@ class RedisSignalBus(AbstractSignalBus):
         self._receiver(channel, message)
 
 
-class PulsarRedisBroker(RedisBroker):
+class PulsarRedisBroker(RedisBrokerMixin, AbstractQueueBroker):
     def __init__(self, dsn: str, logger: Optional[logging.Logger] = None):
         super().__init__(dsn, logger)
         self.redis_store = create_store(dsn, decode_responses=True, loop=self._loop)
@@ -83,12 +82,16 @@ class MicroAgentApp(pulsar.Application):
     def worker_start(self, worker, exc=None):
         log = self.cfg.configured_logger()
 
-        signal_bus_dsn = self.cfg.settings.get('signal_bus').value
-        signal_prefix = self.cfg.settings.get('signal_prefix').value
-        bus = RedisSignalBus(signal_bus_dsn, prefix=signal_prefix, logger=log)
+        signal_bus_dsn = self.cfg.settings['signal_bus'].value
+        if signal_bus_dsn.startswith('redis'):
+            signal_prefix = self.cfg.settings['signal_prefix'].value
+            bus = RedisSignalBus(signal_bus_dsn, prefix=signal_prefix, logger=log)
+        else:
+            bus = None
 
         queue_broker_dsn = self.cfg.settings.get('queue_broker').value
         if queue_broker_dsn.startswith('amqp'):
+            from .amqp import AMQPBroker
             broker = AMQPBroker(queue_broker_dsn)
         elif queue_broker_dsn.startswith('redis'):
             broker = PulsarRedisBroker(queue_broker_dsn)

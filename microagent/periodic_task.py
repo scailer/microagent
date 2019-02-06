@@ -28,6 +28,7 @@ def _periodic(self, func):
         func._period,
         lambda *args: asyncio.ensure_future(_periodic(*args)),
         self, func)
+    self.log.debug(f'Run periodic task %s', func)
     return _wrap(self, func)
 
 
@@ -56,7 +57,7 @@ def periodic(period: Union[int, float], timeout: Optional[Union[int, float]] = 1
 
         @functools.wraps(func)
         def _call(self):
-            asyncio.ensure_future(_wrap(self, func), loop=self._loop)
+            asyncio.ensure_future(_periodic(self, func), loop=self._loop)
 
         _call.origin = func
         _call._start_after = start_after

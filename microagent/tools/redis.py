@@ -4,10 +4,9 @@ import asyncio
 from typing import Optional
 from datetime import datetime
 from collections import defaultdict
-from ..broker import AbstractQueueBroker
 
 
-class RedisBroker(AbstractQueueBroker):
+class RedisBrokerMixin:
     WAIT_TIME = 15
     ROLLBACK_ATTEMPTS = 3
 
@@ -56,6 +55,7 @@ class RedisBroker(AbstractQueueBroker):
             except Exception:
                 self.log.error('Call %s failed', handler.queue.name, exc_info=True)
                 await self.rollback(handler.queue.name, data)
+                return
 
             if asyncio.iscoroutine(response):
                 timer = datetime.now().timestamp()

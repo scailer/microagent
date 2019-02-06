@@ -3,7 +3,8 @@ import asyncio
 import aioredis
 
 from ..bus import AbstractSignalBus
-from .redis import RedisBroker
+from ..broker import AbstractQueueBroker
+from .redis import RedisBrokerMixin
 
 
 class AIORedisSignalBus(AbstractSignalBus):
@@ -30,7 +31,7 @@ class AIORedisSignalBus(AbstractSignalBus):
             self._receiver(channel, message)
 
 
-class AIORedisBroker(RedisBroker):
+class AIORedisBroker(RedisBrokerMixin, AbstractQueueBroker):
     async def new_connection(self):
         return await aioredis.create_redis(self.dsn)
 
