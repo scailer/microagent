@@ -44,8 +44,8 @@ class UserAgent(MicroAgent):
 
 async def _main():
     bus = AIORedisSignalBus('redis://localhost/7')
-    #broker = AMQPBroker('amqp://user:31415@localhost:5672/prod')
-    broker = AIORedisBroker('redis://localhost/7')
+    broker = AMQPBroker('amqp://user:31415@localhost:5672/prod')
+    #broker = AIORedisBroker('redis://localhost/7')
     print('Broker', broker)
     await broker.mailer.declare()
     await broker.emailer.declare()

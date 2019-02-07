@@ -85,7 +85,7 @@ class AMQPBroker(AbstractQueueBroker):
         try:
             return await self.protocol.channel()
         except aioamqp.AmqpClosedConnection:
-            self.protocol = None
+            self.protocol = None  # Drop connection cache
             raise
 
     def _amqp_wrapper(self, handler):
