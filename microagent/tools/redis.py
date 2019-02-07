@@ -13,7 +13,6 @@ class RedisBrokerMixin:
     def __init__(self, dsn: str, logger: Optional[logging.Logger] = None):
         super().__init__(dsn, logger)
         self.transport = None
-        self._bindings = {}
         self._rollbacks = defaultdict(lambda: 0)
 
     async def new_connection(self):

@@ -30,6 +30,7 @@ class AbstractQueueBroker(abc.ABC):
         self.dsn = dsn
         self.log = logger or logging.getLogger('microagent.queue')
         self._loop = asyncio.get_event_loop()
+        self._bindings = {}
 
     def __getattr__(self, name: str):
         return BoundQueue(self, Queue.get(name))
