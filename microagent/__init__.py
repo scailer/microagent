@@ -3,13 +3,15 @@ from typing import List, Union
 import ujson
 
 from .signal import Signal
+from .queue import Queue
 from .agent import MicroAgent
-from .periodic_task import periodic
+from .periodic_task import periodic, cron
 
-__all__ = ['Signal', 'MicroAgent', 'load_signals', 'receiver', 'periodic']
+__all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer',
+           'periodic', 'cron', 'load_stuff', 'load_signals', 'load_queues']
 
 
-def load_signals(source: str):
+def load_stuff(source: str):
     '''
         Init signals from json-file loaded from disk or http request
     '''
@@ -21,10 +23,24 @@ def load_signals(source: str):
         import requests
         data = requests.get(source).json()
 
-    for _data in data['signals']:
+    for _data in data.get('signals', []):
         Signal(name=_data['name'], providing_args=_data['providing_args'])
 
-    return namedtuple('signals', Signal.get_all().keys())(*Signal.get_all().values())
+    for _data in data.get('queues', []):
+        Queue(name=_data['name'])
+
+    return (
+        namedtuple('signals', Signal.get_all().keys())(*Signal.get_all().values()),
+        namedtuple('queues', Queue.get_all().keys())(*Queue.get_all().values())
+    )
+
+
+def load_signals(source: str):
+    return load_stuff(source)[0]
+
+
+def load_queues(source: str):
+    return load_stuff(source)[1]
 
 
 def receiver(*signals: Union[Signal, str], timeout: int = 60):
@@ -46,10 +62,28 @@ def receiver(*signals: Union[Signal, str], timeout: int = 60):
 
     def _decorator(func):
         func.timeout = timeout
+        func.__receiver__ = True
+
         for _signal in signals:
             if isinstance(_signal, str):
                 _signal = Signal.get(_signal)
             _signal.connect(func)
+
+        return func
+
+    return _decorator
+
+
+def consumer(queue: Queue, timeout: int = 60, **options):
+    '''
+        Decorator binding handler to consume messages from queue
+    '''
+
+    def _decorator(func):
+        func.timeout = timeout
+        func.options = options
+        func.queue = queue
+        func.__consumer__ = True
         return func
 
     return _decorator

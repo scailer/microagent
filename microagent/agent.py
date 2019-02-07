@@ -1,12 +1,14 @@
 import asyncio
 import logging
-from typing import Optional, List
+from typing import Optional, Iterable
 from inspect import getmembers, ismethod
+from datetime import datetime, timedelta
 
 from copy import copy
 
 from .signal import Signal
 from .bus import AbstractSignalBus
+from .broker import AbstractQueueBroker
 
 
 class MicroAgent:
@@ -16,21 +18,25 @@ class MicroAgent:
         - reactive
         - rpc
         - periodic
+        - queue
     '''
     log = logging.getLogger('microagent')
 
     def __init__(
             self,
-            bus: AbstractSignalBus,
+            bus: AbstractSignalBus = None,
+            broker: AbstractQueueBroker = None,
             logger: logging.Logger = None,
             settings: dict = None,
             enable_periodic_tasks: Optional[bool] = True,
-            enable_receiving_signals: Optional[bool] = True
+            enable_receiving_signals: Optional[bool] = True,
+            enable_consuming_messages: Optional[bool] = True
         ):
 
         self._loop = asyncio.get_event_loop()
         self._periodic_tasks = self._get_periodic_tasks()
         self.settings = settings or {}
+        self.broker = broker
         self.bus = bus
 
         if logger:
@@ -38,14 +44,27 @@ class MicroAgent:
 
         self.received_signals = self._get_received_signals()
         if enable_receiving_signals and self.received_signals:
-            asyncio.ensure_future(
-                self.bind_receivers(list(self.received_signals.values())))
+            assert self.bus, 'Bus required'
+            asyncio.ensure_future(self.bind_receivers(self.received_signals.values()))
+
+        self.queue_consumers = self._get_queue_consumers()
+        if enable_consuming_messages and self.queue_consumers:
+            assert self.broker, 'Broker required'
+            asyncio.ensure_future(self.bind_consumers(self.queue_consumers))
 
         self.setup()
 
         if enable_periodic_tasks:
             for method in self._periodic_tasks:
-                self._loop.call_later(getattr(method, '_start_after'), method)
+                start_after = getattr(method, '_start_after', 0) or 0
+
+                if start_after > 100:
+                    start_at = datetime.now() + timedelta(seconds=start_after)
+                    self.log.debug('Set periodic task %s at %s', method, f'{start_at:%H:%M:%S}')
+                else:
+                    self.log.debug('Set periodic task %s after %d sec', method, start_after)
+
+                self._loop.call_later(start_after, method)
 
     def setup(self):
         pass
@@ -74,6 +93,13 @@ class MicroAgent:
             if hasattr(method, '__periodic__')
         )
 
+    def _get_queue_consumers(self):
+        return tuple(
+            method
+            for name, method in getmembers(self, ismethod)
+            if hasattr(method, '__consumer__')
+        )
+
     def _get_received_signals(self):
         signals = {}
         mod, name = self.__module__, self.__class__.__name__
@@ -95,7 +121,11 @@ class MicroAgent:
 
         return signals
 
-    async def bind_receivers(self, signals: List[Signal]):
+    async def bind_receivers(self, signals: Iterable[Signal]):
         ''' Bind signal receivers to bus subscribers '''
         for signal in signals:
             await self.bus.bind_signal(signal)
+
+    async def bind_consumers(self, consumers: Iterable):
+        for consumer in consumers:
+            await self.broker.bind_consumer(consumer)

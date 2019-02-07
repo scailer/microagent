@@ -12,6 +12,7 @@ setup(
     install_requires=[
         'ujson',
         'requests',
+        'croniter'
     ],
 
     setup_requires=["pytest-runner"],
@@ -20,6 +21,7 @@ setup(
     extras_require={
         'pulsar': ['pulsar==1.6.4'],
         'aioredis': ['aioredis'],
+        'amqp': ['aioamqp==0.12.0'],
     },
 
     url='https://gitlab.com/tamtam-im/pulsar-microserver',
