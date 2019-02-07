@@ -55,7 +55,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     async def bind(self, name, handler):
         if name in self._bindings:
-            self.log.warning('Handler to queue "%s" already binded. Ignoring')
+            self.log.warning('Handler to queue "%s" already binded. Ignoring', name)
             return
 
         _, protocol = await aioamqp.from_url(
