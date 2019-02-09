@@ -2,6 +2,7 @@ import abc
 import uuid
 import logging
 import asyncio
+import inspect
 import ujson
 
 from typing import Optional, List, Union, Callable
@@ -164,7 +165,7 @@ class AbstractSignalBus(abc.ABC):
             self.log.error('Call %s failed', signal.name, exc_info=True)
             return
 
-        if asyncio.iscoroutine(response):
+        if inspect.isawaitable(response):
             timer = datetime.now().timestamp()
 
             try:

@@ -16,7 +16,16 @@ setup(
     ],
 
     setup_requires=["pytest-runner"],
-    tests_require=['pytest'],
+    tests_require=[
+        'pytest',
+        'pudb',
+        'pytest-pudb',
+        'asynctest',
+        'pytest-cov',
+        'pulsar==1.6.4',
+        'aioredis',
+        'aioamqp==0.12.0'
+    ],
 
     extras_require={
         'pulsar': ['pulsar==1.6.4'],

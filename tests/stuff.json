@@ -1,0 +1,10 @@
+{
+    "version": 1,
+    "signals": [
+        {"name": "test_signal", "providing_args": ["uuid"]},
+        {"name": "else_signal", "providing_args": ["uuid"]}
+    ],
+    "queues": [
+        {"name": "test_queue"}
+    ]
+}
