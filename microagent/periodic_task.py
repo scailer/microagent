@@ -28,7 +28,6 @@ def _periodic(self, func):
         func._period,
         lambda *args: asyncio.ensure_future(_periodic(*args)),
         self, func)
-    self.log.debug(f'Run periodic task %s', func)
     return _wrap(self, func)
 
 
