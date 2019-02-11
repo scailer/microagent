@@ -75,6 +75,9 @@ class PulsarRedisBroker(RedisBrokerMixin, AbstractQueueBroker):
     async def queue_length(self, name: str):
         return int(await self.transport.llen(name))
 
+    async def declare_queue(self, name: str):
+        pass
+
 
 class MicroAgentApp(pulsar.Application):
     cfg = pulsar.Config(apps=['microagent'])

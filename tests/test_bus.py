@@ -4,6 +4,7 @@ import asyncio
 import unittest
 import asynctest
 from microagent.bus import AbstractSignalBus, ResponseContext
+from microagent.signal import SignalException
 from microagent import Signal
 
 
@@ -20,6 +21,14 @@ class Bus(AbstractSignalBus):
 
     def receiver(self, *args, **kwargs):
         pass
+
+
+class TestSignal(unittest.TestCase):
+    def test_repr(self):
+        self.assertIn('Signal', str(test_signal))
+
+    def test_not_found(self):
+        self.assertRaises(SignalException, Signal.get, 'not_found')
 
 
 class TestBus(asynctest.TestCase):

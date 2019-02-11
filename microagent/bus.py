@@ -84,11 +84,11 @@ class AbstractSignalBus(abc.ABC):
 
     @abc.abstractmethod
     def send(self, channel: str, message: str):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     @abc.abstractmethod
     def bind(self, signal: str):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     async def bind_signal(self, signal: Signal):
         if signal.name in self.received_signals:
@@ -99,7 +99,7 @@ class AbstractSignalBus(abc.ABC):
 
     @abc.abstractmethod
     def receiver(self, *args, **kwargs):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     async def call(self, channel: str, message: str, await_from: Union[str, List[str]] = None):
         async with ResponseContext(await_from, self._loop, self.RESPONSE_TIMEOUT) as (signal_id, future):
