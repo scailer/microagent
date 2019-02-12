@@ -37,17 +37,19 @@ class AbstractQueueBroker(abc.ABC):
 
     @abc.abstractmethod
     def send(self, name: str, message: str, **kwargs):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     @abc.abstractmethod
     def bind(self, name: str, handler):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     def bind_consumer(self, consumer):
         return self.bind(consumer.queue.name, consumer)
 
-    async def declare_queue(self, name, **options):
-        pass
+    @abc.abstractmethod
+    def declare_queue(self, name, **options):
+        return NotImplemented  # pragma: no cover
 
-    async def queue_length(self, name, **options):
-        pass
+    @abc.abstractmethod
+    def queue_length(self, name, **options):
+        return NotImplemented  # pragma: no cover

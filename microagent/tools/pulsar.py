@@ -11,8 +11,13 @@ from ..bus import AbstractSignalBus
 from ..broker import AbstractQueueBroker
 from .redis import RedisBrokerMixin
 
+try:
+    from pulsar import Setting, Config, Application
+except ImportError:
+    from pulsar.api import Setting, Config, Application
 
-class MicroAgentSetting(pulsar.Setting):
+
+class MicroAgentSetting(Setting):
     virtual = True
     app = 'microagent'
     section = 'Micro Agent'
@@ -75,9 +80,12 @@ class PulsarRedisBroker(RedisBrokerMixin, AbstractQueueBroker):
     async def queue_length(self, name: str):
         return int(await self.transport.llen(name))
 
+    async def declare_queue(self, name: str):
+        pass
 
-class MicroAgentApp(pulsar.Application):
-    cfg = pulsar.Config(apps=['microagent'])
+
+class MicroAgentApp(Application):
+    cfg = Config(apps=['microagent'])
 
     def worker_start(self, worker, exc=None):
         log = self.cfg.configured_logger()
