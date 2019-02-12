@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import pprint
 from typing import Optional, Iterable
 from inspect import getmembers, ismethod
 from datetime import datetime, timedelta
@@ -45,11 +46,17 @@ class MicroAgent:
         self.received_signals = self._get_received_signals()
         if enable_receiving_signals and self.received_signals:
             assert self.bus, 'Bus required'
+            assert isinstance(self.bus, AbstractSignalBus), \
+                f'Bus must be AbstractSignalBus instance or None instead {bus}'
+
             asyncio.ensure_future(self.bind_receivers(self.received_signals.values()))
 
         self.queue_consumers = self._get_queue_consumers()
         if enable_consuming_messages and self.queue_consumers:
             assert self.broker, 'Broker required'
+            assert isinstance(self.broker, AbstractQueueBroker), \
+                f'Broker must be AbstractQueueBroker instance or None instead {broker}'
+
             asyncio.ensure_future(self.bind_consumers(self.queue_consumers))
 
         self.setup()
@@ -66,24 +73,53 @@ class MicroAgent:
 
                 self._loop.call_later(start_after, method)
 
+        self.log.debug('%s initialized', self)
+
     def setup(self):
         pass
+
+    def __repr__(self):
+        return f'<MicroAgent {self.__class__.__name__}>'
 
     def info(self):
         return {
             'name': self.__class__.__name__,
-            'bus': str(self.bus),
+            'bus': str(self.bus) if self.bus else None,
+            'broker': str(self.broker) if self.broker else None,
             'periodic': [
-                {'name': func.origin.__name__, 'period': func.origin._period,
-                 'timeout': func.origin._timeout, 'start_after': func._start_after}
+                {
+                    'name': func.origin.__name__,
+                    'period': getattr(func.origin, '_period', None),
+                    'cron': getattr(func.origin, '_croniter', None),
+                    'timeout': func.origin._timeout,
+                    'start_after': func._start_after,
+                }
                 for func in self._periodic_tasks
             ],
             'receivers': [
-                {'signal': signal, 'receivers': [
-                    {'name': receiver[1].__name__, 'key': receiver[0]}
-                    for receiver in val.receivers
-                ]} for signal, val in self.received_signals.items()
-            ]
+                {
+                    signal_name: {
+                        'signal': val,
+                        'receivers': [
+                            {
+                                'key': f'{key.mod}.{key.name}',
+                                'timeout': receiver.timeout,
+                            }
+                            for key, receiver in val.receivers
+                        ]
+                    }
+                }
+                for signal_name, val in self.received_signals.items()
+            ],
+            'consumers': [
+                {
+                    'ddd': func,
+                    'queue': func.queue,
+                    'timeout': func.timeout,
+                    'options': func.options,
+                }
+                for func in self.queue_consumers
+            ],
         }
 
     def _get_periodic_tasks(self):

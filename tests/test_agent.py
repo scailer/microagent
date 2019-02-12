@@ -3,6 +3,8 @@ import unittest
 import asynctest
 from unittest.mock import Mock
 from microagent import MicroAgent, Signal, Queue, receiver, consumer, periodic, cron
+from microagent.bus import AbstractSignalBus
+from microagent.broker import AbstractQueueBroker
 
 test_signal = Signal(name='test_signal', providing_args=['uuid'])
 else_signal = Signal(name='else_signal', providing_args=['uuid'])
@@ -60,7 +62,7 @@ class TestAgent(asynctest.TestCase):
         self.assertTrue(ma._setup_called)
 
     async def test_init_bus(self):
-        bus = asynctest.MagicMock()
+        bus = asynctest.MagicMock(spec=AbstractSignalBus)
         bus.bind_signal = asynctest.CoroutineMock()
         ma = DummyReceiverMicroAgent(bus=bus)
         self.assertEqual(ma.settings, {})
@@ -82,7 +84,7 @@ class TestAgent(asynctest.TestCase):
         self.assertRaises(AssertionError, DummyReceiverMicroAgent)
 
     async def test_init_queue(self):
-        broker = asynctest.MagicMock()
+        broker = asynctest.MagicMock(spec=AbstractQueueBroker)
         ma = DummyQueueMicroAgent(broker=broker)
         self.assertEqual(ma.settings, {})
         self.assertEqual(ma._periodic_tasks, ())

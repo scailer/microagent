@@ -74,9 +74,10 @@ class AbstractSignalBus(abc.ABC):
         response_signal = Signal(name='response', providing_args=[])
         self.received_signals = {'response': response_signal}
         asyncio.ensure_future(self.bind(response_signal.make_channel_name(prefix)))
+        self.log.debug('%s initialized', self)
 
     def __repr__(self):
-        return '<Bus {} {}>'.format(self.__class__.__name__, self.prefix)
+        return f'<Bus {self.__class__.__name__} {self.dsn} {self.prefix}#{self.uid}>'
 
     def __getattr__(self, name: str) -> 'BoundSignal':
         signal = Signal.get(name)
@@ -93,9 +94,13 @@ class AbstractSignalBus(abc.ABC):
     async def bind_signal(self, signal: Signal):
         if signal.name in self.received_signals:
             self.received_signals[signal.name].receivers.extend(signal.receivers)
+            self.log.info('Bind extra %s to %s: %s', signal, self,
+                ', '.join(f'{k.mod}.{k.name}' for k, r in signal.receivers))
         else:
             self.received_signals[signal.name] = signal
             await self.bind(signal.make_channel_name(self.prefix))
+            self.log.info('Bind new %s to %s: %s', signal, self,
+                ', '.join(f'{k.mod}.{k.name}' for k, r in signal.receivers))
 
     @abc.abstractmethod
     def receiver(self, *args, **kwargs):

@@ -4,7 +4,7 @@ import asyncio
 import unittest
 import asynctest
 from microagent.bus import AbstractSignalBus, ResponseContext
-from microagent.signal import SignalException
+from microagent.signal import SignalException, LookupKey
 from microagent import Signal
 
 
@@ -49,7 +49,10 @@ class TestBus(asynctest.TestCase):
         self.assertIn('Bus', str(self.bus))
 
     async def test_bind(self):
-        test_signal.receivers = [asynctest.CoroutineMock()]
+        test_signal.receivers = [(
+            LookupKey(mod='mod', name='name', id=1),
+            asynctest.CoroutineMock()
+        )]
 
         await self.bus.bind_signal(test_signal)
         self.bus.bind.assert_called_once()
