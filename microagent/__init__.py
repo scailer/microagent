@@ -7,8 +7,8 @@ from .queue import Queue
 from .agent import MicroAgent
 from .periodic_task import periodic, cron
 
-__all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer',
-           'periodic', 'cron', 'load_stuff', 'load_signals', 'load_queues']
+__all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer', 'periodic',
+           'cron', 'load_stuff', 'load_signals', 'load_queues', 'tools']
 
 
 def load_stuff(source: str):
