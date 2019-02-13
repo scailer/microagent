@@ -8,7 +8,7 @@ from .agent import MicroAgent
 from .periodic_task import periodic, cron
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer', 'periodic',
-           'cron', 'load_stuff', 'load_signals', 'load_queues', 'tools']
+           'cron', 'load_stuff', 'load_signals', 'load_queues']
 
 
 def load_stuff(source: str):
