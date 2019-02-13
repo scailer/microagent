@@ -24,7 +24,7 @@ setup(
     ],
 
     extras_require={
-        'pulsar': ['pulsar==1.6.4'],
+        'pulsar': ['pulsar'],
         'aioredis': ['aioredis'],
         'amqp': ['aioamqp==0.12.0'],
     },
