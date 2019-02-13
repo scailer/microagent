@@ -2,7 +2,7 @@ from setuptools import setup
 
 
 setup(
-    packages=['microagent'],
+    packages=['microagent', 'microagent.tools'],
     include_package_data=True,
     install_requires=[
         'ujson',
