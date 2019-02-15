@@ -27,5 +27,6 @@ setup(
         'pulsar': ['pulsar'],
         'aioredis': ['aioredis'],
         'amqp': ['aioamqp==0.12.0'],
+        'mock': ['asynctest'],
     },
 )
