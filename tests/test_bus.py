@@ -39,7 +39,6 @@ class TestBus(asynctest.TestCase):
         self.bus.send = asynctest.CoroutineMock()
         self.bus.receiver = asynctest.CoroutineMock()
 
-
     def test_init(self):
         self.assertEqual(self.bus.dsn, self.dsn)
         self.assertEqual(self.bus.prefix, 'TEST')

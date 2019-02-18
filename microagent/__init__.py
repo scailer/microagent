@@ -1,14 +1,14 @@
 from collections import namedtuple
-from typing import List, Union
+from typing import Union
 import ujson
 
 from .signal import Signal
 from .queue import Queue
-from .agent import MicroAgent
+from .agent import MicroAgent, on
 from .periodic_task import periodic, cron
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer', 'periodic',
-           'cron', 'load_stuff', 'load_signals', 'load_queues']
+           'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
 
 
 def load_stuff(source: str):

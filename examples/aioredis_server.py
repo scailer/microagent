@@ -4,7 +4,7 @@ import sys
 import os
 
 from microagent import MicroAgent, periodic, receiver, consumer, load_stuff
-from microagent.tools.aioredis import AIORedisSignalBus, AIORedisBroker
+from microagent.tools.aioredis import AIORedisSignalBus  # , AIORedisBroker
 from microagent.tools.amqp import AMQPBroker
 
 
@@ -42,15 +42,17 @@ class UserAgent(MicroAgent):
     async def mailer_handler(self, **kwargs):
         self.log.info('E-Mailer %s %s', self, kwargs)
 
+
 async def _main():
     bus = AIORedisSignalBus('redis://localhost/7')
     broker = AMQPBroker('amqp://user:31415@localhost:5672/prod')
-    #broker = AIORedisBroker('redis://localhost/7')
+    # broker = AIORedisBroker('redis://localhost/7')
     print('Broker', broker)
     await broker.mailer.declare()
     await broker.emailer.declare()
     await bus.started.send('user_agent')
-    UserAgent(bus, broker=broker)
+    agent = UserAgent(bus, broker=broker)
+    await agent.start()
 
 
 def main():

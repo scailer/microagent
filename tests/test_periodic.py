@@ -2,8 +2,7 @@ import asyncio
 import unittest
 import asynctest
 import time
-from unittest.mock import Mock
-from microagent.periodic_task import periodic, cron, _wrap, _periodic, _cron
+from microagent.periodic_task import _wrap, _periodic, _cron
 
 
 class TestAgent(asynctest.TestCase):

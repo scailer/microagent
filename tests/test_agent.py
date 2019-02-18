@@ -1,10 +1,8 @@
-import asyncio
 import unittest
 import asynctest
 from unittest.mock import Mock
-from microagent import MicroAgent, Signal, Queue, receiver, consumer, periodic, cron
-from microagent.bus import AbstractSignalBus
-from microagent.broker import AbstractQueueBroker
+from microagent import MicroAgent, Signal, Queue, receiver, consumer, periodic, cron, on
+from microagent.tools.mocks import BusMock, BrokerMock
 
 test_signal = Signal(name='test_signal', providing_args=['uuid'])
 else_signal = Signal(name='else_signal', providing_args=['uuid'])
@@ -22,6 +20,7 @@ class DummyReceiverMicroAgent(MicroAgent):
 
 
 class DummyPeriodMicroAgent(MicroAgent):
+    @on('pre_start')
     def setup(self):
         self._setup_called = True
 
@@ -52,8 +51,9 @@ class TestAgent(asynctest.TestCase):
         ma = MicroAgent(logger=logger)
         self.assertEqual(ma.log, logger)
 
-    def test_init_periodic(self):
+    async def test_init_periodic(self):
         ma = DummyPeriodMicroAgent()
+        await ma.start()
         self.assertEqual(ma.settings, {})
         self.assertEqual(ma.queue_consumers, ())
         self.assertEqual(ma.received_signals, {})
@@ -62,42 +62,43 @@ class TestAgent(asynctest.TestCase):
         self.assertTrue(ma._setup_called)
 
     async def test_init_bus(self):
-        bus = asynctest.MagicMock(spec=AbstractSignalBus)
-        bus.bind_signal = asynctest.CoroutineMock()
+        bus = BusMock()
         ma = DummyReceiverMicroAgent(bus=bus)
         self.assertEqual(ma.settings, {})
         self.assertEqual(ma._periodic_tasks, ())
         self.assertEqual(ma.queue_consumers, ())
         self.assertIn(test_signal.name, ma.received_signals)
         self.assertIn(else_signal.name, ma.received_signals)
-        await asyncio.sleep(.001)
+        await ma.start()
         self.assertEqual(bus.bind_signal.call_count, 2)
         bus.bind_signal.assert_any_call(test_signal)
         bus.bind_signal.assert_any_call(else_signal)
 
     async def test_init_bus_disabled(self):
-        bus = asynctest.MagicMock()
-        ma = DummyReceiverMicroAgent(bus=bus, enable_receiving_signals=False)
+        bus = BusMock()
+        ma = DummyReceiverMicroAgent(bus=bus)
+        await ma.start(enable_receiving_signals=False)
         bus.bind_signal.assert_not_called()
 
     async def test_init_no_bus(self):
         self.assertRaises(AssertionError, DummyReceiverMicroAgent)
 
     async def test_init_queue(self):
-        broker = asynctest.MagicMock(spec=AbstractQueueBroker)
+        broker = BrokerMock()
         ma = DummyQueueMicroAgent(broker=broker)
         self.assertEqual(ma.settings, {})
         self.assertEqual(ma._periodic_tasks, ())
         self.assertEqual(ma.received_signals, {})
         self.assertIn(ma.handler, ma.queue_consumers)
-        await asyncio.sleep(.001)
+        await ma.start()
         broker.bind_consumer.assert_called_once()
         broker.bind_consumer.assert_called_with(ma.handler)
         self.assertEqual(test_queue, ma.handler.queue)
 
     async def test_init_queue_disabled(self):
-        broker = asynctest.MagicMock()
-        ma = DummyQueueMicroAgent(broker=broker, enable_consuming_messages=False)
+        broker = BrokerMock()
+        ma = DummyQueueMicroAgent(broker=broker)
+        await ma.start(enable_consuming_messages=False)
         broker.bind_consumer.assert_not_called()
 
     async def test_init_no_queue(self):

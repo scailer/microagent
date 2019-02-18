@@ -18,9 +18,10 @@ setup(
         'pytest-pudb',
         'asynctest',
         'pytest-cov',
-        'pulsar==1.6.4',
+        'pulsar==2.0.2',
         'aioredis',
-        'aioamqp==0.12.0'
+        'aioamqp==0.12.0',
+        'pytest-flake8'
     ],
 
     extras_require={

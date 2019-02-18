@@ -107,7 +107,7 @@ class AbstractSignalBus(abc.ABC):
         return NotImplemented  # pragma: no cover
 
     async def call(self, channel: str, message: str, await_from: Union[str, List[str]] = None):
-        async with ResponseContext(await_from, self._loop, self.RESPONSE_TIMEOUT) as (signal_id, future):
+        async with ResponseContext(await_from, self._loop, self.RESPONSE_TIMEOUT) as (signal_id, future):  # noqa
             await self.send(f'{channel}#{signal_id}', message)
             return await future
 
@@ -162,7 +162,7 @@ class AbstractSignalBus(abc.ABC):
             sender: str, message: dict):
 
         self.log.debug('Calling %s by %s:%s with %s', receiver.__qualname__,
-                        signal.name, sender, str(message).encode('utf-8'))
+            signal.name, sender, str(message).encode('utf-8'))
 
         try:
             response = receiver(signal=signal, sender=sender, **message)
