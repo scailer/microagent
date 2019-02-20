@@ -4,8 +4,9 @@ from microagent.broker import AbstractQueueBroker
 
 
 class BoundSignalMock:
-    send = asynctest.CoroutineMock()
-    call = asynctest.CoroutineMock()
+    def __init__(self):
+        self.send = asynctest.CoroutineMock()
+        self.call = asynctest.CoroutineMock()
 
 
 class BusMock(asynctest.MagicMock):
@@ -24,9 +25,10 @@ class BusMock(asynctest.MagicMock):
 
 
 class BoundQueueMock:
-    send = asynctest.CoroutineMock()
-    length = asynctest.CoroutineMock()
-    declare = asynctest.CoroutineMock()
+    def __init__(self):
+        self.send = asynctest.CoroutineMock()
+        self.length = asynctest.CoroutineMock()
+        self.declare = asynctest.CoroutineMock()
 
 
 class BrokerMock(asynctest.MagicMock):
