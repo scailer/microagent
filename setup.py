@@ -13,9 +13,7 @@ setup(
     setup_requires=["pytest-runner"],
     tests_require=[
         'pytest',
-        'pytest-pep8',
-        'pudb',
-        'pytest-pudb',
+        'pytest-asyncio',
         'asynctest',
         'pytest-cov',
         'pulsar==2.0.2',
