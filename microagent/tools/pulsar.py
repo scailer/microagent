@@ -3,7 +3,6 @@ import logging
 import unittest
 from typing import Optional
 
-import pulsar
 from pulsar.apps.data import create_store
 from pulsar.apps.data.redis import RedisServer
 
@@ -12,9 +11,9 @@ from ..broker import AbstractQueueBroker
 from .redis import RedisBrokerMixin
 
 try:
-    from pulsar import Setting, Config, Application
+    from pulsar import Setting, Config, Application  # Ver 1.x
 except ImportError:
-    from pulsar.api import Setting, Config, Application
+    from pulsar.api import Setting, Config, Application  # Ver 2.x
 
 
 class MicroAgentSetting(Setting):
@@ -108,6 +107,7 @@ class MicroAgentApp(Application):
 
         worker.agent = self.cfg.agent(
             bus=bus, broker=broker, logger=log, settings=self.cfg.settings)
+        asyncio.ensure_future(worker.agent.start())
 
 
 class AgentTestCase(unittest.TestCase):

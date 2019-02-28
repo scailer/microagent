@@ -2,7 +2,7 @@ from setuptools import setup
 
 
 setup(
-    packages=['microagent'],
+    packages=['microagent', 'microagent.tools'],
     include_package_data=True,
     install_requires=[
         'ujson',
@@ -18,14 +18,16 @@ setup(
         'pytest-pudb',
         'asynctest',
         'pytest-cov',
-        'pulsar==1.6.4',
+        'pulsar==2.0.2',
         'aioredis',
-        'aioamqp==0.12.0'
+        'aioamqp==0.12.0',
+        'pytest-flake8'
     ],
 
     extras_require={
-        'pulsar': ['pulsar==1.6.4'],
+        'pulsar': ['pulsar'],
         'aioredis': ['aioredis'],
         'amqp': ['aioamqp==0.12.0'],
+        'mock': ['asynctest'],
     },
 )

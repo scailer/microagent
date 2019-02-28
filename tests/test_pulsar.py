@@ -1,7 +1,20 @@
-import asyncio
 import unittest
 import asynctest
-from unittest.mock import Mock
+
+
+class AgentMock:
+    def __init__(self, bus=None, broker=None, logger=None, settings=None):
+        self.settings = settings or {}
+        self.broker = broker
+        self.bus = bus
+        self.log = unittest.mock.MagicMock()
+        self.start = asynctest.CoroutineMock()
+        self.inited = True
+
+    def assert_inited(self):
+        if not getattr(self, 'inited', False):
+            raise AssertionError('Agent is not initialized')
+
 
 class TestBusBroker(asynctest.TestCase):
     @asynctest.mock.patch('pulsar.apps.data.create_store')
@@ -50,12 +63,12 @@ class TestApp(asynctest.TestCase):
         from microagent.tools.pulsar import MicroAgentApp, RedisSignalBus
         app = MicroAgentApp()
         worker = asynctest.MagicMock()
-        app.cfg.agent = unittest.mock.MagicMock()
+        app.cfg.agent = AgentMock
         app.worker_start(worker)
-        app.cfg.agent.assert_called()
-        args, kwargs = app.cfg.agent.call_args
-        self.assertIsInstance(kwargs['bus'], RedisSignalBus)
-        self.assertEqual(kwargs['broker'], None)
+        worker.agent.assert_inited()
+        worker.agent.start.assert_called()
+        self.assertIsInstance(worker.agent.bus, RedisSignalBus)
+        self.assertEqual(worker.agent.broker, None)
 
     @asynctest.mock.patch('pulsar.apps.data.create_store')
     async def test_app_no_bus_no_broker(self, *args, **kw):
@@ -64,12 +77,12 @@ class TestApp(asynctest.TestCase):
         app.cfg.settings['signal_bus'] = SignalBus()
         app.cfg.settings['signal_bus'].set('')
         worker = asynctest.MagicMock()
-        app.cfg.agent = unittest.mock.MagicMock()
+        app.cfg.agent = AgentMock
         app.worker_start(worker)
-        app.cfg.agent.assert_called()
-        args, kwargs = app.cfg.agent.call_args
-        self.assertEqual(kwargs['bus'], None)
-        self.assertEqual(kwargs['broker'], None)
+        worker.agent.assert_inited()
+        worker.agent.start.assert_called()
+        self.assertEqual(worker.agent.bus, None)
+        self.assertEqual(worker.agent.broker, None)
 
     @asynctest.mock.patch('pulsar.apps.data.create_store')
     async def test_app_with_redis_broker(self, *args, **kw):
@@ -78,11 +91,11 @@ class TestApp(asynctest.TestCase):
         app.cfg.settings['queue_broker'] = QueueBroker()
         app.cfg.settings['queue_broker'].set('redis://127.0.0.1:6379/7')
         worker = asynctest.MagicMock()
-        app.cfg.agent = unittest.mock.MagicMock()
+        app.cfg.agent = AgentMock
         app.worker_start(worker)
-        app.cfg.agent.assert_called()
-        args, kwargs = app.cfg.agent.call_args
-        self.assertIsInstance(kwargs['broker'], PulsarRedisBroker)
+        worker.agent.assert_inited()
+        worker.agent.start.assert_called()
+        self.assertIsInstance(worker.agent.broker, PulsarRedisBroker)
 
     @asynctest.mock.patch('pulsar.apps.data.create_store')
     async def test_app_with_amqp_broker(self, *args, **kw):
@@ -92,8 +105,8 @@ class TestApp(asynctest.TestCase):
         app.cfg.settings['queue_broker'] = QueueBroker()
         app.cfg.settings['queue_broker'].set('amqp://fake')
         worker = asynctest.MagicMock()
-        app.cfg.agent = unittest.mock.MagicMock()
+        app.cfg.agent = AgentMock
         app.worker_start(worker)
-        app.cfg.agent.assert_called()
-        args, kwargs = app.cfg.agent.call_args
-        self.assertIsInstance(kwargs['broker'], AMQPBroker)
+        worker.agent.assert_inited()
+        worker.agent.start.assert_called()
+        self.assertIsInstance(worker.agent.broker, AMQPBroker)
