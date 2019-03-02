@@ -1,6 +1,6 @@
 from pathlib import Path
 from microagent import (MicroAgent, Signal, Queue, receiver, consumer,  # noqa
-                        periodic, cron, load_stuff, load_signals, load_queues)  # noqa
+    periodic, cron, load_stuff, load_signals, load_queues, __version__)  # noqa
 
 source = 'file://' + str(Path(__file__).parent / 'stuff.json')
 source_url = 'https://gist.githubusercontent.com/scailer/ee0baed54a9444f328c9d0fd4ed84bed/raw/dfae17935813ee6a0ef0d441cbebc19572f8488c/stuff.json'  # noqa
