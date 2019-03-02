@@ -1,4 +1,5 @@
 import pytest
+import asyncio
 import unittest
 from unittest.mock import Mock
 from microagent import MicroAgent, Signal, Queue, receiver, consumer, periodic, cron, on
@@ -39,6 +40,21 @@ class DummyQueueMicroAgent(MicroAgent):
         pass
 
 
+class DummyHookMicroAgent(MicroAgent):
+
+    @periodic(period=60, timeout=60, start_after=0)
+    def periodic_handler(self, **kw):
+        self._handler_called = True
+
+    @on('pre_periodic_handler')
+    def pre_handle(self, *args, **kwargs):
+        self._pre_called = True
+
+    @on('post_periodic_handler')
+    def post_handle(self, *args, **kwargs):
+        self._post_called = True
+
+
 def test_init_empty():
     ma = MicroAgent()
     assert ma.settings == {}
@@ -59,9 +75,27 @@ async def test_init_periodic():
     assert ma.settings == {}
     assert ma.queue_consumers == ()
     assert ma.received_signals == {}
-    assert ma.handler in ma._periodic_tasks
-    assert ma.cron_handler in ma._periodic_tasks
+
+    periodic_tasks = [x.origin.__name__ for x in ma._periodic_tasks]
+    assert ma.handler.__name__ in periodic_tasks
+    assert ma.cron_handler.__name__ in periodic_tasks
     assert ma._setup_called
+
+
+async def test_hooks_ok():
+    ma = DummyHookMicroAgent()
+    await ma.start()
+    await asyncio.sleep(.01)
+
+    assert ma.settings == {}
+    assert ma.queue_consumers == ()
+    assert ma.received_signals == {}
+
+    periodic_tasks = [x.origin.__name__ for x in ma._periodic_tasks]
+    assert ma.periodic_handler.__name__ in periodic_tasks
+    assert ma._handler_called
+    assert ma._pre_called
+    assert ma._post_called
 
 
 async def test_init_bus():
@@ -100,7 +134,9 @@ async def test_init_queue():
     assert ma.settings == {}
     assert ma._periodic_tasks == ()
     assert ma.received_signals == {}
-    assert ma.handler in ma.queue_consumers
+    queue_consumers = [x.__name__ for x in ma.queue_consumers]
+    assert ma.handler.__name__ in queue_consumers
+    assert ma.handler.__name__ in queue_consumers
 
     await ma.start()
 

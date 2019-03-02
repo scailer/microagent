@@ -41,7 +41,7 @@ class ResponseContext:
         return cls._responses.get(signal_id)
 
     @classmethod
-    def set(cls, signal_id, message):
+    def finish(cls, signal_id, message):
         resp = cls.get(signal_id)
 
         if not resp:
@@ -143,7 +143,7 @@ class AbstractSignalBus(abc.ABC):
             loop=self._loop)
 
     def handle_response(self, signal_id: str, message: str):
-        ResponseContext.set(signal_id, message)
+        ResponseContext.finish(signal_id, message)
 
     async def handle_signal(self, signal: Signal, sender: str,
             signal_id: str, message: dict):

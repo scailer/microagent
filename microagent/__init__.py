@@ -1,3 +1,6 @@
+'''
+Docs
+'''
 __version__ = '0.6'
 
 from collections import namedtuple

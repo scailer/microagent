@@ -1,7 +1,29 @@
+'''
+
+.. code-block:: python
+
+    class Agent(MicroAgent):
+
+        @on('pre_start')
+        async def setup(self):
+            pass
+
+        @periodic(period=5)
+        async def periodic_handler(self):
+            pass
+
+        @receiver(signals.send_mail)
+        async def send_mail_handler(self, **kwargs):
+            pass
+
+        @consumer(queues.mailer)
+        async def mail_handler(self, **kwargs):
+            pass
+'''
 import asyncio
 import logging
 import inspect
-from functools import partial
+from functools import partial, wraps
 from collections import defaultdict
 from typing import Optional, Iterable
 from inspect import getmembers, ismethod
@@ -26,7 +48,43 @@ def on(*hooks: str):
     return _decorator
 
 
+def hook_decorator(hook):
+    def decorator(method):
+        if not any([
+            f'on_pre_{method.__name__}' in hook.bindings,
+            f'on_error_{method.__name__}' in hook.bindings,
+            f'on_post_{method.__name__}' in hook.bindings
+        ]):
+            return method
+
+        @wraps(method)
+        async def wrapper(*args, **kwargs):
+            if f'on_pre_{method.__name__}' in hook.bindings:
+                await hook.call_hook(f'on_pre_{method.__name__}', *args, **kwargs)
+
+            try:
+                response = method(*args, **kwargs)
+
+                if inspect.isawaitable(response):
+                    response = await response
+
+            except Exception as exc:
+                if f'on_error_{method.__name__}' in hook.bindings:
+                    await hook.call_hook(f'on_error_{method.__name__}', exc, *args, **kwargs)
+                raise
+
+            if f'on_post_{method.__name__}' in hook.bindings:
+                await hook.call_hook(f'on_post_{method.__name__}', response, *args, **kwargs)
+
+            return response
+        return wrapper
+    return decorator
+
+
 class Hooks:
+    '''
+        pre|error|post:method
+    '''
     def __init__(self, agent):
         binded_methods = defaultdict(list)
 
@@ -37,7 +95,15 @@ class Hooks:
 
         self._bindings = dict(binded_methods)
 
-    async def _call_hook(self, name, *args, **kwargs):
+    @property
+    def bindings(self):
+        return self._bindings
+
+    @property
+    def decorate(self):
+        return hook_decorator(self)
+
+    async def call_hook(self, name, *args, **kwargs):
         methods = self._bindings.get(name)
         if methods:
             for method in methods:
@@ -47,7 +113,7 @@ class Hooks:
 
     def __getattr__(self, name: str):
         if name.startswith('on_'):
-            return partial(self._call_hook, name)
+            return partial(self.call_hook, name)
 
         return getattr(super(), name)
 
@@ -60,6 +126,40 @@ class MicroAgent:
         - rpc
         - periodic
         - queue
+
+        :param bus: signal bus object of subclass :class:`AbstractSignalBus`,
+            required if `receiver` used
+        :param broker:  queue broker object of subclass :class:`AbstractQueueBroker`,
+            required if `consumer` used
+        :param logger: prepared :class:`logging.Logger`,
+            setup default logger if not provided
+        :param settings: dict of user settings storing in object
+
+        .. attribute:: log
+
+            Prepared python logger::
+
+                self.log.info('Hellow world')
+
+        .. attribute:: bus
+
+            Signal bus, provided on initializing::
+
+                await self.bus.send_mail.send('agent', user_id=1)
+
+        .. attribute:: broker
+
+            Queue broker, provided on initializing::
+
+                await self.broker.mailer.send({'text': 'Hellow world'})
+
+        .. attribute:: settings
+
+            Dict, user settings, provided on initializing, or empty.
+
+        .. attribute:: _loop
+
+            Event loop
     '''
     log = logging.getLogger('microagent')
 
@@ -100,6 +200,14 @@ class MicroAgent:
             enable_periodic_tasks: Optional[bool] = True,
             enable_receiving_signals: Optional[bool] = True,
             enable_consuming_messages: Optional[bool] = True):
+        '''
+            Starting MicroAgent to receive signals, consume messages
+            and initiate periodic running.
+
+            :param enable_periodic_tasks: default enabled
+            :param enable_consuming_messages: default enabled
+            :param enable_receiving_signals: default enabled
+        '''
 
         await self.hook.on_pre_start()
 
@@ -124,12 +232,16 @@ class MicroAgent:
             else:
                 self.log.debug('Set periodic task %s after %d sec', method, start_after)
 
+            print(f'PRD {method} {start_after}')
             self._loop.call_later(start_after, method)
 
     def __repr__(self):
         return f'<MicroAgent {self.__class__.__name__}>'
 
     def info(self):
+        '''
+            Information about MicroAgent in json-serializable dict
+        '''
         return {
             'name': self.__class__.__name__,
             'bus': str(self.bus) if self.bus else None,
@@ -179,7 +291,7 @@ class MicroAgent:
 
     def _get_queue_consumers(self):
         return tuple(
-            method
+            self.hook.decorate(method)
             for name, method in getmembers(self, ismethod)
             if hasattr(method, '__consumer__')
         )
@@ -196,7 +308,7 @@ class MicroAgent:
                     funcname = lookup_key.name.replace(name, '')[1:]
                     func = getattr(self, funcname, None)
                     if func:
-                        receivers.append((lookup_key, func))
+                        receivers.append((lookup_key, hook_decorator(self.hook)(func)))
 
             if receivers:
                 signal = copy(signal)
@@ -208,9 +320,9 @@ class MicroAgent:
     async def bind_receivers(self, signals: Iterable[Signal]):
         ''' Bind signal receivers to bus subscribers '''
         for signal in signals:
-            print('SIGNAL', signal, self.bus.bind_signal)
             await self.bus.bind_signal(signal)
 
     async def bind_consumers(self, consumers: Iterable):
+        ''' Bind message consumers to queues '''
         for consumer in consumers:
             await self.broker.bind_consumer(consumer)
