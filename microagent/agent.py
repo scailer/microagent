@@ -59,8 +59,10 @@ def hook_decorator(hook):
 
         @wraps(method)
         async def wrapper(*args, **kwargs):
+            context = {'args': args, 'kwargs': kwargs}
+
             if f'on_pre_{method.__name__}' in hook.bindings:
-                await hook.call_hook(f'on_pre_{method.__name__}', *args, **kwargs)
+                await hook.call_hook(f'on_pre_{method.__name__}', context=context)
 
             try:
                 response = method(*args, **kwargs)
@@ -70,11 +72,11 @@ def hook_decorator(hook):
 
             except Exception as exc:
                 if f'on_error_{method.__name__}' in hook.bindings:
-                    await hook.call_hook(f'on_error_{method.__name__}', exc, *args, **kwargs)
+                    await hook.call_hook(f'on_error_{method.__name__}', exc, context=context)
                 raise
 
             if f'on_post_{method.__name__}' in hook.bindings:
-                await hook.call_hook(f'on_post_{method.__name__}', response, *args, **kwargs)
+                await hook.call_hook(f'on_post_{method.__name__}', response, context=context)
 
             return response
         return wrapper
