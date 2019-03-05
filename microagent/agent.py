@@ -234,7 +234,6 @@ class MicroAgent:
             else:
                 self.log.debug('Set periodic task %s after %d sec', method, start_after)
 
-            print(f'PRD {method} {start_after}')
             self._loop.call_later(start_after, method)
 
     def __repr__(self):

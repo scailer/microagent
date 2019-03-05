@@ -26,7 +26,6 @@ class UserAgent(MicroAgent):
         self.log.info('Run periodic task')
         await self.bus.user_comment.send('user_agent', user_id=1)
         await self.broker.mailer.send({'data': 'asdasd', 'id': 1, 'f': 123})
-        print(await self.broker.emailer.length())
 
     @receiver(signals.user_created)
     async def created_handler(self, **kwargs):
@@ -47,7 +46,7 @@ async def _main():
     bus = AIORedisSignalBus('redis://localhost/7')
     broker = AMQPBroker('amqp://user:31415@localhost:5672/prod')
     # broker = AIORedisBroker('redis://localhost/7')
-    print('Broker', broker)
+    # print('Broker', broker)
     await broker.mailer.declare()
     await broker.emailer.declare()
     await bus.started.send('user_agent')
