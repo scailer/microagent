@@ -13,6 +13,31 @@ from ..broker import AbstractQueueBroker
 MessageMeta = namedtuple('MessageMeta', ['queue', 'channel', 'envelope', 'properties'])
 
 
+class ChannelContext:
+    def __init__(self, broker, once=False):
+        self.broker = broker
+        self.once = once
+
+    async def __aenter__(self):
+        try:
+            channel_id = self.broker._reuse_channel_ids.pop()
+            self.channel = self.broker.channels[channel_id]
+
+        except KeyError:
+            self.channel = await self.broker.get_channel()
+
+        return self.channel
+
+    async def __aexit__(self, type, value, traceback):
+        if self.once:
+            await self.channel.close()
+
+        else:
+            self.broker._reuse_channel_ids.add(self.channel.channel_id)
+
+        return True
+
+
 class AMQPBroker(AbstractQueueBroker):
     REBIND_ATTEMPTS = 3
 
@@ -20,11 +45,19 @@ class AMQPBroker(AbstractQueueBroker):
         super().__init__(dsn, logger)
         self.protocol = None
         self._bind_attempts = defaultdict(lambda: 1)
+        self._reuse_channel_ids = set()
+
+    @property
+    def channels(self):
+        if self.protocol:
+            return self.protocol.channels
+        else:
+            return {}
 
     async def send(self, name: str, message: str, **kwargs):
         kwargs['exchange_name'] = kwargs.get('exchange_name', '')
-        channel = await self.get_channel()
-        await channel.basic_publish(message, routing_key=name, **kwargs)
+        async with ChannelContext(self) as channel:
+            await channel.basic_publish(message, routing_key=name, **kwargs)
 
     def _on_amqp_error(self, name, exception):
         self.log.warning('Catch AMPQ exception %s on queue "%s"', exception, name)
@@ -80,6 +113,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     async def get_channel(self):
         if not self.protocol:
+            self._reuse_channel_ids = set()
             _, self.protocol = await aioamqp.from_url(self.dsn)
 
         try:
@@ -120,12 +154,12 @@ class AMQPBroker(AbstractQueueBroker):
         return _wrapper
 
     async def declare_queue(self, name, **options):
-        channel = await self.get_channel()
-        info = await channel.queue_declare(name, **options)
-        self.log.info('Declare/get queue "%(queue)s" with %(message_count)s '
-                      'messages, %(consumer_count)s consumers', info)
+        async with ChannelContext(self, once=True) as channel:
+            info = await channel.queue_declare(name, **options)
+            self.log.info('Declare/get queue "%(queue)s" with %(message_count)s '
+                'messages, %(consumer_count)s consumers', info)
 
     async def queue_length(self, name):
-        channel = await self.get_channel()
-        info = await channel.queue_declare(name)
-        return int(info['message_count'])
+        async with ChannelContext(self) as channel:
+            info = await channel.queue_declare(name)
+            return int(info['message_count'])
