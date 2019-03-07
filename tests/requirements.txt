@@ -1,5 +1,0 @@
-ujson
-pulsar==1.6.4
-aioredis
-requests
-pytest

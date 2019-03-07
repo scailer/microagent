@@ -1,3 +1,5 @@
+__version__ = '0.6'
+
 from collections import namedtuple
 from typing import Union
 import ujson

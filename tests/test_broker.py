@@ -1,6 +1,9 @@
+import pytest
 import asynctest
 from microagent.broker import AbstractQueueBroker
 from microagent import Queue
+
+DSN = 'redis://localhost'
 
 
 class Broker(AbstractQueueBroker):
@@ -17,37 +20,42 @@ class Broker(AbstractQueueBroker):
         pass
 
 
-class TestBus(asynctest.TestCase):
-    def setUp(self):
-        self.dsn = 'redis://localhost'
-        self.broker = Broker(dsn=self.dsn)
-        self.broker.bind = asynctest.CoroutineMock()
-        self.broker.send = asynctest.CoroutineMock()
-        self.broker.declare_queue = asynctest.CoroutineMock()
-        self.broker.queue_length = asynctest.CoroutineMock()
+@pytest.fixture
+def broker():
+    broker = Broker(dsn=DSN)
+    broker.bind = asynctest.CoroutineMock()
+    broker.send = asynctest.CoroutineMock()
+    broker.declare_queue = asynctest.CoroutineMock()
+    broker.queue_length = asynctest.CoroutineMock()
+    return broker
 
-    def test_init(self):
-        self.assertEqual(self.broker.dsn, self.dsn)
-        self.assertIn('Broker', str(self.broker))
 
-    async def test_bind(self):
-        test_queue = Queue(name='test_signal')
-        consumer = asynctest.CoroutineMock(queue=test_queue)
-        await self.broker.bind_consumer(consumer)
-        self.broker.bind.assert_called_once()
-        self.broker.bind.assert_called_with(test_queue.name, consumer)
+def test_init(broker):
+    assert broker.dsn == DSN
+    assert 'Broker' in str(broker)
 
-    async def test_send(self):
-        await self.broker.test_queue.send({'uid': 1})
-        self.broker.send.assert_called_once()
-        self.broker.send.assert_called_with('test_queue', '{"uid":1}')
 
-    async def test_declare(self):
-        await self.broker.test_queue.declare()
-        self.broker.declare_queue.assert_called_once()
-        self.broker.declare_queue.assert_called_with('test_queue')
+async def test_bind(broker):
+    test_queue = Queue(name='test_signal')
+    consumer = asynctest.CoroutineMock(queue=test_queue)
+    await broker.bind_consumer(consumer)
+    broker.bind.assert_called_once()
+    broker.bind.assert_called_with(test_queue.name, consumer)
 
-    async def test_length(self):
-        await self.broker.test_queue.length()
-        self.broker.queue_length.assert_called_once()
-        self.broker.queue_length.assert_called_with('test_queue')
+
+async def test_send(broker):
+    await broker.test_queue.send({'uid': 1})
+    broker.send.assert_called_once()
+    broker.send.assert_called_with('test_queue', '{"uid":1}')
+
+
+async def test_declare(broker):
+    await broker.test_queue.declare()
+    broker.declare_queue.assert_called_once()
+    broker.declare_queue.assert_called_with('test_queue')
+
+
+async def test_length(broker):
+    await broker.test_queue.length()
+    broker.queue_length.assert_called_once()
+    broker.queue_length.assert_called_with('test_queue')
