@@ -79,7 +79,7 @@ async def test_send(bus):
 
 async def test_call(bus, event_loop):
     event_loop.call_later(
-        0.005, lambda: [ResponseContext.set(uid, 42) for uid in ResponseContext._responses])
+        0.005, lambda: [ResponseContext.finish(uid, 42) for uid in ResponseContext._responses])
     ret = await bus.test_signal.call(sender='test', uuid=1)
     assert ret == 42
 

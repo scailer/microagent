@@ -109,6 +109,9 @@ class MicroAgentApp(Application):
             bus=bus, broker=broker, logger=log, settings=self.cfg.settings)
         asyncio.ensure_future(worker.agent.start())
 
+    def worker_stopping(self, worker, exc=None):
+        asyncio.ensure_future(worker.agent.stop())
+
 
 class AgentTestCase(unittest.TestCase):
     CHANNEL_PREFIX = 'TEST'
