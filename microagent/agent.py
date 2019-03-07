@@ -138,6 +138,9 @@ class MicroAgent:
 
         await self.hook.on_post_start()
 
+    async def stop(self):
+        await self.hook.on_pre_stop()
+
     def run_periodic_tasks(self, periodic_tasks):
         for method in periodic_tasks:
             start_after = getattr(method, '_start_after', 0) or 0

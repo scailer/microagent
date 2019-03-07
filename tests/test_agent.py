@@ -160,3 +160,8 @@ async def test_init_no_queue():
 def test_info():
     ma = MicroAgent(Mock())
     assert ma.info()
+
+
+async def test_stop():
+    ma = MicroAgent(Mock())
+    await ma.stop()
