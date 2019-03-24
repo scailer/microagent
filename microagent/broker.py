@@ -17,9 +17,6 @@ class BoundQueue:
     async def send(self, message, **options):
         await self.broker.send(self.queue.name, self.queue.serialize(message), **options)
 
-    async def declare(self, **options):
-        await self.broker.declare_queue(self.queue.name, **options)
-
     async def length(self):
         return await self.broker.queue_length(self.queue.name)
 
@@ -45,10 +42,6 @@ class AbstractQueueBroker(abc.ABC):
 
     def bind_consumer(self, consumer):
         return self.bind(consumer.queue.name, consumer)
-
-    @abc.abstractmethod
-    def declare_queue(self, name, **options):
-        return NotImplemented  # pragma: no cover
 
     @abc.abstractmethod
     def queue_length(self, name, **options):

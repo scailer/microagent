@@ -13,9 +13,6 @@ class Broker(AbstractQueueBroker):
     async def bind(self, channel: str):
         pass
 
-    async def declare_queue(self, name):
-        pass
-
     async def queue_length(self, name):
         pass
 
@@ -25,7 +22,6 @@ def broker():
     broker = Broker(dsn=DSN)
     broker.bind = asynctest.CoroutineMock()
     broker.send = asynctest.CoroutineMock()
-    broker.declare_queue = asynctest.CoroutineMock()
     broker.queue_length = asynctest.CoroutineMock()
     return broker
 
@@ -47,12 +43,6 @@ async def test_send(broker):
     await broker.test_queue.send({'uid': 1})
     broker.send.assert_called_once()
     broker.send.assert_called_with('test_queue', '{"uid":1}')
-
-
-async def test_declare(broker):
-    await broker.test_queue.declare()
-    broker.declare_queue.assert_called_once()
-    broker.declare_queue.assert_called_with('test_queue')
 
 
 async def test_length(broker):
