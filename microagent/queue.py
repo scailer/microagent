@@ -1,10 +1,6 @@
 import ujson
 
 
-def load_queues():
-    pass
-
-
 class Queue:
     _queues: dict = {}
 

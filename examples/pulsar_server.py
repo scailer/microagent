@@ -5,7 +5,7 @@ import sys
 import os
 from collections import defaultdict
 
-from microagent import MicroAgent, receiver, load_stuff, on, periodic
+from microagent import MicroAgent, receiver, load_stuff, on, periodic, consumer
 from microagent.tools.pulsar import MicroAgentApp
 
 
@@ -52,6 +52,10 @@ class CommentAgent(MicroAgent):
             await self.broker.emailer.send({'data': 'spam', 'counter': self.counter})
             self.log.info('QTY %s', self.counter)
         asyncio.ensure_future(asyncio.gather(*reqs, loop=self._loop))
+
+    @consumer(queues.emailer)
+    async def catch_email(self, **kwargs):
+        self.log.info('Catch emailer %s', kwargs)
 
     @receiver(signals.user_comment)
     async def comment_handler(self, user_id, **kwargs):

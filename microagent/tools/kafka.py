@@ -63,8 +63,5 @@ class KafkaBroker(AbstractQueueBroker):
                 self.log.fatal('TimeoutError: %s %.2f', handler.__qualname__,
                     datetime.now().timestamp() - timer)
 
-    async def declare_queue(self, name, **options):
-        pass
-
     async def queue_length(self, name, **options):
-        pass
+        pass  # TODO: get queue length

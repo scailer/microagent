@@ -47,8 +47,6 @@ async def _main():
     broker = AMQPBroker('amqp://user:31415@localhost:5672/prod')
     # broker = AIORedisBroker('redis://localhost/7')
     # print('Broker', broker)
-    await broker.mailer.declare()
-    await broker.emailer.declare()
     await bus.started.send('user_agent')
     agent = UserAgent(bus, broker=broker)
     await agent.start()
