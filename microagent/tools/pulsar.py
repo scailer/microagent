@@ -79,9 +79,6 @@ class PulsarRedisBroker(RedisBrokerMixin, AbstractQueueBroker):
     async def queue_length(self, name: str):
         return int(await self.transport.llen(name))
 
-    async def declare_queue(self, name: str):
-        pass
-
 
 class MicroAgentApp(Application):
     cfg = Config(apps=['microagent'])
@@ -90,6 +87,7 @@ class MicroAgentApp(Application):
         log = self.cfg.configured_logger()
 
         signal_bus_dsn = self.cfg.settings['signal_bus'].value
+
         if signal_bus_dsn.startswith('redis'):
             signal_prefix = self.cfg.settings['signal_prefix'].value
             bus = RedisSignalBus(signal_bus_dsn, prefix=signal_prefix, logger=log)
@@ -97,17 +95,27 @@ class MicroAgentApp(Application):
             bus = None
 
         queue_broker_dsn = self.cfg.settings.get('queue_broker').value
+
         if queue_broker_dsn.startswith('amqp'):
             from .amqp import AMQPBroker
             broker = AMQPBroker(queue_broker_dsn)
+
+        elif queue_broker_dsn.startswith('kafka'):
+            from .kafka import KafkaBroker
+            broker = KafkaBroker(queue_broker_dsn)
+
         elif queue_broker_dsn.startswith('redis'):
             broker = PulsarRedisBroker(queue_broker_dsn)
+
         else:
             broker = None
 
         worker.agent = self.cfg.agent(
             bus=bus, broker=broker, logger=log, settings=self.cfg.settings)
         asyncio.ensure_future(worker.agent.start())
+
+    def worker_stopping(self, worker, exc=None):
+        asyncio.ensure_future(worker.agent.stop())
 
 
 class AgentTestCase(unittest.TestCase):

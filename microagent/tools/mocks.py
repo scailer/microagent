@@ -16,6 +16,7 @@ class BusMock(asynctest.MagicMock):
         self.bind_signal = asynctest.CoroutineMock()
         self.send = asynctest.CoroutineMock()
         self.call = asynctest.CoroutineMock()
+        self.__str__ = lambda x: self.__class__.__name__
 
     def __getattr__(self, name):
         if name.startswith('_') or name in ('bind_signal', 'send', 'call'):
@@ -37,6 +38,7 @@ class BrokerMock(asynctest.MagicMock):
         self._stuff = {}
         self.bind_consumer = asynctest.CoroutineMock()
         self.send = asynctest.CoroutineMock()
+        self.__str__ = lambda x: self.__class__.__name__
 
     def __getattr__(self, name):
         if name.startswith('_') or name in ('bind_consumer', 'send'):

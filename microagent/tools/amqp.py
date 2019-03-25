@@ -28,7 +28,7 @@ class ChannelContext:
 
         return self.channel
 
-    async def __aexit__(self, type, value, traceback):
+    async def __aexit__(self, exc_type, exc, traceback):
         if self.once:
             await self.channel.close()
 

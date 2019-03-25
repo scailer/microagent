@@ -44,6 +44,3 @@ class AIORedisBroker(RedisBrokerMixin, AbstractQueueBroker):
         if not self.transport:
             self.transport = await self.new_connection()
         return int(await self.transport.llen(name))
-
-    async def declare_queue(self, name: str):
-        pass

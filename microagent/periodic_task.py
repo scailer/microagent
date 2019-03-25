@@ -1,3 +1,17 @@
+''' :class:`MicroAgent` method can be runing periodicaly by time period or shedule (cron)
+
+.. code-block:: python
+
+    class Agent(MicroAgent):
+
+        @periodic(period=3, timeout=10, start_after=2)  # in seconds
+        async def periodic_handler(self):
+            pass  # code here
+
+        @cron('*/10 * * * *', timeout=10)  # in seconds
+        async def cron_handler(self):
+            pass  # code here
+'''
 import time
 import asyncio
 import inspect
@@ -34,14 +48,11 @@ def _periodic(self, func):
 def periodic(period: Union[int, float], timeout: Optional[Union[int, float]] = 1,
         start_after: Union[int, float] = None):
     '''
-        Decorator for periodical task for Agent object
+        Decorator witch mark :class:`MicroAgent` method as periodic function
 
-        def setup(self, cfg):
-            self._loop.call_later(1, self.periodic_handler)  # initialize cycle
-
-        @periodic(period=3, timeout=10)  # in seconds
-        async def periodic_handler(self, **kwargs):
-            print('PCALL')
+        :param period: Period of running functions in seconds
+        :param timeout: Function timeout in seconds
+        :param start_after: Delay for running loop in seconds
     '''
 
     assert period > 0.001, 'period must be more than 0.001 s'
@@ -56,7 +67,7 @@ def periodic(period: Union[int, float], timeout: Optional[Union[int, float]] = 1
 
         @functools.wraps(func)
         def _call(self):
-            asyncio.ensure_future(_periodic(self, func), loop=self._loop)
+            asyncio.ensure_future(_periodic(self, self.hook.decorate(func)), loop=self._loop)
 
         _call.origin = func
         _call._start_after = start_after
@@ -76,7 +87,10 @@ def _cron(self, func):
 
 def cron(spec: str, timeout: Optional[Union[int, float]] = 1):
     '''
-        Decorator for scheduling tasks
+        Decorator witch mark :class:`MicroAgent` method as shceduling (cron) function
+
+        :param spec: Specified running shceduling in cron format
+        :param timeout: Function timeout in seconds
     '''
 
     assert timeout > 0.001, 'timeout must be more than 0.001 s'
@@ -88,7 +102,7 @@ def cron(spec: str, timeout: Optional[Union[int, float]] = 1):
 
         @functools.wraps(func)
         def _call(self):
-            asyncio.ensure_future(_cron(self, func), loop=self._loop)
+            asyncio.ensure_future(_cron(self, self.hook.decorate(func)), loop=self._loop)
 
         _call.origin = func
         _call._start_after = func._croniter.get_next(float) - time.time()
