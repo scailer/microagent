@@ -55,6 +55,17 @@ class ResponseContext:
             resp.fut.set_result(resp.response)
 
 
+def response_context_factory():
+    '''
+        Make isolated response context
+    '''
+
+    class BoundResponseContext(ResponseContext):
+        _responses: dict = {}
+
+    return BoundResponseContext
+
+
 class AbstractSignalBus(abc.ABC):
     '''
         Signal bus
@@ -75,6 +86,9 @@ class AbstractSignalBus(abc.ABC):
         self.received_signals = {'response': response_signal}
         asyncio.ensure_future(self.bind(response_signal.make_channel_name(prefix)))
         self.log.debug('%s initialized', self)
+
+        # isolate responses context for preventing rase of handlers
+        self.response_context = response_context_factory()
 
     def __repr__(self):
         return f'<Bus {self.__class__.__name__} {self.dsn} {self.prefix}#{self.uid}>'
@@ -107,7 +121,7 @@ class AbstractSignalBus(abc.ABC):
         return NotImplemented  # pragma: no cover
 
     async def call(self, channel: str, message: str, await_from: Union[str, List[str]] = None):
-        async with ResponseContext(await_from, self._loop, self.RESPONSE_TIMEOUT) as (signal_id, future):  # noqa
+        async with self.response_context(await_from, self._loop, self.RESPONSE_TIMEOUT) as (signal_id, future):  # noqa
             await self.send(f'{channel}#{signal_id}', message)
             return await future
 
@@ -143,7 +157,10 @@ class AbstractSignalBus(abc.ABC):
             loop=self._loop)
 
     def handle_response(self, signal_id: str, message: str):
-        ResponseContext.finish(signal_id, message)
+        try:
+            self.response_context.finish(signal_id, message)
+        except asyncio.base_futures.InvalidStateError as exc:
+            self.log.error('Response handle failed: %s', exc, exc_info=True)
 
     async def handle_signal(self, signal: Signal, sender: str,
             signal_id: str, message: dict):
