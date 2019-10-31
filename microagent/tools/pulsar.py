@@ -94,8 +94,7 @@ class MicroAgentApp(Application):
 
         elif signal_bus_dsn.startswith('aioredis'):
             from .aioredis import AIORedisSignalBus
-            bus = AIORedisSignalBus(signal_bus_dsn.replace('aio', '', 1),
-                prefix=signal_prefix, logger=log)
+            bus = AIORedisSignalBus(signal_bus_dsn[3:], prefix=signal_prefix, logger=log)
 
         else:
             bus = None
