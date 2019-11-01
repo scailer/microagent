@@ -87,10 +87,15 @@ class MicroAgentApp(Application):
         log = self.cfg.configured_logger()
 
         signal_bus_dsn = self.cfg.settings['signal_bus'].value
+        signal_prefix = self.cfg.settings['signal_prefix'].value
 
         if signal_bus_dsn.startswith('redis'):
-            signal_prefix = self.cfg.settings['signal_prefix'].value
             bus = RedisSignalBus(signal_bus_dsn, prefix=signal_prefix, logger=log)
+
+        elif signal_bus_dsn.startswith('aioredis'):
+            from .aioredis import AIORedisSignalBus
+            bus = AIORedisSignalBus(signal_bus_dsn[3:], prefix=signal_prefix, logger=log)
+
         else:
             bus = None
 
