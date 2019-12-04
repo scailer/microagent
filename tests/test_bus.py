@@ -4,7 +4,7 @@ import asyncio
 import unittest
 import asynctest
 import pytest
-from microagent.bus import AbstractSignalBus, ResponseContext
+from microagent.bus import AbstractSignalBus
 from microagent.signal import SignalException, LookupKey
 from microagent import Signal
 
@@ -78,9 +78,14 @@ async def test_send(bus):
 
 
 async def test_call(bus, event_loop):
-    event_loop.call_later(
-        0.005, lambda: [ResponseContext.finish(uid, 42) for uid in ResponseContext._responses])
+    def finish():
+        for uid in bus.response_context._responses:
+            bus.response_context.finish(uid, 42)
+
+    event_loop.call_later(0.01, finish)
+
     ret = await bus.test_signal.call(sender='test', uuid=1)
+
     assert ret == 42
 
 

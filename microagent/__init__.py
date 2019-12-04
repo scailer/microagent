@@ -1,7 +1,7 @@
 '''
 Docs
 '''
-__version__ = '0.8'
+__version__ = '0.9'
 
 from collections import namedtuple
 from typing import Union

@@ -121,6 +121,7 @@ class AbstractSignalBus(abc.ABC):
         return NotImplemented  # pragma: no cover
 
     async def call(self, channel: str, message: str, await_from: Union[str, List[str]] = None):
+
         async with self.response_context(await_from, self._loop, self.RESPONSE_TIMEOUT) as (signal_id, future):  # noqa
             await self.send(f'{channel}#{signal_id}', message)
             return await future

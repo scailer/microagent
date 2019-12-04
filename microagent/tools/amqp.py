@@ -130,7 +130,7 @@ class AMQPBroker(AbstractQueueBroker):
                 envelope=envelope, properties=properties)
 
             self.log.debug('Calling %s by %s with %s', handler.__qualname__,
-                handler.queue.name, data)
+                handler.queue.name, str(data).encode('utf-8'))
 
             try:
                 response = handler(**data)
