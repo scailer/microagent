@@ -13,6 +13,7 @@ class AIORedisSignalBus(AbstractSignalBus):
         self.mpsc = aioredis.pubsub.Receiver(loop=self._loop)
         self.transport = None
         self.pubsub = None
+        self._pubsub_lock = asyncio.Lock()
         asyncio.ensure_future(self.receiver(self.mpsc))
 
     async def send(self, channel, message):
@@ -21,9 +22,10 @@ class AIORedisSignalBus(AbstractSignalBus):
         await self.transport.publish(channel, message)
 
     async def bind(self, channel):
-        if not self.pubsub:
-            self.pubsub = await aioredis.create_redis(self.dsn)
-        await self.pubsub.psubscribe(self.mpsc.pattern(channel))
+        async with self._pubsub_lock:
+            if not self.pubsub:
+                self.pubsub = await aioredis.create_redis(self.dsn)
+            await self.pubsub.psubscribe(self.mpsc.pattern(channel))
 
     async def receiver(self, mpsc):
         async for chl, msg in mpsc.iter():
