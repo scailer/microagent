@@ -93,3 +93,18 @@ def consumer(queue: Queue, timeout: int = 60, **options):
         return func
 
     return _decorator
+
+
+def server(**options):
+    '''
+        Decorator marking handler as subserver runner.
+        Will run in start() method, and make it runnig forever for transperent
+        error passing.
+    '''
+
+    def _decorator(func):
+        func.options = options
+        func.__server__ = True
+        return func
+
+    return _decorator

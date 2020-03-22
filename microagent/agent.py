@@ -42,6 +42,7 @@ class MicroAgent:
         - rpc
         - periodic
         - queue
+        - server
 
         :param bus: signal bus object of subclass :class:`AbstractSignalBus`,
             required if `receiver` used
@@ -109,13 +110,16 @@ class MicroAgent:
             assert isinstance(self.broker, AbstractQueueBroker), \
                 f'Broker must be AbstractQueueBroker instance or None instead {broker}'
 
+        self._servers = self._get_servers()
+
         self.log.debug('%s initialized', self)
 
     async def start(
             self,
             enable_periodic_tasks: Optional[bool] = True,
             enable_receiving_signals: Optional[bool] = True,
-            enable_consuming_messages: Optional[bool] = True):
+            enable_consuming_messages: Optional[bool] = True,
+            enable_servers_running: Optional[bool] = True):
         '''
             Starting MicroAgent to receive signals, consume messages
             and initiate periodic running.
@@ -138,8 +142,14 @@ class MicroAgent:
 
         await self.hook.on_post_start()
 
+        if enable_servers_running:
+            await self.run_servers(self._servers)
+
     async def stop(self):
         await self.hook.on_pre_stop()
+
+    async def run_servers(self, servers):
+        return await asyncio.gather(*[func(**func.options) for func in self._servers])
 
     def run_periodic_tasks(self, periodic_tasks):
         for method in periodic_tasks:
@@ -212,6 +222,13 @@ class MicroAgent:
             self.hook.decorate(method)
             for name, method in getmembers(self, ismethod)
             if hasattr(method, '__consumer__')
+        )
+
+    def _get_servers(self):
+        return tuple(
+            method
+            for name, method in getmembers(self, ismethod)
+            if hasattr(method, '__server__')
         )
 
     def _get_received_signals(self):
