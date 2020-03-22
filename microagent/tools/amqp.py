@@ -1,14 +1,18 @@
 import logging
 import asyncio
-import ssl
 
 from collections import namedtuple, defaultdict
 from functools import partial
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 
 import aioamqp
 from ..broker import AbstractQueueBroker
+
+try:
+    from ssl import SSLContext
+except ImportError:  # pragma: no cover
+    SSLContext = Any  # type: ignore
 
 
 MessageMeta = namedtuple('MessageMeta', ['queue', 'channel', 'envelope', 'properties'])
@@ -30,19 +34,14 @@ class ChannelContext:
 class AMQPBroker(AbstractQueueBroker):
     REBIND_ATTEMPTS = 3
 
-    def __init__(self, dsn: str, ssl_cert: str = None,
+    def __init__(self, dsn: str, ssl_context: Optional[SSLContext] = None,
             logger: Optional[logging.Logger] = None):
 
         super().__init__(dsn, logger)
 
-        self.ssl = None
         self.protocol = None
         self._bind_attempts = defaultdict(lambda: 1)
-
-        if ssl_cert:
-            self.ssl = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-            self.ssl.check_hostname = False
-            self.ssl.load_verify_locations(ssl_cert)
+        self.ssl_context = ssl_context
 
     @property
     def channels(self):
@@ -59,7 +58,7 @@ class AMQPBroker(AbstractQueueBroker):
             login=url.username or 'guest',
             password=url.password or 'guest',
             virtualhost=(url.path[1:] if len(url.path) > 1 else '/'),
-            ssl=self.ssl if url.scheme == 'amqps' else None,
+            ssl=self.ssl_context if url.scheme == 'amqps' else None,
             **kwargs
         )
 

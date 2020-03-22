@@ -43,4 +43,10 @@ setup(
         'kafka': ['aiokafka==0.5'],
         'mock': ['asynctest'],
     },
+
+    entry_points={
+        'console_scripts': [
+            'marun = microagent.launcher:run',
+        ]
+    }
 )

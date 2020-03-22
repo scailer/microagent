@@ -1,3 +1,4 @@
+import ssl
 import asyncio
 import logging
 import unittest
@@ -45,6 +46,15 @@ class QueueBroker(MicroAgentSetting):
     meta = "CONNECTION_STRING"
     default = ''
     desc = 'DSN queue broker'
+
+
+class BrokerSSLCert(MicroAgentSetting):
+    is_global = True
+    name = 'broker_cert'
+    flags = ['--broker-cert']
+    meta = "FILE"
+    default = ''
+    desc = 'Broker ssl certificate file'
 
 
 class RedisSignalBus(AbstractSignalBus):
@@ -103,7 +113,15 @@ class MicroAgentApp(Application):
 
         if queue_broker_dsn.startswith('amqp'):
             from .amqp import AMQPBroker
-            broker = AMQPBroker(queue_broker_dsn)
+
+            ssl_context, cert_file = None, self.cfg.settings.get('broker_cert').value
+
+            if cert_file:
+                ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                ssl_context.check_hostname = False
+                ssl_context.load_verify_locations(cert_file)
+
+            broker = AMQPBroker(queue_broker_dsn, ssl_context=ssl_context)
 
         elif queue_broker_dsn.startswith('kafka'):
             from .kafka import KafkaBroker

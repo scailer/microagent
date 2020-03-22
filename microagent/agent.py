@@ -215,16 +215,22 @@ class MicroAgent:
         )
 
     def _get_received_signals(self):
-        signals = {}
-        mod, name = self.__module__, self.__class__.__name__
+        signals, classes = {}, []
+
+        # Agent class with heirs
+        for _cls in self.__class__.__mro__:
+            if _cls.__module__ != 'builtins' and _cls.__name__ != 'MicroAgent':
+                classes.append((_cls.__module__, _cls.__name__))
 
         for signal in Signal.get_all().values():
             receivers = []
 
             for lookup_key, _ in signal.receivers:
-                if lookup_key.mod == mod and lookup_key.name.startswith(name):
-                    funcname = lookup_key.name.replace(name, '')[1:]
+                _module, _class, funcname = lookup_key.mod, *lookup_key.name.split('.')
+
+                if (_module, _class) in classes:
                     func = getattr(self, funcname, None)
+
                     if func:
                         receivers.append((lookup_key, self.hook.decorate(func)))
 
