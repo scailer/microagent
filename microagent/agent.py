@@ -149,7 +149,7 @@ class MicroAgent:
         await self.hook.on_pre_stop()
 
     async def run_servers(self, servers):
-        return await asyncio.gather(*[func(**func.options) for func in self._servers])
+        await asyncio.gather(*[func(**func.options) for func in self._servers])
 
     def run_periodic_tasks(self, periodic_tasks):
         for method in periodic_tasks:
