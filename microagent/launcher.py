@@ -1,5 +1,4 @@
 import os
-import sys
 import signal
 import asyncio
 import argparse
@@ -152,8 +151,7 @@ async def main():
     try:
         await _run_master(cfg)
     finally:
-        logger.info('Exit')
-        sys.exit(0)
+        parser.exit(message="Exit\n")
 
 
 def run():
