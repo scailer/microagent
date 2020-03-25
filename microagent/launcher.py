@@ -7,6 +7,8 @@ import logging
 import concurrent.futures
 from itertools import chain
 from functools import partial
+from multiprocessing import parent_process
+
 
 __all__ = (
     'GroupInterrupt',
@@ -15,6 +17,8 @@ __all__ = (
     'run'
 )
 
+
+MASTER_WATCHER_PERIOD = 5  # sec
 
 logger = logging.getLogger('microagent.run')
 
@@ -70,14 +74,15 @@ def _run_agent(name, cfg):
     '''
     logger.info('Run Agent %s pid#%s', name, os.getpid())
 
-    # Interrupt process when master shutdown
-    def _interrupter():
-        raise GroupInterrupt
-
     async def _run():
         loop = asyncio.get_event_loop()
+
+        # Interrupt process when master shutdown
         loop.add_signal_handler(signal.SIGINT, _interrupter)
         loop.add_signal_handler(signal.SIGTERM, _interrupter)
+
+        # Check master & force break
+        loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, parent_process().pid, loop)
 
         agent = init_agent(cfg)
 
@@ -97,11 +102,22 @@ def _run_agent(name, cfg):
     asyncio.run(_run())
 
 
+def _interrupter():
+    raise GroupInterrupt
+
+
+def _master_watcher(pid, loop):
+    loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, pid, loop)
+    try:
+        os.kill(pid, 0)  # check master process
+    except ProcessLookupError:
+        os._exit(os.EX_OK)  # hard break better than deattached pocesses
+
+
 async def _run_master(cfg):
     with concurrent.futures.ProcessPoolExecutor(len(cfg)) as pool:
         pool.interrupter_lock = False
         signal.signal(signal.SIGTERM, partial(_signal_cb, pool=pool))
-        signal.signal(signal.SIGINT, partial(_signal_cb, pool=pool))
         futures = []
 
         for name, _cfg in cfg:
@@ -118,7 +134,7 @@ async def _run_master(cfg):
                 _close_pool(pool)
 
         except KeyboardInterrupt:
-            logger.error('Force quit')
+            logger.error('Quit')
 
         except Exception as exc:
             logger.error('Quit with error %s', exc, exc_info=True)
@@ -137,7 +153,7 @@ def _signal_cb(signum, *args, pool):
 
 
 def _close_pool(pool):
-    if pool.interrupter_lock:
+    if pool.interrupter_lock:  # Prevent duble kill
         logger.warning('Force kill locked')
         return
 
