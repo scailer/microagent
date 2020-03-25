@@ -74,9 +74,10 @@ def _run_agent(name, cfg):
     def _interrupter(signum, frame):
         raise GroupInterrupt
 
-    signal.signal(signal.SIGINT, _interrupter)
-
     async def _run():
+        signal.signal(signal.SIGINT, _interrupter)
+        signal.signal(signal.SIGTERM, _interrupter)
+
         agent = init_agent(cfg)
 
         try:
@@ -132,7 +133,13 @@ def _signal_cb(signum, *args, pool):
 
 def _close_pool(pool):
     logger.warning('Force kill processes %s', list(pool._processes))
-    [os.kill(pid, signal.SIGINT) for pid in pool._processes]
+
+    for pid in pool._processes:
+        try:
+            os.kill(pid, signal.SIGINT)
+        except ProcessLookupError:
+            logger.info('Process %s already killed', pid)
+
     logger.info('Forked processes killed')
 
 
