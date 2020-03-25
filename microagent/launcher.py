@@ -71,17 +71,21 @@ def _run_agent(name, cfg):
     logger.info('Run Agent %s pid#%s', name, os.getpid())
 
     # Interrupt process when master shutdown
-    def _interrupter(signum, frame):
+    def _interrupter():
         raise GroupInterrupt
 
     async def _run():
-        signal.signal(signal.SIGINT, _interrupter)
-        signal.signal(signal.SIGTERM, _interrupter)
+        loop = asyncio.get_event_loop()
+        loop.add_signal_handler(signal.SIGINT, _interrupter)
+        loop.add_signal_handler(signal.SIGTERM, _interrupter)
 
         agent = init_agent(cfg)
 
         try:
             await agent.start()  # wait when servers used
+        except (KeyboardInterrupt, GroupInterrupt):
+            loop.stop()
+            return
         except Exception as exc:
             logger.error('Catch error %s', exc, exc_info=True)
             raise
@@ -95,6 +99,7 @@ def _run_agent(name, cfg):
 
 async def _run_master(cfg):
     with concurrent.futures.ProcessPoolExecutor(len(cfg)) as pool:
+        pool.interrupter_lock = False
         signal.signal(signal.SIGTERM, partial(_signal_cb, pool=pool))
         signal.signal(signal.SIGINT, partial(_signal_cb, pool=pool))
         futures = []
@@ -132,6 +137,11 @@ def _signal_cb(signum, *args, pool):
 
 
 def _close_pool(pool):
+    if pool.interrupter_lock:
+        logger.warning('Force kill locked')
+        return
+
+    pool.interrupter_lock = True
     logger.warning('Force kill processes %s', list(pool._processes))
 
     for pid in pool._processes:
