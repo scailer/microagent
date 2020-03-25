@@ -1,4 +1,5 @@
 import os
+import sys
 import signal
 import asyncio
 import argparse
@@ -148,7 +149,11 @@ async def main():
     call_args = parser.parse_args()
     cfg = list(chain(*[load_configuration(module) for module in call_args.modules]))
 
-    await _run_master(cfg)
+    try:
+        await _run_master(cfg)
+    finally:
+        logger.info('Exit')
+        sys.exit(0)
 
 
 def run():
