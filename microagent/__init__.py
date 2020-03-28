@@ -1,7 +1,7 @@
 '''
 Docs
 '''
-__version__ = '0.9'
+__version__ = '0.10'
 
 from collections import namedtuple
 from typing import Union
@@ -14,7 +14,7 @@ from .hooks import on
 from .periodic_task import periodic, cron
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer', 'periodic',
-           'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
+           'endpoint', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
 
 
 def load_stuff(source: str):
@@ -95,7 +95,7 @@ def consumer(queue: Queue, timeout: int = 60, **options):
     return _decorator
 
 
-def server(**options):
+def endpoint(url, **options):
     '''
         Decorator marking handler as subserver runner.
         Will run in start() method, and make it runnig forever for transperent
@@ -104,6 +104,7 @@ def server(**options):
 
     def _decorator(func):
         func.options = options
+        func.endpoint = url
         func.__server__ = True
         return func
 
