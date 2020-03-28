@@ -78,8 +78,8 @@ def _run_agent(name, cfg):
         loop = asyncio.get_event_loop()
 
         # Interrupt process when master shutdown
-        loop.add_signal_handler(signal.SIGINT, _interrupter)
-        loop.add_signal_handler(signal.SIGTERM, _interrupter)
+        loop.add_signal_handler(signal.SIGINT, partial(_interrupter, 'INT'))
+        loop.add_signal_handler(signal.SIGTERM, partial(_interrupter, 'TERM'))
 
         # Check master & force break
         loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, parent_process().pid, loop)
@@ -102,8 +102,9 @@ def _run_agent(name, cfg):
     asyncio.run(_run())
 
 
-def _interrupter():
-    raise GroupInterrupt
+def _interrupter(signal):
+    logger.warning('Catch %s signal', signal)
+    raise GroupInterrupt(signal)
 
 
 def _master_watcher(pid, loop):
@@ -134,7 +135,7 @@ async def _run_master(cfg):
                 _close_pool(pool)
 
         except KeyboardInterrupt:
-            logger.error('Quit')
+            logger.waiting('Quit')
 
         except Exception as exc:
             logger.error('Quit with error %s', exc, exc_info=True)
@@ -148,7 +149,7 @@ def _stop_cb(name, future):
 
 
 def _signal_cb(signum, *args, pool):
-    logger.warning('Catch %s %s', signum, list(pool._processes))
+    logger.warning('Catch TERM %s', list(pool._processes))
     _close_pool(pool)
 
 
