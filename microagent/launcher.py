@@ -119,6 +119,7 @@ async def _run_master(cfg):
     with concurrent.futures.ProcessPoolExecutor(len(cfg)) as pool:
         pool.interrupter_lock = False
         signal.signal(signal.SIGTERM, partial(_signal_cb, pool=pool))
+        signal.signal(signal.SIGINT, partial(_signal_cb, pool=pool))
         futures = []
 
         for name, _cfg in cfg:
@@ -149,7 +150,8 @@ def _stop_cb(name, future):
 
 
 def _signal_cb(signum, *args, pool):
-    logger.warning('Catch TERM %s', list(pool._processes))
+    signame = {2: 'INT', 15: 'TERM'}.get(signum, signum)
+    logger.warning('Catch %s %s', signame, list(pool._processes))
     _close_pool(pool)
 
 
