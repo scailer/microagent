@@ -5,11 +5,12 @@ __version__ = '0.10'
 
 from collections import namedtuple
 from typing import Union
+import importlib
 import ujson
 
 from .signal import Signal
 from .queue import Queue
-from .agent import MicroAgent
+from .agent import MicroAgent, ReceiverHandler, ConsumerHandler
 from .hooks import on
 from .periodic_task import periodic, cron
 
@@ -53,27 +54,22 @@ def receiver(*signals: Union[Signal, str], timeout: int = 60):
     '''
         Decorator binding handler to receiving signals
 
-        @receiver([signal_1, signal_2])
+        @receiver(signal_1, signal_2)
         async def handler_1(self, **kwargs):
             log.info('Called handler 1 %s', kwargs)
 
         @receiver(signal_1)
         async def handle_2(self, **kwargs):
             log.info('Called handler 2 %s', kwargs)
-
-        @receiver('signal_1')
-        async def handle_3(self, **kwargs):
-            log.info('Called handler 3 %s', kwargs)
     '''
 
     def _decorator(func):
-        func.timeout = timeout
-        func.__receiver__ = True
-
         for _signal in signals:
-            if isinstance(_signal, str):
-                _signal = Signal.get(_signal)
-            _signal.connect(func)
+            func._receiver = ReceiverHandler(
+                handler=func,
+                signal=_signal,
+                timeout=timeout
+            )
 
         return func
 
@@ -86,10 +82,12 @@ def consumer(queue: Queue, timeout: int = 60, **options):
     '''
 
     def _decorator(func):
-        func.timeout = timeout
-        func.options = options
-        func.queue = queue
-        func.__consumer__ = True
+        func._consumer = ConsumerHandler(
+            handler=func,
+            queue=queue,
+            timeout=timeout,
+            options=options
+        )
         return func
 
     return _decorator

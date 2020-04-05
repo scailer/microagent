@@ -1,35 +1,30 @@
+from typing import List, Dict
+from dataclasses import dataclass
 import ujson
 
 
+@dataclass(frozen=True)
 class Queue:
-    _queues: dict = {}
+    name: str
+    _queues = {}  # type: Dict[str, Queue]
 
-    def __new__(cls, *args, **kwargs):
-        name = kwargs.get('name', args[0] if args else None)
-        return cls._queues[name] if name in cls._queues else super().__new__(cls)
+    def __post_init__(self):
+        self._queues[self.name] = self
 
-    def __init__(self, name: str, serializer=None):
-        if name in self._queues:
-            return
-
-        self.name = name
-        self.serializer = serializer or ujson
-        self._queues[name] = self
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<Queue {self.name}>'
 
-    def __eq__(self, other):
+    def __eq__(self, other: 'Queue') -> bool:
         return self.name == other.name
 
     def serialize(self, data: dict) -> str:
-        return self.serializer.dumps(data)
+        return ujson.dumps(data)
 
     def deserialize(self, data: str) -> dict:
-        return self.serializer.loads(data)
+        return ujson.loads(data)
 
     @classmethod
-    def get(cls, name: str):
+    def get(cls, name: str) -> 'Queue':
         ''' Get signal instance by name '''
         try:
             return cls._queues[name]
@@ -37,5 +32,5 @@ class Queue:
             raise Exception(f'No such signal {name}')
 
     @classmethod
-    def get_all(cls):
+    def get_all(cls) -> Dict[str, 'Queue']:
         return cls._queues

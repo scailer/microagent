@@ -147,6 +147,10 @@ async def _run_master(cfg):
 
 def _stop_cb(name, future):
     logger.info('Agent %s stoped with %s', name, future)
+    try:
+        future.result()
+    except Exception as exc:
+        print(exc)
 
 
 def _signal_cb(signum, *args, pool):

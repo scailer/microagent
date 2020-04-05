@@ -1,21 +1,6 @@
-from typing import List, Callable
-from collections import namedtuple
+from typing import List, Dict
+from dataclasses import dataclass
 import ujson
-
-
-LookupKey = namedtuple('LookupKey', ['mod', 'name', 'id'])
-
-
-def _make_id(target):
-    if isinstance(target, str):
-        return target
-    if hasattr(target, 'im_func'):
-        return id(target.im_self), id(target.im_func)
-    return id(target)
-
-
-def _make_lookup_key(receiver, sender):
-    return LookupKey(mod=receiver.__module__, name=receiver.__qualname__, id=_make_id(sender))
 
 
 class SignalException(Exception):
@@ -23,6 +8,7 @@ class SignalException(Exception):
     pass
 
 
+@dataclass(frozen=True)
 class Signal:
     '''
         Signal instance is descriptional entity based on redis channel.
@@ -41,22 +27,13 @@ class Signal:
 
     '''
 
-    _signals: dict = {}
-    receivers: list
+    name: str
+    providing_args: List[str]
+    content_type: str = 'json'
+    _signals = {}  # type: Dict[str, Signal]
 
-    def __new__(cls, *args, **kwargs):
-        name = kwargs.get('name', args[0] if args else None)
-        return cls._signals[name] if name in cls._signals else super().__new__(cls)
-
-    def __init__(self, name: str, providing_args: List[str], serializer=None):
-        if name in self._signals:
-            return
-
-        self.name = name
-        self.providing_args = providing_args
-        self.serializer = serializer or ujson
-        self._signals[name] = self
-        self.receivers = []
+    def __post_init__(self):
+        self._signals[self.name] = self
 
     def __repr__(self):
         return f'<Signal {self.name}>'
@@ -64,29 +41,17 @@ class Signal:
     def __eq__(self, other):
         return self.name == other.name
 
-    def connect(self, receiver: Callable, sender: str = None) -> None:
-        ''' Bind method to signal '''
-        lookup_key = LookupKey(
-            mod=receiver.__module__, name=receiver.__qualname__, id=_make_id(sender))
-
-        for key, _ in self.receivers:
-            if (key.mod, key.name) == (lookup_key.mod, lookup_key.name):
-                break
-        else:
-            self.receivers.append((lookup_key, receiver))
-
     def make_channel_name(self, channel_prefix: str, sender: str = '*') -> str:
-        ''' Make channel name '''
-        return '{}:{}:{}'.format(channel_prefix, self.name, _make_id(sender))
+        return f'{channel_prefix}:{self.name}:{sender}'
 
     def serialize(self, data: dict) -> str:
-        return self.serializer.dumps(data)
+        return ujson.dumps(data)
 
     def deserialize(self, data: str) -> dict:
-        return self.serializer.loads(data)
+        return ujson.loads(data)
 
     @classmethod
-    def get(cls, name: str):
+    def get(cls, name: str) -> 'Signal':
         ''' Get signal instance by name '''
         try:
             return cls._signals[name]
@@ -94,5 +59,5 @@ class Signal:
             raise SignalException(f'No such signal {name}')
 
     @classmethod
-    def get_all(cls):
+    def get_all(cls) -> Dict[str, 'Signal']:
         return cls._signals
