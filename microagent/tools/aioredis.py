@@ -8,26 +8,26 @@ from .redis import RedisBrokerMixin
 
 
 class AIORedisSignalBus(AbstractSignalBus):
-    def __init__(self, dsn, prefix='PUBSUB', logger=None):
+    def __init__(self, dsn, prefix='PUBSUB', logger=None) -> None:
         super().__init__(dsn, prefix, logger)
-        self.mpsc = aioredis.pubsub.Receiver(loop=self._loop)
+        self.mpsc = aioredis.pubsub.Receiver(loop=asyncio.get_running_loop())
         self.transport = None
         self.pubsub = None
         self._pubsub_lock = asyncio.Lock()
         asyncio.ensure_future(self.receiver(self.mpsc))
 
-    async def send(self, channel, message):
+    async def send(self, channel: str, message: str) -> None:
         if not self.transport:
             self.transport = await aioredis.create_redis(self.dsn)
         await self.transport.publish(channel, message)
 
-    async def bind(self, channel):
+    async def bind(self, channel: str) -> None:
         async with self._pubsub_lock:
             if not self.pubsub:
                 self.pubsub = await aioredis.create_redis(self.dsn)
             await self.pubsub.psubscribe(self.mpsc.pattern(channel))
 
-    async def receiver(self, mpsc):
+    async def receiver(self, mpsc: aioredis.pubsub.Receiver) -> None:
         async for chl, msg in mpsc.iter():
             channel, message = map(functools.partial(str, encoding='utf8'), msg)
             self._receiver(channel, message)

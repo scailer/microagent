@@ -5,10 +5,14 @@ import asyncio
 import inspect
 import ujson
 
+from collections import defaultdict
+from dataclasses import dataclass
 from typing import Optional, List, Union, Callable
 from datetime import datetime
 
-from .signal import Signal
+from .signal import Signal, Receiver
+
+response_signal = Signal(name='response', providing_args=[])
 
 
 class ResponseContext:
@@ -71,20 +75,18 @@ class AbstractSignalBus(abc.ABC):
         Signal bus
     '''
 
-    RESPONSE_TIMEOUT = 60  # sec
+    RESPONSE_TIMEOUT = 60  # sec type: int
 
     def __init__(self, dsn: str, prefix: Optional[str] = 'PUBSUB',
             logger: Optional[logging.Logger] = None):
 
-        self.uid = uuid.uuid4().hex
-        self.dsn = dsn
-        self.prefix = prefix
-        self.log = logger or logging.getLogger('microagent.bus')
-        self._loop = asyncio.get_event_loop()
+        self.uid = uuid.uuid4().hex  # type: str
+        self.dsn = dsn  # type: str
+        self.prefix = prefix  # type: str
+        self.log = logger or logging.getLogger('microagent.bus')  # type: logging.Logger
+        self.receivers = defaultdict(list)  # type: Dict[str, List[Receiver]]
 
-        response_signal = Signal(name='response', providing_args=[])
-        self.received_signals = {'response': response_signal}
-        asyncio.ensure_future(self.bind(response_signal.make_channel_name(prefix)))
+        asyncio.create_task(self.bind(response_signal.make_channel_name(prefix)))
         self.log.debug('%s initialized', self)
 
         # isolate responses context for preventing rase of handlers
@@ -105,16 +107,11 @@ class AbstractSignalBus(abc.ABC):
     def bind(self, signal: str):
         return NotImplemented  # pragma: no cover
 
-    async def bind_signal(self, signal: Signal):
-        if signal.name in self.received_signals:
-            self.received_signals[signal.name].receivers.extend(signal.receivers)
-            self.log.info('Bind extra %s to %s: %s', signal, self,
-                ', '.join(f'{k.mod}.{k.name}' for k, r in signal.receivers))
-        else:
-            self.received_signals[signal.name] = signal
-            await self.bind(signal.make_channel_name(self.prefix))
-            self.log.info('Bind new %s to %s: %s', signal, self,
-                ', '.join(f'{k.mod}.{k.name}' for k, r in signal.receivers))
+    async def bind_receiver(self, receiver: Receiver) -> None:
+        self.receivers[receiver.signal.name].append(receiver)
+        self.log.info('Bind %s to %s: %s', receiver.signal, self, receiver)
+        if receiver.signal.name not in self.receivers:
+            await self.bind(receiver.signal.make_channel_name(self.prefix))
 
     @abc.abstractmethod
     def receiver(self, *args, **kwargs):
@@ -133,7 +130,7 @@ class AbstractSignalBus(abc.ABC):
             signal_id = None
 
         pref, name, sender = channel.split(':')
-        signal = self.received_signals.get(name)
+        signal = Signal.get(name)
 
         try:
             message = signal.deserialize(message)
@@ -166,24 +163,26 @@ class AbstractSignalBus(abc.ABC):
     async def handle_signal(self, signal: Signal, sender: str,
             signal_id: str, message: dict):
 
-        receivers = [x[1] for x in signal.receivers]
-        responses = await asyncio.gather(
-            *[self.broadcast(receiver, signal, sender, message)
-            for receiver in receivers], loop=self._loop)
+        receivers = self.receivers.get(signal.name)
+
+        responses = await asyncio.gather(*[
+            self.broadcast(receiver, signal, sender, message)
+            for receiver in receivers
+        ])
 
         if signal_id:
-            responses = {rec.__qualname__: res for rec, res in zip(receivers, responses)}
+            responses = {rec.handler: res for rec, res in zip(receivers, responses)}
             channel = f'{self.prefix}:response:{self.uid}#{signal_id}'
             await self.send(channel, ujson.dumps(responses))
 
-    async def broadcast(self, receiver: Callable, signal: Signal,
+    async def broadcast(self, receiver: Receiver, signal: Signal,
             sender: str, message: dict):
 
-        self.log.debug('Calling %s by %s:%s with %s', receiver.__qualname__,
+        self.log.debug('Calling %s by %s:%s with %s', receiver.handler,
             signal.name, sender, str(message).encode('utf-8'))
 
         try:
-            response = receiver(signal=signal, sender=sender, **message)
+            response = receiver.handler(signal=signal, sender=sender, **message)
         except TypeError:
             self.log.error('Call %s failed', signal.name, exc_info=True)
             return
@@ -198,7 +197,7 @@ class AbstractSignalBus(abc.ABC):
 
             except asyncio.TimeoutError:
                 self.log.fatal(
-                    'TimeoutError: %s %.2f', receiver.__qualname__,
+                    'TimeoutError: %s %.2f', receiver.handler,
                     datetime.now().timestamp() - timer)
 
 

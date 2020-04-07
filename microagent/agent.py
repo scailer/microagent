@@ -23,17 +23,27 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Optional, Iterable, Callable, Union
+from typing import Optional, Iterable, Callable, Union, Dict
 from inspect import getmembers, ismethod
 from datetime import datetime, timedelta
 
-from copy import copy
-
-from .signal import Signal
-from .queue import Queue
+from .signal import Signal, Receiver
+from .queue import Queue, Consumer
 from .bus import AbstractSignalBus
 from .broker import AbstractQueueBroker
 from .hooks import Hooks
+from .periodic_task import PeriodicTask, CRONTask
+
+
+@dataclass(frozen=True)
+class Server:
+    agent: 'MicroAgent'
+    handler: Callable
+    endpoint: str
+    options: dict
+
+
+HandlerTypes = Union[Receiver, Consumer, PeriodicTask, CRONTask, Server]
 
 
 class MicroAgent:
@@ -75,53 +85,51 @@ class MicroAgent:
         .. attribute:: settings
 
             Dict, user settings, provided on initializing, or empty.
-
-        .. attribute:: _loop
-
-            Event loop
     '''
-    log = logging.getLogger('microagent')
 
     def __init__(
             self,
             bus: AbstractSignalBus = None,
             broker: AbstractQueueBroker = None,
             logger: logging.Logger = None,
-            settings: dict = None):
+            settings: dict = None
+        ) -> None:
 
-        self.hook = Hooks(self)
-        self._loop = asyncio.get_event_loop()
-        self.settings = settings or {}
-        self.broker = broker
-        self.bus = bus
+        self.hook = Hooks(self)  # type: Hooks
+        self.settings = settings or {}  # type: dict
+        self.broker = broker  # type: Optional[AbstractQueueBroker]
+        self.bus = bus  # type: Optional[AbstractSignalBus]
+        self.log = logger or logging.getLogger('microagent')  # type: logging.Logger
 
-        if logger:
-            self.log = logger
+        self.periodic_tasks = PeriodicHandler.bound(self)  # type: Iterable[PeriodicTask]
+        self.cron_tasks = CRONHandler.bound(self)  # type: Iterable[CRONTask]
 
-        self._periodic_tasks = self._get_periodic_tasks()
-
-        self.receivers = ReceiverHandler.bound(self)
+        self.receivers = ReceiverHandler.bound(self)  # type: Iterable[Receiver]
         if self.receivers:
             assert self.bus, 'Bus required'
             assert isinstance(self.bus, AbstractSignalBus), \
                 f'Bus must be AbstractSignalBus instance or None instead {bus}'
 
-        self.queue_consumers = self._get_queue_consumers()
-        if self.queue_consumers:
+        self.consumers = ConsumerHandler.bound(self)  # type: Iterable[Consumer]
+        if self.consumers:
             assert self.broker, 'Broker required'
             assert isinstance(self.broker, AbstractQueueBroker), \
                 f'Broker must be AbstractQueueBroker instance or None instead {broker}'
 
-        self._servers = self._get_servers()
+        self.servers = ServerHandler.bound(self)  # type: Iterable[Server]
 
         self.log.debug('%s initialized', self)
+
+    def __repr__(self) -> str:
+        return f'<MicroAgent {self.__class__.__name__}>'
 
     async def start(
             self,
             enable_periodic_tasks: Optional[bool] = True,
             enable_receiving_signals: Optional[bool] = True,
             enable_consuming_messages: Optional[bool] = True,
-            enable_servers_running: Optional[bool] = True):
+            enable_servers_running: Optional[bool] = True
+        ) -> None:
         '''
             Starting MicroAgent to receive signals, consume messages
             and initiate periodic running.
@@ -137,44 +145,55 @@ class MicroAgent:
             await self.bind_receivers(self.receivers)
 
         if enable_consuming_messages:
-            await self.bind_consumers(self.queue_consumers)
+            await self.bind_consumers(self.consumers)
 
         if enable_periodic_tasks:
-            self.run_periodic_tasks(self._periodic_tasks)
+            self.run_periodic_tasks(self.periodic_tasks, self.cron_tasks)
 
         await self.hook.on_post_start()
 
         if enable_servers_running:
-            await self.run_servers(self._servers)
+            await self.run_servers(self.servers)
 
-    async def stop(self):
+    async def stop(self) -> None:
         await self.hook.on_pre_stop()
 
-    async def run_servers(self, servers):
+    async def run_servers(self, servers: Iterable[Server]) -> None:
         _servers = []
 
-        for func in self._servers:
-            _servers.append(func(func.endpoint, **func.options))
-            self.log.info('Starting server %s', func.endpoint)
+        for server in servers:
+            _servers.append(server.handler(server.endpoint, **server.options))
+            self.log.info('Starting server %s', server.endpoint)
 
         await asyncio.gather(*_servers)
 
-    def run_periodic_tasks(self, periodic_tasks):
-        for method in periodic_tasks:
-            start_after = getattr(method, '_start_after', 0) or 0
+    def run_periodic_tasks(self, periodic_tasks: Iterable[PeriodicTask],
+            cron_tasks: Iterable[CRONTask]) -> None:
+
+        for task in [*periodic_tasks, *cron_tasks]:
+            start_after = getattr(self, 'start_after', None) or 0  # type: Union[int, float]
 
             if start_after > 100:
-                start_at = datetime.now() + timedelta(seconds=start_after)
-                self.log.debug('Set periodic task %s at %s', method, f'{start_at:%H:%M:%S}')
+                start_at = datetime.now() + timedelta(seconds=start_after)  # type: datetime
+                self.log.debug('Set %s at %s', self, f'{start_at:%H:%M:%S}')
             else:
-                self.log.debug('Set periodic task %s after %d sec', method, start_after)
+                self.log.debug('Set %s after %d sec', self, start_after)
 
-            self._loop.call_later(start_after, method)
+            task.start()
 
-    def __repr__(self):
-        return f'<MicroAgent {self.__class__.__name__}>'
+    async def bind_receivers(self, receivers: Iterable[Receiver]) -> None:
+        ''' Bind signal receivers to bus subscribers '''
+        if self.bus:
+            for receiver in receivers:
+                await self.bus.bind_receiver(receiver)
 
-    def info(self):
+    async def bind_consumers(self, consumers: Iterable[Consumer]) -> None:
+        ''' Bind message consumers to queues '''
+        if self.broker:
+            for consumer in consumers:
+                await self.broker.bind_consumer(consumer)
+
+    def info(self) -> dict:
         '''
             Information about MicroAgent in json-serializable dict
         '''
@@ -184,114 +203,45 @@ class MicroAgent:
             'broker': str(self.broker) if self.broker else None,
             'periodic': [
                 {
-                    'name': func.origin.__name__,
-                    'period': getattr(func.origin, '_period', None),
-                    'cron': getattr(func.origin, '_croniter', None),
-                    'timeout': func.origin._timeout,
-                    'start_after': func._start_after,
+                    'name': task.handler.__name__,
+                    'period': task.period,
                 }
-                for func in self._periodic_tasks
+                for task in self.periodic_tasks
+            ],
+            'cron': [
+                {
+                    'name': task.handler.__name__,
+                    'cron': str(task.croniter),
+                }
+                for task in self.cron_tasks
             ],
             'receivers': [
                 {
-                    signal_name: {
-                        'signal': val,
-                        'receivers': [
-                            {
-                                'key': f'{key.mod}.{key.name}',
-                                'timeout': receiver.timeout,
-                            }
-                            for key, receiver in val.receivers
-                        ]
-                    }
+                    'name': receiver.handler.__name__,
+                    'signal': receiver.signal.name,
                 }
-                for signal_name, val in self.received_signals.items()
+                for receiver in self.receivers
             ],
             'consumers': [
                 {
-                    'ddd': func,
-                    'queue': func.queue,
-                    'timeout': func.timeout,
-                    'options': func.options,
+                    'name': consumer.handler.__name__,
+                    'queue': consumer.queue.name,
                 }
-                for func in self.queue_consumers
+                for consumer in self.consumers
             ],
         }
-
-    def _get_periodic_tasks(self):
-        handlers = ReceiverHandler.bound(self)
-        print('HHH', handlers)
-        return tuple(
-            method
-            for name, method in getmembers(self, ismethod)
-            if hasattr(method, '__periodic__')
-        )
-
-    def _get_queue_consumers(self):
-        return tuple(
-            self.hook.decorate(method)
-            for name, method in getmembers(self, ismethod)
-            if hasattr(method, '__consumer__')
-        )
-
-    def _get_servers(self):
-        return tuple(
-            method
-            for name, method in getmembers(self, ismethod)
-            if hasattr(method, '__server__')
-        )
-
-    def _get_received_signals(self):
-        signals, classes = {}, []
-
-        # Agent class with heirs
-        for _cls in self.__class__.__mro__:
-            if _cls.__module__ != 'builtins' and _cls.__name__ != 'MicroAgent':
-                classes.append((_cls.__module__, _cls.__name__))
-
-        for signal in Signal.get_all().values():
-            receivers = []
-
-            for lookup_key, _ in signal.receivers:
-                _module, _class, funcname = lookup_key.mod, *lookup_key.name.split('.')
-
-                if (_module, _class) in classes:
-                    func = getattr(self, funcname, None)
-
-                    if func:
-                        receivers.append((lookup_key, self.hook.decorate(func)))
-
-            if receivers:
-                signal = copy(signal)
-                signal.receivers = receivers
-                signals[signal.name] = signal
-
-        return signals
-
-    async def bind_receivers(self, receivers: Iterable[ReceiverHandler]):
-        ''' Bind signal receivers to bus subscribers '''
-        signals = set(receiver.handler.signal for receiver in receivers)
-
-        for signal in signals:
-            await self.bus.bind_signal(signal)
-
-    async def bind_consumers(self, consumers: Iterable):
-        ''' Bind message consumers to queues '''
-        for consumer in consumers:
-            await self.broker.bind_consumer(consumer)
 
 
 @dataclass(frozen=True)
 class UnboundHandler:
     handler: Callable
-    _register = {}
 
     def __post_init__(self):
         key = self.handler.__module__, *self.handler.__qualname__.split('.')
         self._register[key] = self
 
     @classmethod
-    def bound(cls, agent):
+    def bound(cls, agent: MicroAgent):
         classes, result = [], []
 
         for _cls in agent.__class__.__mro__:
@@ -299,8 +249,15 @@ class UnboundHandler:
                 classes.append((_cls.__module__, _cls.__name__))
 
         for lookup_key, unbound in cls._register.items():
+            args = unbound.__dict__
+            args.pop('handler', None)
+
             if tuple(lookup_key[:2]) in classes:
-                result.append(BoundHandler(agent=agent, handler=unbound))
+                result.append(cls.target_class(
+                    agent=agent,
+                    handler=getattr(agent, lookup_key[-1]),
+                    **args
+                ))
 
         return result
 
@@ -309,7 +266,8 @@ class UnboundHandler:
 class ReceiverHandler(UnboundHandler):
     signal: Signal
     timeout: Union[int, float]
-    _register = {}
+    target_class = Receiver
+    _register = {}  # type: Dict[tuple, ReceiverHandler]
 
 
 @dataclass(frozen=True)
@@ -317,7 +275,8 @@ class ConsumerHandler(UnboundHandler):
     queue: Queue
     timeout: Union[int, float]
     options: dict
-    _register = {}
+    target_class = Consumer
+    _register = {}  # type: Dict[tuple, ConsumerHandler]
 
 
 @dataclass(frozen=True)
@@ -325,24 +284,21 @@ class PeriodicHandler(UnboundHandler):
     period: Union[int, float]
     timeout: Union[int, float]
     start_after: Union[int, float]
-    _register = {}
+    target_class = PeriodicTask
+    _register = {}  # type: Dict[tuple, PeriodicHandler]
 
 
 @dataclass(frozen=True)
 class CRONHandler(UnboundHandler):
     spec: str
     timeout: Union[int, float]
-    _register = {}
+    target_class = CRONTask
+    _register = {}  # type: Dict[tuple, CRONHandler]
 
 
 @dataclass(frozen=True)
-class EndpointHandler(UnboundHandler):
-    url: str
+class ServerHandler(UnboundHandler):
+    endpoint: str
     options: dict
-    _register = {}
-
-
-@dataclass(frozen=True)
-class BoundHandler:
-    agent: MicroAgent
-    handler: UnboundHandler
+    target_class = Server
+    _register = {}  # type: Dict[tuple, ServerHandler]

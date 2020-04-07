@@ -4,31 +4,33 @@ Docs
 __version__ = '0.10'
 
 from collections import namedtuple
-from typing import Union
+from typing import Union, Tuple, Callable
 import importlib
+import time
+
+from croniter import croniter
 import ujson
 
 from .signal import Signal
 from .queue import Queue
-from .agent import MicroAgent, ReceiverHandler, ConsumerHandler
+from .agent import MicroAgent, ReceiverHandler, ConsumerHandler, PeriodicHandler, CRONHandler
 from .hooks import on
-from .periodic_task import periodic, cron
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer', 'periodic',
            'endpoint', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
 
 
-def load_stuff(source: str):
+def load_stuff(source: str) -> Tuple[namedtuple, namedtuple]:
     '''
         Init signals from json-file loaded from disk or http request
     '''
 
     if source.startswith('file://'):
         with open(source.replace('file://', ''), 'r') as f:
-            data = ujson.loads(f.read().replace('\n', ''))
+            data = ujson.loads(f.read().replace('\n', ''))  # type: dict
     else:
         import requests
-        data = requests.get(source).json()
+        data = requests.get(source).json()  # type: dict
 
     for _data in data.get('signals', []):
         Signal(name=_data['name'], providing_args=_data['providing_args'])
@@ -42,15 +44,63 @@ def load_stuff(source: str):
     )
 
 
-def load_signals(source: str):
+def load_signals(source: str) -> namedtuple:
     return load_stuff(source)[0]
 
 
-def load_queues(source: str):
+def load_queues(source: str) -> namedtuple:
     return load_stuff(source)[1]
 
 
-def receiver(*signals: Union[Signal, str], timeout: int = 60):
+def periodic(period: Union[int, float], timeout: Union[int, float] = 1,
+        start_after: Union[int, float] = 0) -> Callable:
+    '''
+        Decorator witch mark :class:`MicroAgent` method as periodic function
+
+        :param period: Period of running functions in seconds
+        :param timeout: Function timeout in seconds
+        :param start_after: Delay for running loop in seconds
+    '''
+
+    assert period > 0.001, 'period must be more than 0.001 s'
+    assert timeout > 0.001, 'timeout must be more than 0.001 s'
+    if start_after:
+        assert start_after >= 0, 'start_after must be a positive'
+
+    def _decorator(func):
+        func._periodic = PeriodicHandler(
+            handler=func,
+            period=period,
+            timeout=timeout,
+            start_after=start_after
+        )
+        return func
+
+    return _decorator
+
+
+def cron(spec: str, timeout: Union[int, float] = 1) -> Callable:
+    '''
+        Decorator witch mark :class:`MicroAgent` method as shceduling (cron) function
+
+        :param spec: Specified running shceduling in cron format
+        :param timeout: Function timeout in seconds
+    '''
+
+    assert timeout > 0.001, 'timeout must be more than 0.001 s'
+
+    def _decorator(func):
+        func._cron = CRONHandler(
+            handler=func,
+            croniter=croniter(spec, time.time()),
+            timeout=timeout
+        )
+        return func
+
+    return _decorator
+
+
+def receiver(*signals: Union[Signal, str], timeout: int = 60) -> Callable:
     '''
         Decorator binding handler to receiving signals
 
@@ -76,7 +126,7 @@ def receiver(*signals: Union[Signal, str], timeout: int = 60):
     return _decorator
 
 
-def consumer(queue: Queue, timeout: int = 60, **options):
+def consumer(queue: Queue, timeout: int = 60, **options) -> Callable:
     '''
         Decorator binding handler to consume messages from queue
     '''
@@ -93,7 +143,7 @@ def consumer(queue: Queue, timeout: int = 60, **options):
     return _decorator
 
 
-def endpoint(url, **options):
+def endpoint(url, **options) -> Callable:
     '''
         Decorator marking handler as subserver runner.
         Will run in start() method, and make it runnig forever for transperent

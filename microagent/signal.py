@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Callable, Union
 from dataclasses import dataclass
 import ujson
 
@@ -61,3 +61,14 @@ class Signal:
     @classmethod
     def get_all(cls) -> Dict[str, 'Signal']:
         return cls._signals
+
+
+@dataclass(frozen=True)
+class Receiver:
+    agent: 'microagent.MicroAgent'
+    handler: Callable
+    signal: Signal
+    timeout: Union[int, float]
+
+    def __repr__(self) -> str:
+        return f'<Receiver {self.handler.__name__} of {self.agent} for {self.signal}>'

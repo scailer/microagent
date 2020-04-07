@@ -15,97 +15,68 @@
 import time
 import asyncio
 import inspect
-import functools
-from typing import Union, Optional
-from croniter import croniter
+from dataclasses import dataclass
+from typing import Union, Optional, Callable
 
 
-async def _wrap(self, func):
-    response = None
+class PeriodicMixin:
+    async def call(self) -> None:
+        response = None
 
-    try:
-        response = func(self)
-    except Exception as e:
-        self.log.fatal(f'Periodic Exception: {e}', exc_info=True)
-
-    if inspect.isawaitable(response):
         try:
-            await asyncio.wait_for(response, func._timeout)
-        except asyncio.TimeoutError:
-            self.log.fatal(f'TimeoutError: {func.__qualname__}')
-        except Exception as e:
-            self.log.fatal(f'Periodic Exception: {e}', exc_info=True)
+            response = self.handler()
+        except Exception as exc:
+            self.agent.log.fatal(f'Periodic Exception: {exc}', exc_info=True)
+
+        if inspect.isawaitable(response):
+            try:
+                await asyncio.wait_for(response, self.timeout)
+            except asyncio.TimeoutError:
+                self.agent.log.fatal(f'TimeoutError: {self}')
+            except Exception as exc:
+                self.agent.log.fatal(f'Periodic Exception: {exc}', exc_info=True)
+
+    def start(self) -> None:
+        self._start()
 
 
-def _periodic(self, func):
-    self._loop.call_later(
-        func._period,
-        lambda *args: asyncio.ensure_future(_periodic(*args)),
-        self, func)
-    return _wrap(self, func)
+@dataclass(frozen=True)
+class PeriodicTask(PeriodicMixin):
+    agent: 'microagent.MicroAgent'
+    handler: Callable
+    period: Union[int, float]
+    timeout: Union[int, float]
+    start_after: Optional[Union[int, float]]
+
+    def __repr__(self) -> str:
+        return f'<PeriodicTask {self.handler.__name__} of {self.agent} every {self.period} sec>'
+
+    def _start(self) -> None:
+        asyncio.get_running_loop().call_later(self.start_after, _periodic, self)
 
 
-def periodic(period: Union[int, float], timeout: Optional[Union[int, float]] = 1,
-        start_after: Union[int, float] = None):
-    '''
-        Decorator witch mark :class:`MicroAgent` method as periodic function
-
-        :param period: Period of running functions in seconds
-        :param timeout: Function timeout in seconds
-        :param start_after: Delay for running loop in seconds
-    '''
-
-    assert period > 0.001, 'period must be more than 0.001 s'
-    assert timeout > 0.001, 'timeout must be more than 0.001 s'
-    if start_after:
-        assert start_after >= 0, 'start_after must be a positive'
-
-    def _decorator(func):
-        func.__periodic__ = True
-        func._period = period
-        func._timeout = timeout
-
-        @functools.wraps(func)
-        def _call(self):
-            asyncio.ensure_future(_periodic(self, self.hook.decorate(func)), loop=self._loop)
-
-        _call.origin = func
-        _call._start_after = start_after
-        return _call
-
-    return _decorator
+def _periodic(task: PeriodicTask) -> asyncio.Task:
+    asyncio.get_running_loop().call_later(task.period, _periodic, task)
+    return asyncio.create_task(task.call())
 
 
-def _cron(self, func):
-    self._loop.call_later(
-        func._croniter.get_next(float) - time.time(),
-        lambda *args: asyncio.ensure_future(_cron(*args)),
-        self, func)
-    self.log.debug(f'Run cron task %s', func)
-    return _wrap(self, func)
+@dataclass(frozen=True)
+class CRONTask(PeriodicMixin):
+    agent: 'microagent.MicroAgent'
+    handler: Callable
+    croniter: Union[int, float]
+    timeout: Union[int, float]
+
+    def __repr__(self) -> str:
+        return f'<CRONTask {self.handler.__name__} of {self.agent} every {self.croniter}>'
+
+    def _start(self) -> None:
+        start_after = self.croniter.get_next(float) - time.time()
+        asyncio.get_running_loop().call_later(start_after, self.handler)
 
 
-def cron(spec: str, timeout: Optional[Union[int, float]] = 1):
-    '''
-        Decorator witch mark :class:`MicroAgent` method as shceduling (cron) function
-
-        :param spec: Specified running shceduling in cron format
-        :param timeout: Function timeout in seconds
-    '''
-
-    assert timeout > 0.001, 'timeout must be more than 0.001 s'
-
-    def _decorator(func):
-        func.__periodic__ = True
-        func._croniter = croniter(spec, time.time())
-        func._timeout = timeout
-
-        @functools.wraps(func)
-        def _call(self):
-            asyncio.ensure_future(_cron(self, self.hook.decorate(func)), loop=self._loop)
-
-        _call.origin = func
-        _call._start_after = func._croniter.get_next(float) - time.time()
-        return _call
-
-    return _decorator
+def _cron(task: CRONTask) -> asyncio.Task:
+    delay = task.croniter.get_next(float) - time.time()
+    asyncio.get_running_loop().call_later(delay, _cron, task)
+    task.agent.log.debug('Run %s', task)
+    return asyncio.create_task(task.call())

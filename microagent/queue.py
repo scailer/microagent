@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Callable, Union
 from dataclasses import dataclass
 import ujson
 
@@ -34,3 +34,15 @@ class Queue:
     @classmethod
     def get_all(cls) -> Dict[str, 'Queue']:
         return cls._queues
+
+
+@dataclass(frozen=True)
+class Consumer:
+    agent: 'microagent.MicroAgent'
+    handler: Callable
+    queue: Queue
+    timeout: Union[int, float]
+    options: dict
+
+    def __repr__(self) -> str:
+        return f'<Consumer {self.handler.__name__} of {self.agent} for {self.queue}>'
