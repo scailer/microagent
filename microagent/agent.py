@@ -23,7 +23,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Optional, Iterable, Callable, Union, Dict
+from typing import Optional, Iterable, Callable, Union, Dict, Tuple
 from inspect import getmembers, ismethod
 from datetime import datetime, timedelta
 
@@ -87,6 +87,42 @@ class MicroAgent:
             Dict, user settings, provided on initializing, or empty.
     '''
 
+    log: logging.Logger
+    bus: Optional[AbstractSignalBus]
+    broker: Optional[AbstractQueueBroker]
+    settings: Dict
+
+    periodic_tasks: Iterable[PeriodicTask]
+    cron_tasks: Iterable[CRONTask]
+    receivers: Iterable[Receiver]
+    consumers: Iterable[Consumer]
+    servers: Iterable[Server]
+    hook: Hooks
+
+    def __new__(cls, bus, broker, **kwargs) -> 'MicroAgent':
+        agent = super(MicroAgent, cls).__new__(cls)
+
+        agent.periodic_tasks = PeriodicHandler.bound(agent)
+        agent.cron_tasks = CRONHandler.bound(agent)
+        agent.receivers = ReceiverHandler.bound(agent)
+        agent.consumers = ConsumerHandler.bound(agent)
+        agent.servers = ServerHandler.bound(agent)
+        agent.log = logging.getLogger('microagent')
+        agent.hook = Hooks(agent)
+        agent.settings = {}
+
+        if agent.receivers:
+            assert bus, 'Bus required'
+            assert isinstance(bus, AbstractSignalBus), \
+                f'Bus must be AbstractSignalBus instance or None instead {bus}'
+
+        if agent.consumers:
+            assert broker, 'Broker required'
+            assert isinstance(broker, AbstractQueueBroker), \
+                f'Broker must be AbstractQueueBroker instance or None instead {broker}'
+
+        return agent
+
     def __init__(
             self,
             bus: AbstractSignalBus = None,
@@ -95,28 +131,12 @@ class MicroAgent:
             settings: dict = None
         ) -> None:
 
-        self.hook = Hooks(self)  # type: Hooks
-        self.settings = settings or {}  # type: dict
-        self.broker = broker  # type: Optional[AbstractQueueBroker]
-        self.bus = bus  # type: Optional[AbstractSignalBus]
-        self.log = logger or logging.getLogger('microagent')  # type: logging.Logger
+        self.bus = bus
+        self.broker = broker
+        self.settings = settings or {}
 
-        self.periodic_tasks = PeriodicHandler.bound(self)  # type: Iterable[PeriodicTask]
-        self.cron_tasks = CRONHandler.bound(self)  # type: Iterable[CRONTask]
-
-        self.receivers = ReceiverHandler.bound(self)  # type: Iterable[Receiver]
-        if self.receivers:
-            assert self.bus, 'Bus required'
-            assert isinstance(self.bus, AbstractSignalBus), \
-                f'Bus must be AbstractSignalBus instance or None instead {bus}'
-
-        self.consumers = ConsumerHandler.bound(self)  # type: Iterable[Consumer]
-        if self.consumers:
-            assert self.broker, 'Broker required'
-            assert isinstance(self.broker, AbstractQueueBroker), \
-                f'Broker must be AbstractQueueBroker instance or None instead {broker}'
-
-        self.servers = ServerHandler.bound(self)  # type: Iterable[Server]
+        if logger:
+            self.log = logger
 
         self.log.debug('%s initialized', self)
 
@@ -232,9 +252,10 @@ class MicroAgent:
         }
 
 
-@dataclass(frozen=True)
 class UnboundHandler:
     handler: Callable
+    target_class: type
+    _register: Dict
 
     def __post_init__(self):
         key = self.handler.__module__, *self.handler.__qualname__.split('.')
@@ -264,41 +285,46 @@ class UnboundHandler:
 
 @dataclass(frozen=True)
 class ReceiverHandler(UnboundHandler):
+    handler: Callable
     signal: Signal
     timeout: Union[int, float]
     target_class = Receiver
-    _register = {}  # type: Dict[tuple, ReceiverHandler]
+    _register = {}  # type: Dict[Tuple[str, str, str], ReceiverHandler]
 
 
 @dataclass(frozen=True)
 class ConsumerHandler(UnboundHandler):
+    handler: Callable
     queue: Queue
     timeout: Union[int, float]
     options: dict
     target_class = Consumer
-    _register = {}  # type: Dict[tuple, ConsumerHandler]
+    _register = {}  # type: Dict[Tuple[str, str, str], ConsumerHandler]
 
 
 @dataclass(frozen=True)
 class PeriodicHandler(UnboundHandler):
+    handler: Callable
     period: Union[int, float]
     timeout: Union[int, float]
     start_after: Union[int, float]
     target_class = PeriodicTask
-    _register = {}  # type: Dict[tuple, PeriodicHandler]
+    _register = {}  # type: Dict[Tuple[str, str, str], PeriodicHandler]
 
 
 @dataclass(frozen=True)
 class CRONHandler(UnboundHandler):
+    handler: Callable
     spec: str
     timeout: Union[int, float]
     target_class = CRONTask
-    _register = {}  # type: Dict[tuple, CRONHandler]
+    _register = {}  # type: Dict[Tuple[str, str, str], CRONHandler]
 
 
 @dataclass(frozen=True)
 class ServerHandler(UnboundHandler):
+    handler: Callable
     endpoint: str
     options: dict
     target_class = Server
-    _register = {}  # type: Dict[tuple, ServerHandler]
+    _register = {}  # type: Dict[Tuple[str, str, str], ServerHandler]

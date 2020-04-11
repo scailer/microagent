@@ -14,7 +14,9 @@ class Queue:
     def __repr__(self) -> str:
         return f'<Queue {self.name}>'
 
-    def __eq__(self, other: 'Queue') -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Queue):
+            return NotImplemented
         return self.name == other.name
 
     def serialize(self, data: dict) -> str:

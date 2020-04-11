@@ -4,7 +4,7 @@ Docs
 __version__ = '0.10'
 
 from collections import namedtuple
-from typing import Union, Tuple, Callable
+from typing import Union, Tuple, Callable, Dict, Iterable, List, Any
 import importlib
 import time
 
@@ -20,17 +20,19 @@ __all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer', 'periodic',
            'endpoint', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
 
 
-def load_stuff(source: str) -> Tuple[namedtuple, namedtuple]:
+def load_stuff(source: str) -> Tuple[object, object]:
     '''
         Init signals from json-file loaded from disk or http request
     '''
 
+    data: Dict[str, Iterable[Dict[str, Any]]] = {}
+
     if source.startswith('file://'):
         with open(source.replace('file://', ''), 'r') as f:
-            data = ujson.loads(f.read().replace('\n', ''))  # type: dict
+            data.update(ujson.loads(f.read().replace('\n', '')))
     else:
         import requests
-        data = requests.get(source).json()  # type: dict
+        data.update(requests.get(source).json())
 
     for _data in data.get('signals', []):
         Signal(name=_data['name'], providing_args=_data['providing_args'])
@@ -39,16 +41,16 @@ def load_stuff(source: str) -> Tuple[namedtuple, namedtuple]:
         Queue(name=_data['name'])
 
     return (
-        namedtuple('signals', Signal.get_all().keys())(*Signal.get_all().values()),
-        namedtuple('queues', Queue.get_all().keys())(*Queue.get_all().values())
+        namedtuple('signals', Signal.get_all().keys())(*Signal.get_all().values()),  # type: ignore
+        namedtuple('queues', Queue.get_all().keys())(*Queue.get_all().values())  # type: ignore
     )
 
 
-def load_signals(source: str) -> namedtuple:
+def load_signals(source: str) -> object:
     return load_stuff(source)[0]
 
 
-def load_queues(source: str) -> namedtuple:
+def load_queues(source: str) -> object:
     return load_stuff(source)[1]
 
 
@@ -64,15 +66,14 @@ def periodic(period: Union[int, float], timeout: Union[int, float] = 1,
 
     assert period > 0.001, 'period must be more than 0.001 s'
     assert timeout > 0.001, 'timeout must be more than 0.001 s'
-    if start_after:
-        assert start_after >= 0, 'start_after must be a positive'
+    assert start_after >= 0, 'start_after must be a positive'
 
     def _decorator(func):
         func._periodic = PeriodicHandler(
             handler=func,
-            period=period,
-            timeout=timeout,
-            start_after=start_after
+            period=float(period),
+            timeout=float(timeout),
+            start_after=float(start_after)
         )
         return func
 
@@ -93,7 +94,7 @@ def cron(spec: str, timeout: Union[int, float] = 1) -> Callable:
         func._cron = CRONHandler(
             handler=func,
             croniter=croniter(spec, time.time()),
-            timeout=timeout
+            timeout=float(timeout)
         )
         return func
 

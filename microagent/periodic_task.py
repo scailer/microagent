@@ -15,11 +15,16 @@
 import time
 import asyncio
 import inspect
+import croniter
 from dataclasses import dataclass
 from typing import Union, Optional, Callable
 
 
 class PeriodicMixin:
+    agent: 'microagent.MicroAgent'
+    handler: Callable
+    timeout: float
+
     async def call(self) -> None:
         response = None
 
@@ -37,46 +42,41 @@ class PeriodicMixin:
                 self.agent.log.fatal(f'Periodic Exception: {exc}', exc_info=True)
 
     def start(self) -> None:
-        self._start()
+        asyncio.get_running_loop().call_later(self.start_after, _periodic, self)
 
 
 @dataclass(frozen=True)
 class PeriodicTask(PeriodicMixin):
     agent: 'microagent.MicroAgent'
     handler: Callable
-    period: Union[int, float]
-    timeout: Union[int, float]
-    start_after: Optional[Union[int, float]]
+    period: float
+    timeout: float
+    start_after: float
 
     def __repr__(self) -> str:
         return f'<PeriodicTask {self.handler.__name__} of {self.agent} every {self.period} sec>'
-
-    def _start(self) -> None:
-        asyncio.get_running_loop().call_later(self.start_after, _periodic, self)
-
-
-def _periodic(task: PeriodicTask) -> asyncio.Task:
-    asyncio.get_running_loop().call_later(task.period, _periodic, task)
-    return asyncio.create_task(task.call())
 
 
 @dataclass(frozen=True)
 class CRONTask(PeriodicMixin):
     agent: 'microagent.MicroAgent'
     handler: Callable
-    croniter: Union[int, float]
-    timeout: Union[int, float]
+    croniter: croniter.croniter
+    timeout: float
 
     def __repr__(self) -> str:
         return f'<CRONTask {self.handler.__name__} of {self.agent} every {self.croniter}>'
 
-    def _start(self) -> None:
-        start_after = self.croniter.get_next(float) - time.time()
-        asyncio.get_running_loop().call_later(start_after, self.handler)
+    @property
+    def start_after(self) -> float:
+        return self.croniter.get_next(float) - time.time()
+
+    @property
+    def period(self) -> float:
+        self.agent.log.debug('Run %s', self)
+        return self.croniter.get_next(float) - time.time()
 
 
-def _cron(task: CRONTask) -> asyncio.Task:
-    delay = task.croniter.get_next(float) - time.time()
-    asyncio.get_running_loop().call_later(delay, _cron, task)
-    task.agent.log.debug('Run %s', task)
+def _periodic(task: Union[PeriodicTask, CRONTask]) -> asyncio.Task:
+    asyncio.get_running_loop().call_later(task.period, _periodic, task)
     return asyncio.create_task(task.call())
