@@ -8,6 +8,10 @@ class SignalException(Exception):
     pass
 
 
+class SerializingError(SignalException):
+    pass
+
+
 @dataclass(frozen=True)
 class Signal:
     '''
@@ -47,10 +51,16 @@ class Signal:
         return f'{channel_prefix}:{self.name}:{sender}'
 
     def serialize(self, data: dict) -> str:
-        return ujson.dumps(data)
+        try:
+            return ujson.dumps(data)
+        except (ValueError, TypeError) as exc:
+            raise SerializingError(exc)
 
     def deserialize(self, data: str) -> dict:
-        return ujson.loads(data)
+        try:
+            return ujson.loads(data)
+        except (ValueError, TypeError) as exc:
+            raise SerializingError(exc)
 
     @classmethod
     def get(cls, name: str) -> 'Signal':
@@ -71,6 +81,10 @@ class Receiver:
     handler: Callable
     signal: Signal
     timeout: Union[int, float]
+
+    @property
+    def key(self) -> str:
+        return self.handler.__qualname__
 
     def __repr__(self) -> str:
         return f'<Receiver {self.handler.__name__} of {self.agent} for {self.signal}>'

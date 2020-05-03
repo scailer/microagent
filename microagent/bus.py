@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Optional, List, Union, Callable, Dict, Any, Tuple, ClassVar, Type
 from datetime import datetime
 
-from .signal import Signal, Receiver
+from .signal import Signal, Receiver, SerializingError
 
 response_signal = Signal(name='response', providing_args=[])
 
@@ -54,10 +54,10 @@ class ResponseContext:
     def finish(cls, signal_id: str, message: Dict[str, Union[str, int, None]]) -> None:
         resp = cls.get(signal_id)  # type: Optional[ResponseContext]
 
-        if not resp:
+        if not resp:  # already closed
             return
 
-        if not resp.await_from:
+        if not resp.await_from:  # return first
             return resp.fut.set_result(message)
 
         resp.response.update(message)
@@ -131,13 +131,12 @@ class AbstractSignalBus(abc.ABC):
         return NotImplemented  # pragma: no cover
 
     async def bind_receiver(self, receiver: Receiver) -> None:
-        self.receivers[receiver.signal.name].append(receiver)
         self.log.info('Bind %s to %s: %s', receiver.signal, self, receiver)
         if receiver.signal.name not in self.receivers:
             await self.bind(receiver.signal.make_channel_name(self.prefix))
+        self.receivers[receiver.signal.name].append(receiver)
 
     async def call(self, channel: str, message: str, await_from: List[str] = None) -> Any:
-
         async with self.response_context(await_from, self.RESPONSE_TIMEOUT) as (signal_id, future):
             await self.send(f'{channel}#{signal_id}', message)
             return await future
@@ -153,8 +152,8 @@ class AbstractSignalBus(abc.ABC):
 
         try:
             data = signal.deserialize(message)  # type: dict
-        except ValueError:
-            self.log.error('Invalid pubsub message: %s', data)
+        except SerializingError:
+            self.log.error('Invalid pubsub message: %s', message)
             return
 
         if not isinstance(data, dict):
@@ -191,7 +190,7 @@ class AbstractSignalBus(abc.ABC):
             await self.send(
                 f'{self.prefix}:response:{self.uid}#{signal_id}',
                 ujson.dumps({
-                    rec.handler: res for rec, res in zip(receivers, responses)
+                    rec.key: res for rec, res in zip(receivers, responses)
                 })
             )
 

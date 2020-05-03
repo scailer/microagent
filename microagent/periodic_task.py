@@ -61,20 +61,20 @@ class PeriodicTask(PeriodicMixin):
 class CRONTask(PeriodicMixin):
     agent: 'microagent.MicroAgent'
     handler: Callable
-    croniter: croniter.croniter
+    cron: croniter.croniter
     timeout: float
 
     def __repr__(self) -> str:
-        return f'<CRONTask {self.handler.__name__} of {self.agent} every {self.croniter}>'
+        return f'<CRONTask {self.handler.__name__} of {self.agent} every {self.cron}>'
 
     @property
     def start_after(self) -> float:
-        return self.croniter.get_next(float) - time.time()
+        return self.cron.get_next(float) - time.time()
 
     @property
     def period(self) -> float:
         self.agent.log.debug('Run %s', self)
-        return self.croniter.get_next(float) - time.time()
+        return self.cron.get_next(float) - time.time()
 
 
 def _periodic(task: Union[PeriodicTask, CRONTask]) -> asyncio.Task:

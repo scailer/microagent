@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from typing import Optional, Iterable, Callable, Union, Dict, Tuple
 from inspect import getmembers, ismethod
 from datetime import datetime, timedelta
+import croniter
 
 from .signal import Signal, Receiver
 from .queue import Queue, Consumer
@@ -298,7 +299,7 @@ class PeriodicHandler(UnboundHandler):
 @dataclass(frozen=True)
 class CRONHandler(UnboundHandler):
     handler: Callable
-    spec: str
+    cron: croniter.croniter
     timeout: Union[int, float]
     target_class = CRONTask
     _register = {}  # type: Dict[Tuple[str, str, str], CRONHandler]

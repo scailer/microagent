@@ -92,7 +92,7 @@ def cron(spec: str, timeout: Union[int, float] = 1) -> Callable:
     def _decorator(func):
         func._cron = CRONHandler(
             handler=func,
-            croniter=croniter(spec, time.time()),
+            cron=croniter(spec, time.time()),
             timeout=float(timeout)
         )
         return func
