@@ -31,19 +31,10 @@ from .signal import Signal, Receiver
 from .queue import Queue, Consumer
 from .bus import AbstractSignalBus
 from .broker import AbstractQueueBroker
-from .hooks import Hooks
+from .hooks import Hooks, Hook
 from .periodic_task import PeriodicTask, CRONTask
 
-
-@dataclass(frozen=True)
-class Server:
-    agent: 'MicroAgent'
-    handler: Callable
-    endpoint: str
-    options: dict
-
-
-HandlerTypes = Union[Receiver, Consumer, PeriodicTask, CRONTask, Server]
+HandlerTypes = Union[Receiver, Consumer, PeriodicTask, CRONTask, Hook]
 
 
 class MicroAgent:
@@ -96,7 +87,6 @@ class MicroAgent:
     cron_tasks: Iterable[CRONTask]
     receivers: Iterable[Receiver]
     consumers: Iterable[Consumer]
-    servers: Iterable[Server]
     hook: Hooks
 
     def __new__(cls, bus, broker, **kwargs) -> 'MicroAgent':
@@ -106,9 +96,8 @@ class MicroAgent:
         agent.cron_tasks = CRONHandler.bound(agent)
         agent.receivers = ReceiverHandler.bound(agent)
         agent.consumers = ConsumerHandler.bound(agent)
-        agent.servers = ServerHandler.bound(agent)
+        agent.hook = Hooks(HookHandler.bound(agent))
         agent.log = logging.getLogger('microagent')
-        agent.hook = Hooks(agent)
         agent.settings = {}
 
         if agent.receivers:
@@ -159,7 +148,7 @@ class MicroAgent:
             :param enable_receiving_signals: default enabled
         '''
 
-        await self.hook.on_pre_start()
+        await self.hook.pre_start()
 
         if enable_receiving_signals:
             await self.bind_receivers(self.receivers)
@@ -170,22 +159,16 @@ class MicroAgent:
         if enable_periodic_tasks:
             self.run_periodic_tasks(self.periodic_tasks, self.cron_tasks)
 
-        await self.hook.on_post_start()
+        await self.hook.post_start()
 
         if enable_servers_running:
-            await self.run_servers(self.servers)
+            await self.run_servers(self.hook.servers)
 
     async def stop(self) -> None:
-        await self.hook.on_pre_stop()
+        await self.hook.pre_stop()
 
-    async def run_servers(self, servers: Iterable[Server]) -> None:
-        _servers = []
-
-        for server in servers:
-            _servers.append(server.handler(server.endpoint, **server.options))
-            self.log.info('Starting server %s', server.endpoint)
-
-        await asyncio.gather(*_servers)
+    async def run_servers(self, servers: Iterable[Callable]) -> None:
+        await asyncio.gather(*[server() for server in servers])
 
     def run_periodic_tasks(self, periodic_tasks: Iterable[PeriodicTask],
             cron_tasks: Iterable[CRONTask]) -> None:
@@ -322,9 +305,8 @@ class CRONHandler(UnboundHandler):
 
 
 @dataclass(frozen=True)
-class ServerHandler(UnboundHandler):
+class HookHandler(UnboundHandler):
     handler: Callable
-    endpoint: str
-    options: dict
-    target_class = Server
-    _register = {}  # type: Dict[Tuple[str, str, str], ServerHandler]
+    label: str
+    target_class = Hook
+    _register = {}  # type: Dict[Tuple[str, str, str], HookHandler]

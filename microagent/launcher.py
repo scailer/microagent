@@ -5,10 +5,12 @@ import argparse
 import importlib
 import logging
 import concurrent.futures
+from typing import Optional, Iterator, Tuple, Union, Dict, Type, List, Any
 from itertools import chain
 from functools import partial
 from multiprocessing import parent_process
 
+CFG_T = Tuple[str, Dict[str, Any]]
 
 __all__ = (
     'GroupInterrupt',
@@ -27,50 +29,83 @@ class GroupInterrupt(SystemExit):
     pass
 
 
-def load_configuration(config_path: str):
+def load_configuration(config_path: str) -> Iterator[Tuple[str, CFG_T]]:
     '''
-        Load configuration from module and prepare it for initializint agents
+        Load configuration from module and prepare it for initializing agents.
+        Returns list of unfolded configs for each agent.
+
+        .. code-block:: python
+
+        BUS = {
+            'default': {
+                'backend': 'microagent.tools.aioredis.AIORedisSignalBus',
+                'dsn': 'redis://localhost',
+                'prefix': 'APP',
+            }
+        }
+
+        BROKER = {
+            'main': {
+                'backend': 'microagent.tools.amqp.AMQPBroker',
+                'dsn': 'amqp://guest:guest@localhost:5671/myhost',
+            }
+        }
+
+        AGENT = {
+            'my_agent': {
+                'backend': 'app.agent.AppAgent',
+                'bus': 'default',
+                'broker': 'main',
+            }
+        }
     '''
 
     mod = importlib.import_module(config_path)
-    _agents = getattr(mod, 'AGENT', {})
-    _brokers = getattr(mod, 'BROKER', {})
-    _buses = getattr(mod, 'BUS', {})
 
-    for name, cfg in _agents.items():
+    _buses = dict(_configuration(getattr(mod, 'BROKER', {})))
+    _brokers = dict(_configuration(getattr(mod, 'BUS', {})))
+
+    for name, (backend, cfg) in _configuration(getattr(mod, 'AGENT', {})):
         cfg['bus'] = _buses.get(cfg.pop('bus', None))
         cfg['broker'] = _brokers.get(cfg.pop('broker', None))
-        yield name, cfg
+        if backend:
+            yield name, (backend, cfg)
 
 
-def init_agent(cfg: dict):
+def _configuration(data: Dict[str, Dict[str, str]]) -> Iterator[Tuple[str, CFG_T]]:
+    for name, params in data.items():
+        backend = params.pop('backend', None)
+        if backend:
+            yield name, (backend, params)
+
+
+def init_agent(backend: str, cfg: Dict[str, Any]) -> 'microagent.MicroAgent':
     '''
-        Initialize agent from config-dict
+        Import and load all using backends from config,
+        initialize it and returns not started MicroAgent instance
     '''
 
-    bus = cfg.pop('bus', None)
-    broker = cfg.pop('broker', None)
+    _bus = cfg.pop('bus', None)  # type: Optional[CFG_T]
+    _broker = cfg.pop('broker', None)  # type: Optional[CFG_T]
 
-    if bus:
-        Bus = _import(bus.pop('backend'))
-        bus = Bus(**bus)
+    if _bus:
+        bus = _import(_bus[0])(**_bus[1])  # type: microagent.bus.AbstractSignalBus
 
-    if broker:
-        Broker = _import(broker.pop('backend'))
-        broker = Broker(**broker)
+    if _broker:
+        broker = _import(_broker[0])(**_broker[1])  # type: microagent.bus.AbstractQueueBroker
 
-    Agent = _import(cfg.pop('backend'))
-    return Agent(bus=bus, broker=broker, **cfg)
+    return _import(backend)(bus=bus, broker=broker, **cfg)
 
 
-def _import(path):
+def _import(path: str):
     mod = importlib.import_module('.'.join(path.split('.')[:-1]))
     return getattr(mod, path.split('.')[-1])
 
 
-def _run_agent(name, cfg):
+def _run_agent(name: str, backend: str, cfg: Dict[str, Any]) -> None:
     '''
-        Initialize and run microagent
+        Initialize MicroAgent instance from config and run it forever
+        Contains handling for process control
     '''
     logger.info('Run Agent %s pid#%s', name, os.getpid())
 
@@ -84,7 +119,7 @@ def _run_agent(name, cfg):
         # Check master & force break
         loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, parent_process().pid, loop)
 
-        agent = init_agent(cfg)
+        agent = init_agent(backend, cfg)
 
         try:
             await agent.start()  # wait when servers used
@@ -102,20 +137,20 @@ def _run_agent(name, cfg):
     asyncio.run(_run())
 
 
-def _interrupter(signal):
-    logger.warning('Catch %s signal', signal)
-    raise GroupInterrupt(signal)
+def _interrupter(sig):
+    logger.warning('Catch %s signal', sig)
+    raise GroupInterrupt(sig)
 
 
-def _master_watcher(pid, loop):
+def _master_watcher(pid: int, loop: asyncio.BaseEventLoop):
     loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, pid, loop)
     try:
         os.kill(pid, 0)  # check master process
     except ProcessLookupError:
-        os._exit(os.EX_OK)  # hard break better than deattached pocesses
+        os._exit(os.EX_OK)  # noqa: W0212 hard break better than deattached pocesses
 
 
-async def _run_master(cfg):
+async def _run_master(cfg: List[Tuple[str, CFG_T]]):
     with concurrent.futures.ProcessPoolExecutor(len(cfg)) as pool:
         pool.interrupter_lock = False
         signal.signal(signal.SIGTERM, partial(_signal_cb, pool=pool))
@@ -123,7 +158,7 @@ async def _run_master(cfg):
         futures = []
 
         for name, _cfg in cfg:
-            fut = pool.submit(_run_agent, name, _cfg)  # run agent in forked process
+            fut = pool.submit(_run_agent, name, *_cfg)  # run agent in forked process
             fut.add_done_callback(partial(_stop_cb, name))  # subscribe for finishing
             futures.append(fut)
 
@@ -136,7 +171,7 @@ async def _run_master(cfg):
                 _close_pool(pool)
 
         except KeyboardInterrupt:
-            logger.waiting('Quit')
+            logger.warning('Quit')
 
         except Exception as exc:
             logger.error('Quit with error %s', exc, exc_info=True)

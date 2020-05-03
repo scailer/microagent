@@ -3,7 +3,7 @@ import uuid
 import logging
 import asyncio
 
-from typing import Optional
+from typing import Dict, Optional, Protocol, Callable, runtime_checkable
 from .queue import Queue, Consumer
 
 
@@ -24,11 +24,12 @@ class BoundQueue:
         return await self.broker.queue_length(self.queue.name)
 
 
-class AbstractQueueBroker(abc.ABC):
+@runtime_checkable
+class AbstractQueueBroker(Protocol):
     uid: str
     dsn: str
     log: logging.Logger
-    _bindings: dict
+    _bindings: Dict[str, Consumer]
 
     def __new__(cls, dsn, **kwargs) -> 'AbstractQueueBroker':
         broker = super(AbstractQueueBroker, cls).__new__(cls)
@@ -53,11 +54,18 @@ class AbstractQueueBroker(abc.ABC):
         return NotImplemented  # pragma: no cover
 
     @abc.abstractmethod
-    async def bind(self, name: str, handler) -> None:
+    async def bind(self, name: str) -> None:
         return NotImplemented  # pragma: no cover
 
     async def bind_consumer(self, consumer: Consumer) -> None:
-        await self.bind(consumer.queue.name, consumer)
+        if consumer.queue.name in self._bindings:
+            self.log.warning('Handler to queue "%s" already binded. Ignoring', consumer)
+            return
+
+        self._bindings[consumer.queue.name] = consumer
+        await self.bind(consumer.queue.name)
+
+        self.log.debug('Bind %s to queue "%s"', consumer, consumer.queue.name)
 
     @abc.abstractmethod
     async def queue_length(self, name: str, **options) -> int:

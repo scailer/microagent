@@ -136,17 +136,13 @@ class AbstractSignalBus(abc.ABC):
         if receiver.signal.name not in self.receivers:
             await self.bind(receiver.signal.make_channel_name(self.prefix))
 
-    @abc.abstractmethod
-    def receiver(self, *args, **kwargs):
-        return NotImplemented  # pragma: no cover
-
     async def call(self, channel: str, message: str, await_from: List[str] = None) -> Any:
 
         async with self.response_context(await_from, self.RESPONSE_TIMEOUT) as (signal_id, future):
             await self.send(f'{channel}#{signal_id}', message)
             return await future
 
-    def _receiver(self, channel: str, message: str) -> None:
+    def receiver(self, channel: str, message: str) -> None:
         signal_id = None  # type: Optional[str]
 
         if '#' in channel:

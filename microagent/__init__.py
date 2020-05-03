@@ -13,11 +13,10 @@ import ujson
 
 from .signal import Signal
 from .queue import Queue
-from .agent import MicroAgent, ReceiverHandler, ConsumerHandler, PeriodicHandler, CRONHandler
-from .hooks import on
+from .agent import MicroAgent, ReceiverHandler, ConsumerHandler, PeriodicHandler, CRONHandler, HookHandler
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer', 'periodic',
-           'endpoint', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
+           'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
 
 
 def load_stuff(source: str) -> Tuple[object, object]:
@@ -101,7 +100,7 @@ def cron(spec: str, timeout: Union[int, float] = 1) -> Callable:
     return _decorator
 
 
-def receiver(*signals: Union[Signal, str], timeout: int = 60) -> Callable:
+def receiver(*signals: Signal, timeout: int = 60) -> Callable:
     '''
         Decorator binding handler to receiving signals
 
@@ -144,17 +143,20 @@ def consumer(queue: Queue, timeout: int = 60, **options) -> Callable:
     return _decorator
 
 
-def endpoint(url, **options) -> Callable:
+def on(label: str) -> Callable:
     '''
-        Decorator marking handler as subserver runner.
-        Will run in start() method, and make it runnig forever for transperent
-        error passing.
+        Hooks for internal events (pre_start, post_start, pre_stop)
+        or running forever servers (server)
+
+        :param label: Hook type label string (pre_start, post_start, pre_stop, server)
     '''
+    assert label in ('pre_start', 'post_start', 'pre_stop', 'server'), 'Bad label'
 
     def _decorator(func):
-        func.options = options
-        func.endpoint = url
-        func.__server__ = True
+        func._hook = HookHandler(
+            handler=func,
+            label=label
+        )
         return func
 
     return _decorator

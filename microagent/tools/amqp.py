@@ -1,13 +1,13 @@
 import logging
 import asyncio
-
-from collections import namedtuple, defaultdict
 from functools import partial
+from dataclasses import dataclass
+from collections import namedtuple, defaultdict
+from typing import Optional, Dict, Any, Callable
 from datetime import datetime
-from typing import Optional, Any
 
-import aioamqp
-from ..broker import AbstractQueueBroker
+import aioamqp  # type: ignore
+from ..broker import AbstractQueueBroker, Consumer, Queue
 
 try:
     from ssl import SSLContext
@@ -15,14 +15,23 @@ except ImportError:  # pragma: no cover
     SSLContext = Any  # type: ignore
 
 
-MessageMeta = namedtuple('MessageMeta', ['queue', 'channel', 'envelope', 'properties'])
+@dataclass(frozen=True)
+class MessageMeta:
+    queue: Queue
+    channel: aioamqp.channel.Channel
+    envelope: aioamqp.envelope.Envelope
+    properties: aioamqp.properties.Properties
 
 
 class ChannelContext:
-    def __init__(self, broker):
-        self.broker = broker
+    broker: 'AMQPBroker'
+    channel: Optional[aioamqp.channel.Channel]
 
-    async def __aenter__(self):
+    def __init__(self, broker: 'AMQPBroker'):
+        self.broker = broker
+        self.channel = None
+
+    async def __aenter__(self) -> aioamqp.channel.Channel:
         self.channel = await self.broker.get_channel()
         return self.channel
 
@@ -34,9 +43,11 @@ class ChannelContext:
 class AMQPBroker(AbstractQueueBroker):
     REBIND_ATTEMPTS = 3
 
-    def __init__(self, dsn: str, ssl_context: Optional[SSLContext] = None,
-            logger: Optional[logging.Logger] = None):
+    protocol: Optional[aioamqp.AmqpProtocol]
+    ssl_context: Optional[SSLContext]
+    _bind_attempts: dict
 
+    def __init__(self, dsn: str, ssl_context: SSLContext = None, logger: logging.Logger = None):
         super().__init__(dsn, logger)
 
         self.protocol = None
@@ -44,13 +55,13 @@ class AMQPBroker(AbstractQueueBroker):
         self.ssl_context = ssl_context
 
     @property
-    def channels(self):
+    def channels(self) -> Dict[int, aioamqp.channel.Channel]:
         if self.protocol:
             return self.protocol.channels
         else:
             return {}
 
-    async def connect(self, **kwargs):
+    async def connect(self, **kwargs) -> aioamqp.AmqpProtocol:
         url = aioamqp.urlparse(self.dsn)
         return await aioamqp.connect(
             host=url.hostname or 'localhost',
@@ -62,12 +73,11 @@ class AMQPBroker(AbstractQueueBroker):
             **kwargs
         )
 
-    async def send(self, name: str, message: str, **kwargs):
-        kwargs['exchange_name'] = kwargs.get('exchange_name', '')
+    async def send(self, name: str, message: str, exchange: str = '', **kwargs) -> None:
         async with ChannelContext(self) as channel:
-            await channel.basic_publish(message, routing_key=name, **kwargs)
+            await channel.basic_publish(message, routing_key=name, exchange_name=exchange, **kwargs)
 
-    def _on_amqp_error(self, name, exception):
+    def _on_amqp_error(self, name: str, exception: Exception):
         self.log.warning('Catch AMPQ exception %s on queue "%s"', exception, name)
         handler = self._bindings.pop(name, None)
 
@@ -75,9 +85,9 @@ class AMQPBroker(AbstractQueueBroker):
             self.log.error('Failed rebind queue "%s" without handler', name)
             return
 
-        asyncio.ensure_future(self.rebind(name, handler))
+        asyncio.ensure_future(self.rebind(name))
 
-    async def rebind(self, name, handler):
+    async def rebind(self, name: str) -> None:
         if self._bind_attempts[name] > self.REBIND_ATTEMPTS:
             self.log.error('Failed all attempts to rebind queue "%s"', name, exc_info=True)
             return
@@ -86,39 +96,32 @@ class AMQPBroker(AbstractQueueBroker):
         self._bind_attempts[name] += 1
 
         try:
-            await self.bind(name, handler)
-            self.log.info('Success rebind queue "%s": %s', name, handler)
+            await self.bind(name)
+            self.log.info('Success rebind queue "%s"', name)
             del self._bind_attempts[name]
 
         except (OSError, aioamqp.AmqpClosedConnection, aioamqp.ChannelClosed) as exc:
             self.log.error('Failed rebind queue "%s": %s', name, exc, exc_info=True)
-            asyncio.ensure_future(self.rebind(name, handler))
+            asyncio.ensure_future(self.rebind(name))
 
-    async def bind(self, name, handler):
-        if name in self._bindings:
-            self.log.warning('Handler to queue "%s" already binded. Ignoring', name)
-            return
-
+    async def bind(self, name: str):
         _, protocol = await self.connect(on_error=partial(self._on_amqp_error, name))
-        channel = await protocol.channel()
-
-        self.log.debug('Bind %s to queue "%s"', handler, name)
+        channel = await protocol.channel()  # type: aioamqp.channel.Channel
+        consumer = self._bindings[name]
 
         try:
-            await channel.basic_consume(self._amqp_wrapper(handler), queue_name=name)
+            await channel.basic_consume(self._amqp_wrapper(consumer), queue_name=name)
 
         except aioamqp.ChannelClosed as exc:
             if exc.code != 404:
                 raise
 
             self.log.warning('Declare queue "%s"', name)
-            channel = await protocol.channel()
+            channel = await protocol.channel()  # type: ignore
             await channel.queue_declare(name)
-            await channel.basic_consume(self._amqp_wrapper(handler), queue_name=name)
+            await channel.basic_consume(self._amqp_wrapper(consumer), queue_name=name)
 
-        self._bindings[name] = handler
-
-    async def get_channel(self):
+    async def get_channel(self) -> aioamqp.channel.Channel:
         if not self.protocol:
             _, self.protocol = await self.connect()
 
@@ -128,44 +131,44 @@ class AMQPBroker(AbstractQueueBroker):
             self.protocol = None  # Drop connection cache
             raise
 
-    def _amqp_wrapper(self, handler):
+    def _amqp_wrapper(self, consumer: Consumer) -> Callable:
         async def _wrapper(channel, body, envelope, properties):
-            data = handler.queue.deserialize(body)
+            data = consumer.queue.deserialize(body)
             data['amqp'] = MessageMeta(
-                queue=handler.queue, channel=channel,
+                queue=consumer.queue, channel=channel,
                 envelope=envelope, properties=properties)
 
-            self.log.debug('Calling %s by %s with %s', handler.__qualname__,
-                handler.queue.name, str(data).encode('utf-8'))
+            self.log.debug('Calling %s by %s with %s', consumer,
+                consumer.queue.name, str(data).encode('utf-8'))
 
             try:
-                response = handler(**data)
+                response = consumer.handler(**data)
             except TypeError:
-                self.log.error('Call %s failed', handler.__qualname__, exc_info=True)
+                self.log.error('Call %s failed', consumer, exc_info=True)
                 return
 
             if asyncio.iscoroutine(response):
                 timer = datetime.now().timestamp()
 
                 try:
-                    await asyncio.wait_for(response, handler.timeout)
+                    await asyncio.wait_for(response, consumer.timeout)
                 except asyncio.TimeoutError:
-                    self.log.fatal('TimeoutError: %s %.2f', handler.__qualname__,
+                    self.log.fatal('TimeoutError: %s %.2f', consumer,
                         datetime.now().timestamp() - timer)
                     return
 
-            if handler.options.get('autoack', True):
+            if consumer.options.get('autoack', True):
                 await channel.basic_client_ack(delivery_tag=envelope.delivery_tag)
 
         return _wrapper
 
-    async def declare_queue(self, name, **options):
+    async def declare_queue(self, name: str, **options) -> None:
         async with ChannelContext(self) as channel:
             info = await channel.queue_declare(name, **options)
             self.log.info('Declare/get queue "%(queue)s" with %(message_count)s '
                 'messages, %(consumer_count)s consumers', info)
 
-    async def queue_length(self, name):
+    async def queue_length(self, name: str, **kwargs) -> int:
         async with ChannelContext(self) as channel:
             info = await channel.queue_declare(name)
             return int(info['message_count'])

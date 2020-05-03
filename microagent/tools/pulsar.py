@@ -62,7 +62,7 @@ class RedisSignalBus(AbstractSignalBus):
         super().__init__(dsn, prefix, logger)
         redis = create_store(dsn, decode_responses=True, loop=self._loop)
         self.transport = redis.pubsub()
-        self.transport.add_client(self.receiver)
+        self.transport.add_client(self._receiver)
 
     async def send(self, channel, message):
         await self.transport.publish(channel, message)
@@ -70,8 +70,8 @@ class RedisSignalBus(AbstractSignalBus):
     async def bind(self, channel):
         await self.transport.psubscribe(channel)
 
-    def receiver(self, channel, message):
-        self._receiver(channel, message)
+    def _receiver(self, channel, message):
+        self.receiver(channel, message)
 
 
 class PulsarRedisBroker(RedisBrokerMixin, AbstractQueueBroker):
