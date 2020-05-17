@@ -5,22 +5,23 @@ import logging
 from typing import Optional, Callable
 from datetime import datetime
 
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer  # type: ignore
+import aiokafka  # type: ignore
 
 from ..broker import AbstractQueueBroker, Consumer
 
 
 class KafkaBroker(AbstractQueueBroker):
     addr: str
-    producer: AIOKafkaProducer
+    producer: aiokafka.AIOKafkaProducer
 
     def __init__(self, dsn: str, logger: logging.Logger = None) -> None:
         super().__init__(dsn, logger)
+        _loop = asyncio.get_running_loop()
         self.addr = urllib.parse.urlparse(dsn).netloc
-        self.producer = AIOKafkaProducer(loop=self._loop, bootstrap_servers=self.addr)
+        self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
 
     async def send(self, name: str, message: str, **kwargs) -> None:
-        if not self.producer._closed:
+        if self.producer._closed:
             await self.producer.start()
 
         try:
@@ -28,14 +29,15 @@ class KafkaBroker(AbstractQueueBroker):
 
         finally:
             await self.producer.stop()
-            self.producer = AIOKafkaProducer(loop=self._loop, bootstrap_servers=self.addr)
+            _loop = asyncio.get_running_loop()
+            self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
 
     async def bind(self, name: str):
         loop = asyncio.get_running_loop()
-        kafka_consumer = AIOKafkaConsumer(name, loop=loop, bootstrap_servers=self.addr)
+        kafka_consumer = aiokafka.AIOKafkaConsumer(name, loop=loop, bootstrap_servers=self.addr)
         asyncio.ensure_future(self._kafka_wrapper(kafka_consumer, name))
 
-    async def _kafka_wrapper(self, kafka_consumer: AIOKafkaConsumer, name: str) -> None:
+    async def _kafka_wrapper(self, kafka_consumer: aiokafka.AIOKafkaConsumer, name: str) -> None:
         consumer = self._bindings[name]
         await kafka_consumer.start()
 

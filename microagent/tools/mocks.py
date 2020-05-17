@@ -13,7 +13,7 @@ class BusMock(MagicMock):
     def __init__(self):
         super().__init__(spec=AbstractSignalBus)
         self._stuff = {}
-        self.bind_signal = AsyncMock()
+        self.bind_receiver = AsyncMock()
         self.send = AsyncMock()
         self.call = AsyncMock()
         self.__str__ = lambda x: self.__class__.__name__

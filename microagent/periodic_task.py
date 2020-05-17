@@ -41,8 +41,8 @@ class PeriodicMixin:
             except Exception as exc:
                 self.agent.log.fatal(f'Periodic Exception: {exc}', exc_info=True)
 
-    def start(self) -> None:
-        asyncio.get_running_loop().call_later(self.start_after, _periodic, self)
+    def start(self, start_after: float) -> None:
+        asyncio.get_running_loop().call_later(start_after, _periodic, self)
 
 
 @dataclass(frozen=True)
@@ -69,12 +69,12 @@ class CRONTask(PeriodicMixin):
 
     @property
     def start_after(self) -> float:
-        return self.cron.get_next(float) - time.time()
+        return self.cron.get_next(float) - time.time()  # increment counter, return initial delay
 
     @property
     def period(self) -> float:
         self.agent.log.debug('Run %s', self)
-        return self.cron.get_next(float) - time.time()
+        return self.cron.get_next(float) - time.time()  # increment counter, return next step delay
 
 
 def _periodic(task: Union[PeriodicTask, CRONTask]) -> asyncio.Task:

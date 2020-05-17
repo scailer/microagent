@@ -8,6 +8,7 @@ from collections import defaultdict
 
 class RedisBrokerMixin:
     WAIT_TIME: int = 15
+    BIND_TIME: float = 1
     ROLLBACK_ATTEMPTS: int = 3
 
     log: logging.Logger
@@ -25,7 +26,7 @@ class RedisBrokerMixin:
 
     async def bind(self, name: str) -> None:
         _loop = asyncio.get_running_loop()
-        _loop.call_later(1, lambda: asyncio.ensure_future(self._wait(name)))
+        _loop.call_later(self.BIND_TIME, lambda: asyncio.ensure_future(self._wait(name)))
 
     async def _wait(self, name: str) -> None:
         transport = await self.new_connection()

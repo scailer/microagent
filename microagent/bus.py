@@ -12,8 +12,6 @@ from datetime import datetime
 
 from .signal import Signal, Receiver, SerializingError
 
-response_signal = Signal(name='response', providing_args=[])
-
 
 class ResponseContext:
     _responses: Dict[str, 'ResponseContext'] = {}
@@ -46,6 +44,15 @@ class ResponseContext:
             self.fut.cancel()
         self._responses.pop(self.signal_id, None)
 
+    def complete(self) -> None:
+        if self.await_from:
+            result = {k: v for k, v in self.response.items() if k in self.await_from}
+        else:
+            result = self.response
+
+        self.fut.set_result(result)
+        self.close()
+
     @classmethod
     def get(cls, signal_id: str) -> Optional['ResponseContext']:
         return cls._responses.get(signal_id)
@@ -55,14 +62,18 @@ class ResponseContext:
         resp = cls.get(signal_id)  # type: Optional[ResponseContext]
 
         if not resp:  # already closed
-            return
-
-        if not resp.await_from:  # return first
-            return resp.fut.set_result(message)
+            return None
 
         resp.response.update(message)
-        if set(resp.await_from) - set(x.split('.')[0] for x in resp.response.keys()):
-            resp.fut.set_result(resp.response)
+
+        if not resp.await_from:  # return first
+            resp.complete()
+
+        elif not (set(resp.await_from) - set(x.split('.')[0] for x in resp.response.keys())):
+            resp.complete()
+
+        else:
+            return None
 
 
 def response_context_factory() -> Type[ResponseContext]:
@@ -111,6 +122,7 @@ class AbstractSignalBus(abc.ABC):
         if logger:
             self.log = logger
 
+        response_signal = Signal(name='response', providing_args=[])
         asyncio.create_task(self.bind(response_signal.make_channel_name(self.prefix)))
 
         self.log.debug('%s initialized', self)
@@ -211,15 +223,15 @@ class AbstractSignalBus(abc.ABC):
 
             try:
                 response = await asyncio.wait_for(response, receiver.timeout)
-                if isinstance(response, (int, str)):
-                    return response
 
             except asyncio.TimeoutError:
                 self.log.error(
                     'TimeoutError: %s %.2f', receiver.handler,
                     datetime.now().timestamp() - timer)
+                return None
 
-        return None
+        if isinstance(response, (int, str)):
+            return response
 
 
 class BoundSignal:

@@ -1,3 +1,40 @@
+'''
+    Configuration and launch MicroAgents
+
+    Specify bus, brokers and agents in python-file
+
+    .. code-block:: python
+
+        BUS = {
+            'default': {
+                'backend': 'microagent.tools.aioredis.AIORedisSignalBus',
+                'dsn': 'redis://localhost',
+                'prefix': 'APP',
+            }
+        }
+
+        BROKER = {
+            'main': {
+                'backend': 'microagent.tools.amqp.AMQPBroker',
+                'dsn': 'amqp://guest:guest@localhost:5671/myhost',
+            }
+        }
+
+        AGENT = {
+            'my_agent': {
+                'backend': 'app.agent.AppAgent',
+                'bus': 'default',
+                'broker': 'main',
+            }
+        }
+
+    Launch all agents
+
+    .. code-block:: bash
+
+        marun myproject.app1 myproject.app2
+'''
+
 import os
 import signal
 import asyncio
@@ -34,42 +71,17 @@ def load_configuration(config_path: str) -> Iterator[Tuple[str, CFG_T]]:
         Load configuration from module and prepare it for initializing agents.
         Returns list of unfolded configs for each agent.
 
-        .. code-block:: python
-
-        BUS = {
-            'default': {
-                'backend': 'microagent.tools.aioredis.AIORedisSignalBus',
-                'dsn': 'redis://localhost',
-                'prefix': 'APP',
-            }
-        }
-
-        BROKER = {
-            'main': {
-                'backend': 'microagent.tools.amqp.AMQPBroker',
-                'dsn': 'amqp://guest:guest@localhost:5671/myhost',
-            }
-        }
-
-        AGENT = {
-            'my_agent': {
-                'backend': 'app.agent.AppAgent',
-                'bus': 'default',
-                'broker': 'main',
-            }
-        }
     '''
 
     mod = importlib.import_module(config_path)
 
-    _buses = dict(_configuration(getattr(mod, 'BROKER', {})))
-    _brokers = dict(_configuration(getattr(mod, 'BUS', {})))
+    _buses = dict(_configuration(getattr(mod, 'BUS', {})))
+    _brokers = dict(_configuration(getattr(mod, 'BROKER', {})))
 
     for name, (backend, cfg) in _configuration(getattr(mod, 'AGENT', {})):
         cfg['bus'] = _buses.get(cfg.pop('bus', None))
         cfg['broker'] = _brokers.get(cfg.pop('broker', None))
-        if backend:
-            yield name, (backend, cfg)
+        yield name, (backend, cfg)
 
 
 def _configuration(data: Dict[str, Dict[str, str]]) -> Iterator[Tuple[str, CFG_T]]:
@@ -85,6 +97,7 @@ def init_agent(backend: str, cfg: Dict[str, Any]) -> 'microagent.MicroAgent':
         initialize it and returns not started MicroAgent instance
     '''
 
+    bus, broker = None, None
     _bus = cfg.pop('bus', None)  # type: Optional[CFG_T]
     _broker = cfg.pop('broker', None)  # type: Optional[CFG_T]
 
@@ -108,8 +121,11 @@ def _run_agent(name: str, backend: str, cfg: Dict[str, Any]) -> None:
         Contains handling for process control
     '''
     logger.info('Run Agent %s pid#%s', name, os.getpid())
+    asyncio.run(run_agent(name, backend, cfg, parent_process().pid))
 
-    async def _run():
+
+async def run_agent(name: str, backend: str, cfg: Dict[str, Any], pid: int = None) -> None:
+    if pid:  # pid if run in coprocess
         loop = asyncio.get_event_loop()
 
         # Interrupt process when master shutdown
@@ -117,24 +133,26 @@ def _run_agent(name: str, backend: str, cfg: Dict[str, Any]) -> None:
         loop.add_signal_handler(signal.SIGTERM, partial(_interrupter, 'TERM'))
 
         # Check master & force break
-        loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, parent_process().pid, loop)
+        loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, pid, loop)
 
-        agent = init_agent(backend, cfg)
+    agent = init_agent(backend, cfg)
 
-        try:
-            await agent.start()  # wait when servers used
-        except (KeyboardInterrupt, GroupInterrupt):
+    try:
+        await agent.start()  # wait when servers used
+
+    except (KeyboardInterrupt, GroupInterrupt):
+        if pid:
+            loop = asyncio.get_event_loop()
             loop.stop()
-            return
-        except Exception as exc:
-            logger.error('Catch error %s', exc, exc_info=True)
-            raise
+        return
 
-        while True:  # wait when no servers in agent
-            logger.debug('Agent %s alive', name)
-            await asyncio.sleep(3600)
+    except Exception as exc:
+        logger.error('Catch error %s', exc, exc_info=True)
+        raise
 
-    asyncio.run(_run())
+    while True:  # wait when no servers in agent
+        logger.debug('Agent %s alive', name)
+        await asyncio.sleep(3600)
 
 
 def _interrupter(sig):

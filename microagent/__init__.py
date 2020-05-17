@@ -1,7 +1,6 @@
 '''
-Docs
 '''
-__version__ = '0.10'
+__version__ = '1.0'
 
 from collections import namedtuple
 from typing import Union, Tuple, Callable, Dict, Iterable, List, Any

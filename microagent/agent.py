@@ -49,11 +49,11 @@ class MicroAgent:
         - server
 
         :param bus: signal bus object of subclass :class:`AbstractSignalBus`,
-            required if `receiver` used
+            required for recieve or send signals
         :param broker:  queue broker object of subclass :class:`AbstractQueueBroker`,
-            required if `consumer` used
+            required for consume or send messages
         :param logger: prepared :class:`logging.Logger`,
-            setup default logger if not provided
+            or use default logger if not provided
         :param settings: dict of user settings storing in object
 
         .. attribute:: log
@@ -90,7 +90,7 @@ class MicroAgent:
     consumers: Iterable[Consumer]
     hook: Hooks
 
-    def __new__(cls, bus, broker, **kwargs) -> 'MicroAgent':
+    def __new__(cls, **kwargs) -> 'MicroAgent':
         agent = super(MicroAgent, cls).__new__(cls)
 
         agent.periodic_tasks = PeriodicHandler.bound(agent)
@@ -102,11 +102,13 @@ class MicroAgent:
         agent.settings = {}
 
         if agent.receivers:
+            bus = kwargs.get('bus')
             assert bus, 'Bus required'
             assert isinstance(bus, AbstractSignalBus), \
                 f'Bus must be AbstractSignalBus instance or None instead {bus}'
 
         if agent.consumers:
+            broker = kwargs.get('broker')
             assert broker, 'Broker required'
             assert isinstance(broker, AbstractQueueBroker), \
                 f'Broker must be AbstractQueueBroker instance or None instead {broker}'
@@ -175,7 +177,7 @@ class MicroAgent:
             cron_tasks: Iterable[CRONTask]) -> None:
 
         for task in [*periodic_tasks, *cron_tasks]:
-            start_after = getattr(self, 'start_after', None) or 0  # type: Union[int, float]
+            start_after = getattr(task, 'start_after', None) or 0  # type: Union[int, float]
 
             if start_after > 100:
                 start_at = datetime.now() + timedelta(seconds=start_after)  # type: datetime
@@ -183,19 +185,17 @@ class MicroAgent:
             else:
                 self.log.debug('Set %s after %d sec', self, start_after)
 
-            task.start()
+            task.start(start_after)
 
     async def bind_receivers(self, receivers: Iterable[Receiver]) -> None:
         ''' Bind signal receivers to bus subscribers '''
-        if self.bus:
-            for receiver in receivers:
-                await self.bus.bind_receiver(receiver)
+        for receiver in receivers:
+            await self.bus.bind_receiver(receiver)
 
     async def bind_consumers(self, consumers: Iterable[Consumer]) -> None:
         ''' Bind message consumers to queues '''
-        if self.broker:
-            for consumer in consumers:
-                await self.broker.bind_consumer(consumer)
+        for consumer in consumers:
+            await self.broker.bind_consumer(consumer)
 
     def info(self) -> dict:
         '''
@@ -215,7 +215,7 @@ class MicroAgent:
             'cron': [
                 {
                     'name': task.handler.__name__,
-                    'cron': str(task.croniter),
+                    'cron': str(task.cron),
                 }
                 for task in self.cron_tasks
             ],
@@ -251,16 +251,16 @@ class UnboundHandler:
 
         for _cls in agent.__class__.__mro__:
             if _cls.__module__ != 'builtins' and _cls.__name__ != 'MicroAgent':
-                classes.append((_cls.__module__, _cls.__name__))
+                classes.append((_cls.__module__, *_cls.__qualname__.split('.')))
 
         for lookup_key, unbound in cls._register.items():
             args = unbound.__dict__
             args.pop('handler', None)
 
-            if tuple(lookup_key[:2]) in classes:
+            if tuple(lookup_key[:-1]) in classes:
                 result.append(cls.target_class(
                     agent=agent,
-                    handler=getattr(agent, lookup_key[-1]),
+                    handler=getattr(agent, lookup_key[-1].split(':')[0]),
                     **args
                 ))
 
@@ -274,6 +274,10 @@ class ReceiverHandler(UnboundHandler):
     timeout: Union[int, float]
     target_class = Receiver
     _register = {}  # type: Dict[Tuple[str, str, str], ReceiverHandler]
+
+    def __post_init__(self):
+        key = self.handler.__module__, *self.handler.__qualname__.split('.')
+        self._register[(*key[:-1], f'{key[-1]}:{self.signal.name}')] = self
 
 
 @dataclass(frozen=True)

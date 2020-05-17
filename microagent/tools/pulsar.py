@@ -60,9 +60,10 @@ class BrokerSSLCert(MicroAgentSetting):
 class RedisSignalBus(AbstractSignalBus):
     def __init__(self, dsn, prefix='PUBSUB', logger=None):
         super().__init__(dsn, prefix, logger)
-        redis = create_store(dsn, decode_responses=True, loop=self._loop)
+        _loop = asyncio.get_running_loop()
+        redis = create_store(dsn, decode_responses=True, loop=_loop)
         self.transport = redis.pubsub()
-        self.transport.add_client(self._receiver)
+        self.transport.add_client(self.receiver)
 
     async def send(self, channel, message):
         await self.transport.publish(channel, message)
@@ -70,14 +71,15 @@ class RedisSignalBus(AbstractSignalBus):
     async def bind(self, channel):
         await self.transport.psubscribe(channel)
 
-    def _receiver(self, channel, message):
-        self.receiver(channel, message)
+    def receiver(self, channel, message):
+        self._receiver(channel, message)
 
 
 class PulsarRedisBroker(RedisBrokerMixin, AbstractQueueBroker):
     def __init__(self, dsn: str, logger: Optional[logging.Logger] = None):
         super().__init__(dsn, logger)
-        self.redis_store = create_store(dsn, decode_responses=True, loop=self._loop)
+        _loop = asyncio.get_running_loop()
+        self.redis_store = create_store(dsn, decode_responses=True, loop=_loop)
         self.transport = self.redis_store.client()
 
     async def new_connection(self):
@@ -139,31 +141,3 @@ class MicroAgentApp(Application):
 
     def worker_stopping(self, worker, exc=None):
         asyncio.ensure_future(worker.agent.stop())
-
-
-class AgentTestCase(unittest.TestCase):
-    CHANNEL_PREFIX = 'TEST'
-    REDIS_DSN = 'redis://localhost:6379/5'
-    AGENT_CLASS = None
-    SETTINGS = {
-        'redis_server': RedisServer(),
-        'signal_prefix': SignalPrefix(),
-        'signal_bus': SignalBus(),
-        'queue_broker': QueueBroker(),
-    }
-
-    @classmethod
-    async def setUpClass(cls):
-        cls.SETTINGS['redis_server'].set(cls.REDIS_DSN)
-        cls.SETTINGS['signal_bus'].set(cls.REDIS_DSN)
-        cls.SETTINGS['queue_broker'].set(cls.REDIS_DSN)
-        cls.SETTINGS['signal_prefix'].set(cls.CHANNEL_PREFIX)
-        cls.loop = asyncio.get_event_loop()
-        cls.bus = RedisSignalBus(cls.REDIS_DSN, prefix=cls.CHANNEL_PREFIX)
-        cls.agent = cls.AGENT_CLASS(cls.bus, settings=cls.SETTINGS,
-            enable_periodic_tasks=False, enable_receiving_signals=False)
-
-    @classmethod
-    def tearDownClass(cls):
-        del cls.agent
-        del cls.bus

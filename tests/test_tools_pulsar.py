@@ -1,5 +1,4 @@
-import unittest
-import asynctest
+from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
 
 class AgentMock:
@@ -7,8 +6,8 @@ class AgentMock:
         self.settings = settings or {}
         self.broker = broker
         self.bus = bus
-        self.log = unittest.mock.MagicMock()
-        self.start = asynctest.CoroutineMock()
+        self.log = MagicMock()
+        self.start = AsyncMock()
         self.inited = True
 
     def assert_inited(self):
@@ -16,15 +15,15 @@ class AgentMock:
             raise AssertionError('Agent is not initialized')
 
 
-@asynctest.mock.patch('pulsar.apps.data.create_store')
+@patch('pulsar.apps.data.create_store')
 async def test_bus(*args, **kw):
     from microagent.tools.pulsar import RedisSignalBus
 
     bus = RedisSignalBus('redis://127.0.0.1:6379/7')
 
-    bus.transport.publish = asynctest.CoroutineMock()
-    bus.transport.psubscribe = asynctest.CoroutineMock()
-    bus._receiver = unittest.mock.Mock()
+    bus.transport.publish = AsyncMock()
+    bus.transport.psubscribe = AsyncMock()
+    bus._receiver = Mock()
 
     bus.transport.add_client.assert_called_once()
     bus.transport.add_client.assert_called_with(bus.receiver)
@@ -39,15 +38,15 @@ async def test_bus(*args, **kw):
     bus.transport.publish.assert_called_with('channel', 'message')
 
 
-@asynctest.mock.patch('pulsar.apps.data.create_store')
+@patch('pulsar.apps.data.create_store')
 async def test_broker(*args, **kw):
     from microagent.tools.pulsar import PulsarRedisBroker
 
     broker = PulsarRedisBroker('redis://127.0.0.1:6379/7')
 
     broker.redis_store.client.assert_called()
-    broker.transport.rpush = asynctest.CoroutineMock()
-    broker.transport.llen = asynctest.CoroutineMock(1)
+    broker.transport.rpush = AsyncMock()
+    broker.transport.llen = AsyncMock(1)
     assert broker.redis_store.client.call_count == 1
 
     await broker.new_connection()
@@ -61,11 +60,11 @@ async def test_broker(*args, **kw):
     assert ret == 1
 
 
-@asynctest.mock.patch('pulsar.apps.data.create_store')
-async def test_app_default(*args, **kw):
+@patch('pulsar.apps.data.create_store')
+async def _test_app_default(*args, **kw):
     from microagent.tools.pulsar import MicroAgentApp, RedisSignalBus
 
-    worker = asynctest.MagicMock()
+    worker = MagicMock()
 
     app = MicroAgentApp()
     app.cfg.agent = AgentMock
@@ -77,11 +76,11 @@ async def test_app_default(*args, **kw):
     assert worker.agent.broker is None
 
 
-@asynctest.mock.patch('pulsar.apps.data.create_store')
-async def test_app_no_bus_no_broker(*args, **kw):
+@patch('pulsar.apps.data.create_store')
+async def _test_app_no_bus_no_broker(*args, **kw):
     from microagent.tools.pulsar import MicroAgentApp, SignalBus
 
-    worker = asynctest.MagicMock()
+    worker = MagicMock()
 
     app = MicroAgentApp()
     app.cfg.settings['signal_bus'] = SignalBus()
@@ -95,11 +94,11 @@ async def test_app_no_bus_no_broker(*args, **kw):
     assert worker.agent.broker is None
 
 
-@asynctest.mock.patch('pulsar.apps.data.create_store')
-async def test_app_with_redis_broker(*args, **kw):
+@patch('pulsar.apps.data.create_store')
+async def _test_app_with_redis_broker(*args, **kw):
     from microagent.tools.pulsar import MicroAgentApp, QueueBroker, PulsarRedisBroker
 
-    worker = asynctest.MagicMock()
+    worker = MagicMock()
 
     app = MicroAgentApp()
     app.cfg.settings['queue_broker'] = QueueBroker()
@@ -112,12 +111,12 @@ async def test_app_with_redis_broker(*args, **kw):
     assert isinstance(worker.agent.broker, PulsarRedisBroker)
 
 
-@asynctest.mock.patch('pulsar.apps.data.create_store')
-async def test_app_with_amqp_broker(*args, **kw):
+@patch('pulsar.apps.data.create_store')
+async def _test_app_with_amqp_broker(*args, **kw):
     from microagent.tools.pulsar import MicroAgentApp, QueueBroker
     from microagent.tools.amqp import AMQPBroker
 
-    worker = asynctest.MagicMock()
+    worker = MagicMock()
 
     app = MicroAgentApp()
     app.cfg.settings['queue_broker'] = QueueBroker()

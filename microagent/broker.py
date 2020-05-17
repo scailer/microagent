@@ -3,7 +3,7 @@ import uuid
 import logging
 import asyncio
 
-from typing import Dict, Optional, Protocol, Callable, runtime_checkable
+from typing import Dict, Optional, Callable
 from .queue import Queue, Consumer
 
 
@@ -24,8 +24,7 @@ class BoundQueue:
         return await self.broker.queue_length(self.queue.name)
 
 
-@runtime_checkable
-class AbstractQueueBroker(Protocol):
+class AbstractQueueBroker(abc.ABC):
     uid: str
     dsn: str
     log: logging.Logger

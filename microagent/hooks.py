@@ -1,3 +1,7 @@
+'''
+Internal hooks
+'''
+
 import inspect
 from dataclasses import dataclass
 from collections import defaultdict
@@ -12,6 +16,10 @@ class Hook:
 
 
 class Hooks:
+    '''
+    Internal hooks
+    '''
+
     binds: Dict[str, List[Hook]]
 
     def __init__(self, hooks: Iterable[Hook]):

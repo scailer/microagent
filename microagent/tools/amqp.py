@@ -99,10 +99,12 @@ class AMQPBroker(AbstractQueueBroker):
             await self.bind(name)
             self.log.info('Success rebind queue "%s"', name)
             del self._bind_attempts[name]
+            return True
 
         except (OSError, aioamqp.AmqpClosedConnection, aioamqp.ChannelClosed) as exc:
             self.log.error('Failed rebind queue "%s": %s', name, exc, exc_info=True)
             asyncio.ensure_future(self.rebind(name))
+            return False
 
     async def bind(self, name: str):
         _, protocol = await self.connect(on_error=partial(self._on_amqp_error, name))

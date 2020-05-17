@@ -3,6 +3,19 @@ from dataclasses import dataclass
 import ujson
 
 
+class QueueException(Exception):
+    ''' Base signal exception '''
+    pass
+
+
+class QueueNotFound(QueueException):
+    pass
+
+
+class SerializingError(QueueException):
+    pass
+
+
 @dataclass(frozen=True)
 class Queue:
     name: str
@@ -20,10 +33,16 @@ class Queue:
         return self.name == other.name
 
     def serialize(self, data: dict) -> str:
-        return ujson.dumps(data)
+        try:
+            return ujson.dumps(data)
+        except (ValueError, TypeError) as exc:
+            raise SerializingError(exc)
 
     def deserialize(self, data: str) -> dict:
-        return ujson.loads(data)
+        try:
+            return ujson.loads(data)
+        except (ValueError, TypeError) as exc:
+            raise SerializingError(exc)
 
     @classmethod
     def get(cls, name: str) -> 'Queue':
@@ -31,7 +50,7 @@ class Queue:
         try:
             return cls._queues[name]
         except KeyError:
-            raise Exception(f'No such signal {name}')
+            raise QueueNotFound(f'No such queue {name}')
 
     @classmethod
     def get_all(cls) -> Dict[str, 'Queue']:
