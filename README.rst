@@ -1,23 +1,28 @@
-|pypiversion|  |pyversions|  |license|  |status|  |downloads|  |travis|  |coverage|  |docs|
+MicroAgent
+==========
 
+.. image:: https://img.shields.io/pypi/v/microagent.svg
+   :target: https://pypi.python.org/pypi/microagent
 
-.. |pypiversion| image:: https://img.shields.io/pypi/v/microagent.svg
-    :target: https://pypi.python.org/pypi/microagent
-.. |pyversions| image:: https://img.shields.io/pypi/pyversions/microagent.svg
+.. image:: https://img.shields.io/pypi/pyversions/microagent.svg
   :target: https://pypi.python.org/pypi/microagent
-.. |license| image:: https://img.shields.io/pypi/l/microagent.svg
+
+.. image:: https://img.shields.io/pypi/l/microagent.svg
   :target: https://pypi.python.org/pypi/microagent
-.. |status| image:: https://img.shields.io/pypi/status/microagent.svg
+
+.. image:: https://img.shields.io/pypi/status/microagent.svg
   :target: https://pypi.python.org/pypi/microagent
-.. |downloads| image:: https://img.shields.io/pypi/dd/microagent.svg
+
+.. image:: https://img.shields.io/pypi/dd/microagent.svg
   :target: https://pypi.python.org/pypi/microagent
-.. |contributors| image:: https://img.shields.io/github/contributors/scailer/microagent.svg
-  :target: https://github.com/scailer/microagent/graphs/contributors
-.. |coverage| image:: https://codecov.io/gh/scailer/microagent/branch/master/graph/badge.svg
+
+.. image:: https://codecov.io/gh/scailer/microagent/branch/master/graph/badge.svg
   :target: https://codecov.io/gh/scailer/microagent
-.. |travis| image:: https://api.travis-ci.org/scailer/microagent.svg?branch=master
+
+.. image:: https://api.travis-ci.org/scailer/microagent.svg?branch=master
   :target: https://travis-ci.org/scailer/microagent
-.. |docs| image:: https://readthedocs.org/projects/microagent/badge/?version=latest&style=flat
+
+.. image:: https://readthedocs.org/projects/microagent/badge/?version=latest&style=flat
   :target: https://microagent.readthedocs.io/
 
 
