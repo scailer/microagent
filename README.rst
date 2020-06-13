@@ -19,7 +19,7 @@ MicroAgent
 .. image:: https://codecov.io/gh/scailer/microagent/branch/master/graph/badge.svg
   :target: https://codecov.io/gh/scailer/microagent
 
-.. image:: https://api.travis-ci.org/scailer/microagent.svg?branch=master
+.. image:: https://travis-ci.org/scailer/microagent.svg?branch=master
   :target: https://travis-ci.org/scailer/microagent
 
 .. image:: https://readthedocs.org/projects/microagent/badge/?version=latest&style=flat
