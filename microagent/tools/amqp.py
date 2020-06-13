@@ -24,7 +24,6 @@ class MessageMeta:
     '''
         .. _amqp_meta:
 
-
         MessageMeta - DTO for entity provided by aioamqp
 
         .. attribute:: queue
