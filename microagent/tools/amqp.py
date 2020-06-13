@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import ssl
 
 from collections import namedtuple, defaultdict
 from functools import partial
@@ -14,38 +15,34 @@ MessageMeta = namedtuple('MessageMeta', ['queue', 'channel', 'envelope', 'proper
 
 
 class ChannelContext:
-    def __init__(self, broker, once=False):
+    def __init__(self, broker):
         self.broker = broker
-        self.once = once
 
     async def __aenter__(self):
-        try:
-            channel_id = self.broker._reuse_channel_ids.pop()
-            self.channel = self.broker.channels[channel_id]
-
-        except KeyError:
-            self.channel = await self.broker.get_channel()
-
+        self.channel = await self.broker.get_channel()
         return self.channel
 
     async def __aexit__(self, exc_type, exc, traceback):
-        if self.once:
-            await self.channel.close()
-
-        else:
-            self.broker._reuse_channel_ids.add(self.channel.channel_id)
-
+        await self.channel.close()
         return True
 
 
 class AMQPBroker(AbstractQueueBroker):
     REBIND_ATTEMPTS = 3
 
-    def __init__(self, dsn: str, logger: Optional[logging.Logger] = None):
+    def __init__(self, dsn: str, ssl_cert: str = None,
+            logger: Optional[logging.Logger] = None):
+
         super().__init__(dsn, logger)
+
+        self.ssl = None
         self.protocol = None
         self._bind_attempts = defaultdict(lambda: 1)
-        self._reuse_channel_ids = set()
+
+        if ssl_cert:
+            self.ssl = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            self.ssl.check_hostname = False
+            self.ssl.load_verify_locations(ssl_cert)
 
     @property
     def channels(self):
@@ -53,6 +50,18 @@ class AMQPBroker(AbstractQueueBroker):
             return self.protocol.channels
         else:
             return {}
+
+    async def connect(self, **kwargs):
+        url = aioamqp.urlparse(self.dsn)
+        return await aioamqp.connect(
+            host=url.hostname or 'localhost',
+            port=url.port,
+            login=url.username or 'guest',
+            password=url.password or 'guest',
+            virtualhost=(url.path[1:] if len(url.path) > 1 else '/'),
+            ssl=self.ssl if url.scheme == 'amqps' else None,
+            **kwargs
+        )
 
     async def send(self, name: str, message: str, **kwargs):
         kwargs['exchange_name'] = kwargs.get('exchange_name', '')
@@ -91,8 +100,7 @@ class AMQPBroker(AbstractQueueBroker):
             self.log.warning('Handler to queue "%s" already binded. Ignoring', name)
             return
 
-        _, protocol = await aioamqp.from_url(
-            self.dsn, on_error=partial(self._on_amqp_error, name))
+        _, protocol = await self.connect(on_error=partial(self._on_amqp_error, name))
         channel = await protocol.channel()
 
         self.log.debug('Bind %s to queue "%s"', handler, name)
@@ -113,8 +121,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     async def get_channel(self):
         if not self.protocol:
-            self._reuse_channel_ids = set()
-            _, self.protocol = await aioamqp.from_url(self.dsn)
+            _, self.protocol = await self.connect()
 
         try:
             return await self.protocol.channel()
@@ -154,7 +161,7 @@ class AMQPBroker(AbstractQueueBroker):
         return _wrapper
 
     async def declare_queue(self, name, **options):
-        async with ChannelContext(self, once=True) as channel:
+        async with ChannelContext(self) as channel:
             info = await channel.queue_declare(name, **options)
             self.log.info('Declare/get queue "%(queue)s" with %(message_count)s '
                 'messages, %(consumer_count)s consumers', info)
