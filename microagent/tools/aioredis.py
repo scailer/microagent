@@ -47,6 +47,7 @@ class AIORedisSignalBus(AbstractSignalBus):
             self.transport = await aioredis.create_redis(self.dsn)
         await self.transport.publish(channel, message)
 
+
     async def bind(self, channel: str) -> None:
         async with self._pubsub_lock:
             if not self.pubsub:

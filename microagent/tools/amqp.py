@@ -3,6 +3,7 @@
 '''
 import logging
 import asyncio
+
 from functools import partial
 from dataclasses import dataclass
 from collections import defaultdict
@@ -22,6 +23,7 @@ except ImportError:  # pragma: no cover
 class MessageMeta:
     '''
         .. _amqp_meta:
+
 
         MessageMeta - DTO for entity provided by aioamqp
 

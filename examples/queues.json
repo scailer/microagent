@@ -1,0 +1,6 @@
+{
+    "version": 1,
+    "queues": [
+        {"name": "my_queue"}
+    ]
+}
