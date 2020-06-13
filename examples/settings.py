@@ -1,9 +1,10 @@
 import sys
 import logging
 
-logging.basicConfig(
-format='%(levelname)-8s [pid#%(process)d] %(asctime)s %(name)s %(filename)s:%(lineno)d %(message)s',
-stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(format=(
+    '%(levelname)-8s [pid#%(process)d] %(asctime)s %(name)s '
+    '%(filename)s:%(lineno)d %(message)s'
+), stream=sys.stdout, level=logging.DEBUG)
 
 
 BUS = {

@@ -50,7 +50,7 @@ async def test_Queue_serialize_ok(test_queue):
 
 async def test_Queue_serialize_fail(test_queue):
     with pytest.raises(SerializingError):
-        test_queue.serialize({'a': pytest})
+        test_queue.serialize({'a': logging})
 
 
 async def test_Queue_deserialize_ok(test_queue):

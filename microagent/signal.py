@@ -1,6 +1,9 @@
-from typing import List, Dict, Callable, Union
+from typing import List, Dict, Callable, Union, TYPE_CHECKING
 from dataclasses import dataclass
 import ujson
+
+if TYPE_CHECKING:
+    from .agent import MicroAgent
 
 
 class SignalException(Exception):
@@ -104,7 +107,7 @@ class Signal:
         '''
         try:
             return ujson.dumps(data)
-        except (ValueError, TypeError) as exc:
+        except (ValueError, TypeError, OverflowError) as exc:
             raise SerializingError(exc)
 
     def deserialize(self, data: str) -> dict:
@@ -115,13 +118,13 @@ class Signal:
         '''
         try:
             return ujson.loads(data)
-        except (ValueError, TypeError) as exc:
+        except (ValueError, TypeError, OverflowError) as exc:
             raise SerializingError(exc)
 
 
 @dataclass(frozen=True)
 class Receiver:
-    agent: 'microagent.MicroAgent'
+    agent: 'MicroAgent'
     handler: Callable
     signal: Signal
     timeout: Union[int, float]

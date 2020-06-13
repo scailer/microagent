@@ -1,8 +1,7 @@
 import os
 import asyncio
 from collections import defaultdict
-from microagent import MicroAgent, on, periodic, receiver, consumer, cron, load_stuff
-from microagent.tools.aioredis import AIORedisSignalBus, AIORedisBroker
+from microagent import MicroAgent, on, receiver, load_stuff
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 signals, queues = load_stuff('file://' + os.path.join(cur_dir, 'signals.json'))

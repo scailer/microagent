@@ -1,4 +1,3 @@
-import os
 import sys
 import asyncio
 import logging
@@ -8,9 +7,10 @@ from user_agent import UserAgent
 from comment_agent import CommentAgent
 from email_agent import EmailAgent
 
-logging.basicConfig(
-format='%(levelname)-8s [pid#%(process)d] %(asctime)s %(name)s %(filename)s:%(lineno)d %(message)s',
-stream=sys.stdout, level=logging.DEBUG)
+logging.basicConfig(format=(
+    '%(levelname)-8s [pid#%(process)d] %(asctime)s %(name)s '
+    '%(filename)s:%(lineno)d %(message)s'
+), stream=sys.stdout, level=logging.DEBUG)
 
 
 async def main():

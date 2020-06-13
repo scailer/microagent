@@ -42,10 +42,16 @@ import argparse
 import importlib
 import logging
 import concurrent.futures
-from typing import Optional, Iterator, Tuple, Union, Dict, Type, List, Any
+from typing import Optional, Iterator, Tuple, Dict, List, Any, TYPE_CHECKING
 from itertools import chain
 from functools import partial
 from multiprocessing import parent_process
+
+if TYPE_CHECKING:
+    from .agent import MicroAgent
+    from .bus import AbstractSignalBus
+    from .broker import AbstractQueueBroker
+
 
 CFG_T = Tuple[str, Dict[str, Any]]
 
@@ -91,21 +97,21 @@ def _configuration(data: Dict[str, Dict[str, str]]) -> Iterator[Tuple[str, CFG_T
             yield name, (backend, params)
 
 
-def init_agent(backend: str, cfg: Dict[str, Any]) -> 'microagent.MicroAgent':
+def init_agent(backend: str, cfg: Dict[str, Any]) -> 'MicroAgent':
     '''
         Import and load all using backends from config,
         initialize it and returns not started MicroAgent instance
     '''
 
     bus, broker = None, None
-    _bus = cfg.pop('bus', None)  # type: Optional[CFG_T]
-    _broker = cfg.pop('broker', None)  # type: Optional[CFG_T]
+    _bus: Optional[CFG_T] = cfg.pop('bus', None)
+    _broker: Optional[CFG_T] = cfg.pop('broker', None)
 
     if _bus:
-        bus = _import(_bus[0])(**_bus[1])  # type: microagent.bus.AbstractSignalBus
+        bus: 'AbstractSignalBus' = _import(_bus[0])(**_bus[1])
 
     if _broker:
-        broker = _import(_broker[0])(**_broker[1])  # type: microagent.bus.AbstractQueueBroker
+        broker: 'AbstractQueueBroker' = _import(_broker[0])(**_broker[1])
 
     return _import(backend)(bus=bus, broker=broker, **cfg)
 
@@ -203,7 +209,7 @@ def _stop_cb(name, future):
     try:
         future.result()
     except Exception as exc:
-        print(exc)
+        print(exc)  # noqa: T001
 
 
 def _signal_cb(signum, *args, pool):

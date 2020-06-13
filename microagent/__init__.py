@@ -1,8 +1,7 @@
 __version__ = '1.0'
 
 from collections import namedtuple
-from typing import Union, Tuple, Callable, Dict, Iterable, List, Any
-import importlib
+from typing import Union, Tuple, Callable, Dict, Iterable, Any
 import time
 
 from croniter import croniter
@@ -10,7 +9,8 @@ import ujson
 
 from .signal import Signal
 from .queue import Queue
-from .agent import MicroAgent, ReceiverHandler, ConsumerHandler, PeriodicHandler, CRONHandler, HookHandler
+from .agent import (MicroAgent, ReceiverHandler, ConsumerHandler,
+    PeriodicHandler, CRONHandler, HookHandler)
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer', 'periodic',
            'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']

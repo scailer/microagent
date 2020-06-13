@@ -1,11 +1,9 @@
 import ssl
 import asyncio
 import logging
-import unittest
 from typing import Optional
 
 from pulsar.apps.data import create_store
-from pulsar.apps.data.redis import RedisServer
 
 from ..bus import AbstractSignalBus
 from ..broker import AbstractQueueBroker

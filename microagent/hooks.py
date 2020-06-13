@@ -5,7 +5,10 @@ Internal hooks
 import inspect
 from dataclasses import dataclass
 from collections import defaultdict
-from typing import Callable, Dict, List, Iterable, Awaitable
+from typing import Callable, Dict, List, Iterable, Awaitable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .agent import MicroAgent
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,7 @@
 import logging
 import asyncio
 
-from typing import Optional, Callable, Dict, List
+from typing import Callable
 from datetime import datetime
 from collections import defaultdict
 

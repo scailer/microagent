@@ -5,7 +5,7 @@ import logging
 import asyncio
 from functools import partial
 from dataclasses import dataclass
-from collections import namedtuple, defaultdict
+from collections import defaultdict
 from typing import Optional, Dict, Any, Callable
 from datetime import datetime
 
@@ -145,7 +145,7 @@ class AMQPBroker(AbstractQueueBroker):
             :param message: string, serialized message
             :param exchange: string, target exchange name
             :param \*\*kwargs: dict, other basic_publish options
-        '''
+        '''  # noqa: W605
         async with ChannelContext(self) as channel:
             await channel.basic_publish(message, routing_key=name, exchange_name=exchange, **kwargs)
 
@@ -245,7 +245,7 @@ class AMQPBroker(AbstractQueueBroker):
 
             :param name: string, queue name
             :param \*\*options: other queue_declare options
-        '''
+        '''  # noqa: W605
         async with ChannelContext(self) as channel:
             info = await channel.queue_declare(name, **options)
             self.log.info('Declare/get queue "%(queue)s" with %(message_count)s '

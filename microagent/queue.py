@@ -1,6 +1,9 @@
-from typing import List, Dict, Callable, Union
+from typing import Dict, Callable, Union, TYPE_CHECKING
 from dataclasses import dataclass
 import ujson
+
+if TYPE_CHECKING:
+    from .agent import MicroAgent
 
 
 class QueueException(Exception):
@@ -81,7 +84,7 @@ class Queue:
         '''
         try:
             return ujson.dumps(data)
-        except (ValueError, TypeError) as exc:
+        except (ValueError, TypeError, OverflowError) as exc:
             raise SerializingError(exc)
 
     def deserialize(self, data: str) -> dict:
@@ -92,13 +95,13 @@ class Queue:
         '''
         try:
             return ujson.loads(data)
-        except (ValueError, TypeError) as exc:
+        except (ValueError, TypeError, OverflowError) as exc:
             raise SerializingError(exc)
 
 
 @dataclass(frozen=True)
 class Consumer:
-    agent: 'microagent.MicroAgent'
+    agent: 'MicroAgent'
     handler: Callable
     queue: Queue
     timeout: Union[int, float]

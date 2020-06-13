@@ -48,9 +48,8 @@ Using with MicroAgent
 import abc
 import uuid
 import logging
-import asyncio
 
-from typing import Dict, Optional, Callable
+from typing import Dict, Optional
 from .queue import Queue, Consumer
 
 
@@ -138,7 +137,7 @@ class AbstractQueueBroker(abc.ABC):
             :param name: string, queue name
             :param message: string, serialized object
             :param \*\*kwargs: specific parameters for each broker implementation
-        '''
+        '''  # noqa: W605
         return NotImplemented  # pragma: no cover
 
     @abc.abstractmethod
@@ -171,5 +170,5 @@ class AbstractQueueBroker(abc.ABC):
 
             :param name: string, queue name
             :param \*\*options: specific parameters for each broker implementation
-        '''
+        '''  # noqa: W605
         return NotImplemented  # pragma: no cover

@@ -58,7 +58,7 @@ async def test_Signal_serialize_ok(test_signal):
 
 async def test_Signal_serialize_fail(test_signal):
     with pytest.raises(SerializingError):
-        test_signal.serialize({'a': pytest})
+        test_signal.serialize({'a': uuid})
 
 
 async def test_Signal_deserialize_ok(test_signal):

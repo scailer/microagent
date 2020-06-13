@@ -52,8 +52,7 @@ import inspect
 import ujson
 
 from collections import defaultdict
-from dataclasses import dataclass
-from typing import Optional, List, Union, Callable, Dict, Any, Tuple, ClassVar, Type
+from typing import Optional, List, Union, Dict, Any, Tuple, Type
 from datetime import datetime
 
 from .signal import Signal, Receiver, SerializingError

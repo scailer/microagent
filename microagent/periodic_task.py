@@ -24,11 +24,14 @@ import asyncio
 import inspect
 import croniter
 from dataclasses import dataclass
-from typing import Union, Optional, Callable
+from typing import Union, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .agent import MicroAgent
 
 
 class PeriodicMixin:
-    agent: 'microagent.MicroAgent'
+    agent: 'MicroAgent'
     handler: Callable
     timeout: float
 
@@ -54,7 +57,7 @@ class PeriodicMixin:
 
 @dataclass(frozen=True)
 class PeriodicTask(PeriodicMixin):
-    agent: 'microagent.MicroAgent'
+    agent: 'MicroAgent'
     handler: Callable
     period: float
     timeout: float
@@ -66,7 +69,7 @@ class PeriodicTask(PeriodicMixin):
 
 @dataclass(frozen=True)
 class CRONTask(PeriodicMixin):
-    agent: 'microagent.MicroAgent'
+    agent: 'MicroAgent'
     handler: Callable
     cron: croniter.croniter
     timeout: float
@@ -77,16 +80,16 @@ class CRONTask(PeriodicMixin):
     @property
     def start_after(self) -> float:
         '''
-            *start_after* property of **CRONTask** object is a next value of generator behind facade.
-            Be carefully with manual manipulation with it.
+            *start_after* property of **CRONTask** object is a next value of
+            generator behind facade. Be carefully with manual manipulation with it.
         '''
         return self.cron.get_next(float) - time.time()  # increment counter, return initial delay
 
     @property
     def period(self) -> float:
         '''
-            *period* property of **CRONTask** object is a next value of generator behind facade.
-            Be carefully with manual manipulation with it.
+            *period* property of **CRONTask** object is a next value of
+            generator behind facade. Be carefully with manual manipulation with it.
         '''
         self.agent.log.debug('Run %s', self)
         return self.cron.get_next(float) - time.time()  # increment counter, return next step delay

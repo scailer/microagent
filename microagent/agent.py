@@ -79,7 +79,6 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Optional, Iterable, Callable, Union, Dict, Tuple
-from inspect import getmembers, ismethod
 from datetime import datetime, timedelta
 import croniter
 
@@ -174,13 +173,12 @@ class MicroAgent:
 
         return agent
 
-    def __init__(
-            self,
-            bus: AbstractSignalBus = None,
-            broker: AbstractQueueBroker = None,
-            logger: logging.Logger = None,
-            settings: dict = None
-        ) -> None:
+    def __init__(self,
+                bus: AbstractSignalBus = None,
+                broker: AbstractQueueBroker = None,
+                logger: logging.Logger = None,
+                settings: dict = None
+            ) -> None:
 
         self.bus = bus
         self.broker = broker
@@ -194,13 +192,12 @@ class MicroAgent:
     def __repr__(self) -> str:
         return f'<MicroAgent {self.__class__.__name__}>'
 
-    async def start(
-            self,
-            enable_periodic_tasks: Optional[bool] = True,
-            enable_receiving_signals: Optional[bool] = True,
-            enable_consuming_messages: Optional[bool] = True,
-            enable_servers_running: Optional[bool] = True
-        ) -> None:
+    async def start(self,
+                enable_periodic_tasks: Optional[bool] = True,
+                enable_receiving_signals: Optional[bool] = True,
+                enable_consuming_messages: Optional[bool] = True,
+                enable_servers_running: Optional[bool] = True
+            ) -> None:
         '''
             Starting MicroAgent to receive signals, consume messages
             and initiate periodic running.

@@ -2,7 +2,6 @@ import urllib
 import asyncio
 import logging
 
-from typing import Optional, Callable
 from datetime import datetime
 
 import aiokafka  # type: ignore
