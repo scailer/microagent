@@ -1,4 +1,11 @@
-''' :class:`MicroAgent` method can be runing periodicaly by time period or shedule (cron)
+'''
+The MicroAgent method can be run periodically after a certain period of time or
+on a schedule (cron).
+
+Periodic calls are implemented with *asyncio.call_later* chains.
+Before each method call, the next call is initiated.
+Each call is independent, and previous calls do not affect subsequent calls.
+Exceptions are written to the logger in the associated Microagent.
 
 .. code-block:: python
 
@@ -69,10 +76,18 @@ class CRONTask(PeriodicMixin):
 
     @property
     def start_after(self) -> float:
+        '''
+            *start_after* property of **CRONTask** object is a next value of generator behind facade.
+            Be carefully with manual manipulation with it.
+        '''
         return self.cron.get_next(float) - time.time()  # increment counter, return initial delay
 
     @property
     def period(self) -> float:
+        '''
+            *period* property of **CRONTask** object is a next value of generator behind facade.
+            Be carefully with manual manipulation with it.
+        '''
         self.agent.log.debug('Run %s', self)
         return self.cron.get_next(float) - time.time()  # increment counter, return next step delay
 

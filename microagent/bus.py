@@ -1,3 +1,49 @@
+'''
+Event-driven architecture is based on objects exchanging a non-directed messages - events.
+Here we assume that events (signals) that are not stored anywhere, everyone can
+receive and send them, like a radio-transfer.
+
+Here, the intermediary that manages messages routing is called the Signal Bus and
+implements the publish / subscribe pattern. A signal is a message with a strict fixed structure.
+The Bus contains many channels that are different for each type of signal.
+We can send a signal from many sources and listen it with many receivers.
+
+Implementations:
+
+* :ref:`aioredis <tools-aioredis>`
+
+
+Using SignalBus separately (sending only)
+
+.. code-block:: python
+
+    from microagent import load_signals
+    from microagent.tools.aioredis import AIORedisSignalBus
+
+    signals = load_signals('file://signals.json')
+
+    bus = AIORedisSignalBus('redis://localhost/7')
+    await bus.user_created.send('user_agent', user_id=1)
+
+
+Using with MicroAgent
+
+.. code-block:: python
+
+    from microagent import MicroAgent, load_signals
+    from microagent.tools.aioredis import AIORedisSignalBus
+
+    signals = load_signals('file://signals.json')
+
+    class UserAgent(MicroAgent):
+        @receiver(signals.user_created)
+        async def example(self, user_id, **kwargs):
+            await self.bus.user_created.send('some_signal', user_id=1)
+
+    bus = AIORedisSignalBus('redis://localhost/7')
+    user_agent = UserAgent(bus=bus)
+    await user_agent.start()
+'''
 import abc
 import uuid
 import logging
@@ -79,6 +125,7 @@ class ResponseContext:
 def response_context_factory() -> Type[ResponseContext]:
     '''
         Make isolated response context
+
     '''
 
     class BoundResponseContext(ResponseContext):
@@ -89,7 +136,45 @@ def response_context_factory() -> Type[ResponseContext]:
 
 class AbstractSignalBus(abc.ABC):
     '''
-        Signal bus
+        Signal bus is an abstract interface with two basic methods - send and bind.
+
+        `send`-method allows to publish some signal in the channel for subscribers.
+
+        `bind`-method allows to subscribe to the channel(s) for receive the signal(s).
+
+        `call`-method allows to use RPC based on `send` and `bind`.
+
+        All registered Signals are available in the bus object as attributes
+        with the names specified in the declaration.
+
+        .. code-block:: python
+
+            Signal(name='user_created', providing_args=['user_id'])
+
+            bus = AIORedisSignalBus('redis://localhost/7')
+            await bus.user_created.send('user_agent', user_id=1)
+
+        .. attribute:: dsn
+
+            Bus has only one required parameter - dsn-string (data source name),
+            which provide details for establishing a connection with the mediator-service.
+
+        .. attribute:: prefix
+
+            Channel prefix, string, one for project. It is allowing use same
+            redis for different projects.
+
+        .. attribute:: log
+
+            Provided or defaul logger
+
+        .. attribute:: uid
+
+            UUID, id of bus instance (for debugging)
+
+        .. attribute:: receivers
+
+            Dict of all binded receivers
     '''
 
     RESPONSE_TIMEOUT: int = 60  # sec
@@ -115,7 +200,6 @@ class AbstractSignalBus(abc.ABC):
         return bus
 
     def __init__(self, dsn: str, prefix: str = 'PUBSUB', logger: logging.Logger = None) -> None:
-
         self.dsn = dsn
         self.prefix = prefix
 
@@ -136,24 +220,64 @@ class AbstractSignalBus(abc.ABC):
 
     @abc.abstractmethod
     def send(self, channel: str, message: str):
+        '''
+            Send raw message to channel.
+
+            :param channel: string, channel name
+            :param message: string, serialized object
+        '''
         return NotImplemented  # pragma: no cover
 
     @abc.abstractmethod
     def bind(self, signal: str):
+        '''
+            Subscribe to channel.
+
+            :param signal: string, signal name for subscribe
+        '''
         return NotImplemented  # pragma: no cover
 
     async def bind_receiver(self, receiver: Receiver) -> None:
+        '''
+            Bind bounded to agent receiver to current bus.
+        '''
         self.log.info('Bind %s to %s: %s', receiver.signal, self, receiver)
         if receiver.signal.name not in self.receivers:
             await self.bind(receiver.signal.make_channel_name(self.prefix))
         self.receivers[receiver.signal.name].append(receiver)
 
-    async def call(self, channel: str, message: str, await_from: List[str] = None) -> Any:
+    async def call(self, channel: str, message: str, await_from: List[str] = None
+                ) -> Dict[str, Union[int, str, None]]:
+        '''
+            RPC over pub/sub. Pair of signals - sending and responsing. Response-signal
+            is an internal construction enabled by default. When we call `call` we send
+            a ordinary declared by user signal with a unique id and awaiting a response
+            with same id. The response can contain a string value or an integer that is
+            returned by the signal receiver. By default, it will catch only first value
+            if we have multiple signal receivers, but we can specify the name of the
+            target receiver that will respond to us.
+
+            Answer: ```{"<Class>.<method>": <value>}```
+
+            .. code-block:: python
+
+                class CommentAgent(MicroAgent):
+                    @receiver(signals.rpc_comments_count)
+                    async def example_rpc_handler(self, user_id, **kwargs):
+                        return 1
+
+                response = await bus.rpc_comments_count.call('user_agent', user_id=1)
+                value = response['CommentAgent.example_rpc_handler']
+        '''
         async with self.response_context(await_from, self.RESPONSE_TIMEOUT) as (signal_id, future):
             await self.send(f'{channel}#{signal_id}', message)
             return await future
 
     def receiver(self, channel: str, message: str) -> None:
+        '''
+            Handler of raw incoming messages.
+        '''
+
         signal_id = None  # type: Optional[str]
 
         if '#' in channel:

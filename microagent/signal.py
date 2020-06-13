@@ -8,6 +8,10 @@ class SignalException(Exception):
     pass
 
 
+class SignalNotFound(SignalException):
+    pass
+
+
 class SerializingError(SignalException):
     pass
 
@@ -15,20 +19,42 @@ class SerializingError(SignalException):
 @dataclass(frozen=True)
 class Signal:
     '''
-        Signal instance is descriptional entity based on redis channel.
+        Dataclass (declaration) for a signal entity with a unique name.
+        Each instance registered at creation.
+        Usually, you don't need to work directly with the Signal-class.
 
-        Format of channel name:
-            <prefix>:<name>:<sender>#<signal_id>
+        .. attribute:: name
 
-        prefix - global channel filter
-        name - signal identificator
-        sender - identificator of app wich send this signal
-        signal_id - identificator of signal (optional)
+            String, signal name, project-wide unique, `[a-z_]+`
 
-        some_signal = Signal(
-            providing_args=['some_arg'],
-            name='some_signal')
+        .. attribute:: providing_args
 
+            List of strings, all available and required parameters of message
+
+        .. attribute:: content_type
+
+            String, content format, `json` by default
+
+
+        Declaration with config-file (signals.json)
+
+        .. code-block:: json
+
+            {
+                "signals": [
+                    {"name": "started", "providing_args": []},
+                    {"name": "user_created", "providing_args": ["user_id"]},
+                ]
+            }
+
+        Manual declaration (not recommended)
+
+        .. code-block:: python
+
+            some_signal = Signal(
+                name='some_signal',
+                providing_args=['some_arg']
+            )
     '''
 
     name: str
@@ -47,32 +73,50 @@ class Signal:
             return NotImplemented
         return self.name == other.name
 
+    @classmethod
+    def get(cls, name: str) -> 'Signal':
+        ''' Get the signal instance by name '''
+        try:
+            return cls._signals[name]
+        except KeyError:
+            raise SignalNotFound(f'No such signal {name}')
+
+    @classmethod
+    def get_all(cls) -> Dict[str, 'Signal']:
+        ''' All registered signals '''
+        return cls._signals
+
     def make_channel_name(self, channel_prefix: str, sender: str = '*') -> str:
+        '''
+            Construct a channel name by the signal description
+
+            :param channel_prefix: prefix, often project name
+            :param name: signal name, project-wide unique
+            :param sender: name of signal sender
+        '''
         return f'{channel_prefix}:{self.name}:{sender}'
 
     def serialize(self, data: dict) -> str:
+        '''
+            Data serializing method
+
+            :param data: dict of transfered data
+        '''
         try:
             return ujson.dumps(data)
         except (ValueError, TypeError) as exc:
             raise SerializingError(exc)
 
     def deserialize(self, data: str) -> dict:
+        '''
+            Data deserializing method
+
+            :param data: serialized transfered data
+        '''
         try:
             return ujson.loads(data)
         except (ValueError, TypeError) as exc:
             raise SerializingError(exc)
-
-    @classmethod
-    def get(cls, name: str) -> 'Signal':
-        ''' Get signal instance by name '''
-        try:
-            return cls._signals[name]
-        except KeyError:
-            raise SignalException(f'No such signal {name}')
-
-    @classmethod
-    def get_all(cls) -> Dict[str, 'Signal']:
-        return cls._signals
 
 
 @dataclass(frozen=True)

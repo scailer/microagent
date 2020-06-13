@@ -1,6 +1,19 @@
 '''
+MicroAgent is a **container** for **signal receivers**, **message consumers**
+and **periodic tasks**. The MicroAgent links the abstract declarations of receivers
+and consumers with the provided bus and broker. The MicroAgent initiates
+periodic tasks and starts the servers.
+
+The microagent can be launched using the supplied launcher.
+Or it can be used as a stand-alone entity running in python-shell or a custom script.
+It may be useful for testing, exploring, debugging and launching in specific purposes.
+
+
+Agent declaration.
 
 .. code-block:: python
+
+    from microagent import MicroAgent, receiver, consumer, periodic, cron, on
 
     class Agent(MicroAgent):
 
@@ -19,7 +32,49 @@
         @consumer(queues.mailer)
         async def mail_handler(self, **kwargs):
             pass
+
+
+Agent initiation.
+
+.. code-block:: python
+
+    import logging
+    from microagent.tools.aioredis import AIORedisSignalBus, AIORedisBroker
+
+    # Initialize bus, broker and logger
+    bus = AIORedisSignalBus('redis://localhost/7')
+    broker = AIORedisBroker('redis://localhost/7')
+    log = logging.getLogger('my_log')
+    settings = {'secret': 'my_secret'}
+
+    # Initialize MicroAgent, all arguments optional
+    agent = Agent(bus=bus, broker=broker, logger=logger, settings=settings)
+
+
+Manual launching.
+
+.. code-block:: python
+
+    await user_agent.start()  # freezed here if sub-servers running
+
+    while True:
+        await asyncio.sleep(60)
+
+
+Using MicroAgent resources.
+
+.. code-block:: python
+
+    class Agent(MicroAgent):
+
+        async def setup(self):
+            self.log.info('Setup called!')  # write log
+            await self.bus.my_sugnal.send(sender='agent', param=1)  # use bus
+            await self.broker.my_queue.send({'text': 'Hello world!'})  # use broker
+            secret = self.settings['secret']  # user settings
+            print(self.info())  # serializable dict of agent structure
 '''
+
 import asyncio
 import logging
 from dataclasses import dataclass
@@ -40,18 +95,22 @@ HandlerTypes = Union[Receiver, Consumer, PeriodicTask, CRONTask, Hook]
 
 class MicroAgent:
     '''
-        MicroAgent
+        MicroAgent is a **container** for **signal receivers**,
+        **message consumers** and **periodic tasks**.
 
-        - reactive
-        - rpc
-        - periodic
-        - queue
-        - server
+        The magic of declarations binding to an agent-object is implemented in *__new__*.
+        Attaching the bus, broker and logger is implemented in *__init__*.
+        Subscribing and initiating periodic tasks and servers is implemented in *start* method.
 
-        :param bus: signal bus object of subclass :class:`AbstractSignalBus`,
-            required for recieve or send signals
-        :param broker:  queue broker object of subclass :class:`AbstractQueueBroker`,
-            required for consume or send messages
+        To create specialized MicroAgent classes, you can override *__init__*,
+        which is safe for the constructor logic. But it is usually sufficient to use
+        *@on('pre_start')* decorator for sync or async methods for initializing
+        resources and etc.
+
+        :param bus: signal bus, object of subclass :class:`AbstractSignalBus`,
+            required for receive or send the signals
+        :param broker:  queue broker, object of subclass :class:`AbstractQueueBroker`,
+            required for consume or send the messages
         :param logger: prepared :class:`logging.Logger`,
             or use default logger if not provided
         :param settings: dict of user settings storing in object
@@ -72,7 +131,7 @@ class MicroAgent:
 
             Queue broker, provided on initializing::
 
-                await self.broker.mailer.send({'text': 'Hellow world'})
+                await self.broker.mailer.send({'text': 'Hello world'})
 
         .. attribute:: settings
 
@@ -149,6 +208,7 @@ class MicroAgent:
             :param enable_periodic_tasks: default enabled
             :param enable_consuming_messages: default enabled
             :param enable_receiving_signals: default enabled
+            :param enable_servers_running: default enabled
         '''
 
         await self.hook.pre_start()

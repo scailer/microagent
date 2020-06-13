@@ -1,3 +1,6 @@
+'''
+:ref:`Queue Broker <broker>` based on :aioamqp:`aioamqp <>`.
+'''
 import logging
 import asyncio
 from functools import partial
@@ -17,6 +20,27 @@ except ImportError:  # pragma: no cover
 
 @dataclass(frozen=True)
 class MessageMeta:
+    '''
+        .. _amqp_meta:
+
+        MessageMeta - DTO for entity provided by aioamqp
+
+        .. attribute:: queue
+
+            Queue object
+
+        .. attribute:: channel
+
+            aioamqp.channel.Channel
+
+        .. attribute:: envelope
+
+            aioamqp.envelope.Envelope
+
+        .. attribute:: properties
+
+            aioamqp.properties.Properties
+    '''
     queue: Queue
     channel: aioamqp.channel.Channel
     envelope: aioamqp.envelope.Envelope
@@ -41,6 +65,45 @@ class ChannelContext:
 
 
 class AMQPBroker(AbstractQueueBroker):
+    '''
+        The broker is based on the basic_consume method of the AMQP and sends
+        a acknowledgement automatically if the handler is completed without errors.
+        The consumer takes an exclusive channel. Sending an reuse the channels.
+
+        :param dsn: string, data source name for connection amqp://guest@localhost:5672/
+        :param ssl_context: SSLContext object for encrypted amqps connection (only for amqps)
+        :param logger: logging.Logger (optional)
+
+        .. code-block:: python
+
+            from microagent.tools.amqp import AMQPBroker
+
+            broker = AMQPBroker('amqp://guest:guest@localhost:5672/')
+
+            await broker.user_created.send({'user_id': 1})
+
+
+        `@consumer`-decorator for this broker has an additional option - `autoack`,
+        which enables / disables sending automatic acknowledgements.
+
+        .. code-block:: python
+
+            class EmailAgent(MicroAgent):
+                @consumer(queues.mailer, autoack=False)
+                async def example_read_queue(self, amqp, **data):
+                    if amqp.channel.is_open:
+                        await amqp.channel.basic_client_ack(delivery_tag=amqp.envelope.delivery_tag)
+                    else:
+                        channel = await self.broker.get_channel()
+                        await channel.basic_client_ack(delivery_tag=amqp.envelope.delivery_tag)
+
+
+        Handler will takes one required positional argument - :ref:`MessageMeta <amqp_meta>`.
+        Consumer will be reconnect and subscribe to queue on disconnect.
+        It make 3 attempts of reconnect after 1, 4, 9 seconds.
+        if the queue does not exist, it will be declared with the default parameters when binding.
+
+    '''
     REBIND_ATTEMPTS = 3
 
     protocol: Optional[aioamqp.AmqpProtocol]
@@ -56,6 +119,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     @property
     def channels(self) -> Dict[int, aioamqp.channel.Channel]:
+        ''' Dict of open channels '''
         if self.protocol:
             return self.protocol.channels
         else:
@@ -74,6 +138,14 @@ class AMQPBroker(AbstractQueueBroker):
         )
 
     async def send(self, name: str, message: str, exchange: str = '', **kwargs) -> None:
+        '''
+            Raw message sending.
+
+            :param name: string, target queue name (routing_key)
+            :param message: string, serialized message
+            :param exchange: string, target exchange name
+            :param \*\*kwargs: dict, other basic_publish options
+        '''
         async with ChannelContext(self) as channel:
             await channel.basic_publish(message, routing_key=name, exchange_name=exchange, **kwargs)
 
@@ -124,6 +196,9 @@ class AMQPBroker(AbstractQueueBroker):
             await channel.basic_consume(self._amqp_wrapper(consumer), queue_name=name)
 
     async def get_channel(self) -> aioamqp.channel.Channel:
+        '''
+            Takes a channel from the pool or a new one, performs a lazy connection if required.
+        '''
         if not self.protocol:
             _, self.protocol = await self.connect()
 
@@ -165,12 +240,23 @@ class AMQPBroker(AbstractQueueBroker):
         return _wrapper
 
     async def declare_queue(self, name: str, **options) -> None:
+        '''
+            Declare queue with queue_declare method.
+
+            :param name: string, queue name
+            :param \*\*options: other queue_declare options
+        '''
         async with ChannelContext(self) as channel:
             info = await channel.queue_declare(name, **options)
             self.log.info('Declare/get queue "%(queue)s" with %(message_count)s '
                 'messages, %(consumer_count)s consumers', info)
 
-    async def queue_length(self, name: str, **kwargs) -> int:
+    async def queue_length(self, name: str) -> int:
+        '''
+            Get a queue length with queue_declare method.
+
+            :param name: string, queue name
+        '''
         async with ChannelContext(self) as channel:
             info = await channel.queue_declare(name)
             return int(info['message_count'])

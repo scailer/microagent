@@ -1,3 +1,6 @@
+'''
+:ref:`Signal Bus <bus>` and :ref:`Queue Broker <broker>` based on :aioredis:`aioredis <>`.
+'''
 import functools
 import asyncio
 import logging
@@ -11,6 +14,22 @@ from .redis import RedisBrokerMixin
 
 
 class AIORedisSignalBus(AbstractSignalBus):
+    '''
+        Bus is based on redis publish and subscribe features.
+        Channel name is forming by rule ```{prefix}:{signal_name}:{sender_name}#{message_id}```
+
+        Example:
+
+        .. code-block:: python
+
+            from microagent.tools.aioredis import AIORedisSignalBus
+
+            bus = AIORedisSignalBus('redis://localhost/7', prefix='MYAPP', logger=custom_logger)
+
+            await bus.user_created.send('user_agent', user_id=1)
+
+
+    '''
     mpsc: aioredis.pubsub.Receiver
     transport: Optional[aioredis.Redis]
     pubsub: Optional[aioredis.Redis]
@@ -41,6 +60,30 @@ class AIORedisSignalBus(AbstractSignalBus):
 
 
 class AIORedisBroker(RedisBrokerMixin, AbstractQueueBroker):
+    '''
+        Broker is based on Redis lists and RPUSH and BLPOP commands.
+        Queue name using as a key. If hanling faild, message will be returned
+        to queue 3 times (by default) and then droped.
+
+        Example:
+
+        .. code-block:: python
+
+            from microagent.tools.aioredis import AIORedisBroker
+
+            broker = AIORedisBroker('redis://localhost/7', logger=custom_logger)
+
+            await broker.user_created.send({'user_id': 1})
+
+        .. attribute:: ROLLBACK_ATTEMPTS
+
+            Number attempts for handling of message before it will be droped (by default: 3)
+
+        .. attribute:: WAIT_TIME
+
+            BLPOP option (by default: 15)
+    '''
+
     async def new_connection(self) -> aioredis.Redis:
         return await aioredis.create_redis(self.dsn)
 

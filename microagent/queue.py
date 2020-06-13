@@ -4,7 +4,7 @@ import ujson
 
 
 class QueueException(Exception):
-    ''' Base signal exception '''
+    ''' Base queue exception '''
     pass
 
 
@@ -18,6 +18,34 @@ class SerializingError(QueueException):
 
 @dataclass(frozen=True)
 class Queue:
+    '''
+        Dataclass (declaration) for a queue entity with a unique name.
+        Each instance registered at creation.
+        Usually, you don't need to work directly with the Queue-class.
+
+        .. attribute:: name
+
+            String, queue name, project-wide unique, `[a-z_]+`
+
+        Declaration with config-file (queues.json)
+
+        .. code-block:: json
+
+            {
+                "queues": [
+                    {"name": "mailer"},
+                    {"name": "pusher"},
+                ]
+            }
+
+        Manual declaration (not recommended)
+
+        .. code-block:: python
+
+            some_queue = Queue(
+                name='some_queue'
+            )
+    '''
     name: str
     _queues = {}  # type: Dict[str, Queue]
 
@@ -32,21 +60,9 @@ class Queue:
             return NotImplemented
         return self.name == other.name
 
-    def serialize(self, data: dict) -> str:
-        try:
-            return ujson.dumps(data)
-        except (ValueError, TypeError) as exc:
-            raise SerializingError(exc)
-
-    def deserialize(self, data: str) -> dict:
-        try:
-            return ujson.loads(data)
-        except (ValueError, TypeError) as exc:
-            raise SerializingError(exc)
-
     @classmethod
     def get(cls, name: str) -> 'Queue':
-        ''' Get signal instance by name '''
+        ''' Get the queue instance by name '''
         try:
             return cls._queues[name]
         except KeyError:
@@ -54,7 +70,30 @@ class Queue:
 
     @classmethod
     def get_all(cls) -> Dict[str, 'Queue']:
+        ''' All registered queues '''
         return cls._queues
+
+    def serialize(self, data: dict) -> str:
+        '''
+            Data serializing method
+
+            :param data: dict of transfered data
+        '''
+        try:
+            return ujson.dumps(data)
+        except (ValueError, TypeError) as exc:
+            raise SerializingError(exc)
+
+    def deserialize(self, data: str) -> dict:
+        '''
+            Data deserializing method
+
+            :param data: serialized transfered data
+        '''
+        try:
+            return ujson.loads(data)
+        except (ValueError, TypeError) as exc:
+            raise SerializingError(exc)
 
 
 @dataclass(frozen=True)

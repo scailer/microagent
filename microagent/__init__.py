@@ -1,5 +1,3 @@
-'''
-'''
 __version__ = '1.0'
 
 from collections import namedtuple
@@ -45,21 +43,79 @@ def load_stuff(source: str) -> Tuple[object, object]:
 
 
 def load_signals(source: str) -> object:
+    '''
+        Load Signal-entities from file or by web.
+
+        .. code-block:: python
+
+            from microagent import load_signals
+
+            signals_from_file = load_signals('file://signals.json')
+            signals_from_web = load_signals('http://example.com/signals.json')
+
+
+        Signals declarations (signals.json).
+
+        .. code-block:: json
+
+            {
+                "signals": [
+                    {"name": "started", "providing_args": []},
+                    {"name": "user_created", "providing_args": ["user_id"]},
+                ]
+            }
+    '''
     return load_stuff(source)[0]
 
 
 def load_queues(source: str) -> object:
+    '''
+        Load Queue-entities from file or by web.
+
+        .. code-block:: python
+
+            from microagent import load_queues
+
+            signals_from_file = load_signals('file://queues.json')
+            signals_from_web = load_signals('http://example.com/queues.json')
+
+
+        Queues declarations (queues.json).
+
+        .. code-block:: json
+
+            {
+                "queues": [
+                    {"name": "mailer"},
+                    {"name": "pusher"},
+                ]
+            }
+    '''
     return load_stuff(source)[1]
 
 
 def periodic(period: Union[int, float], timeout: Union[int, float] = 1,
         start_after: Union[int, float] = 0) -> Callable:
     '''
-        Decorator witch mark :class:`MicroAgent` method as periodic function
+        Run decorated handler periodically.
 
         :param period: Period of running functions in seconds
         :param timeout: Function timeout in seconds
         :param start_after: Delay for running loop in seconds
+
+        .. code-block:: python
+
+            @periodic(period=5)
+            async def handler_1(self):
+                log.info('Called handler 1')
+
+            @periodic(5, timeout=4)
+            async def handler_2(self):
+                log.info('Called handler 2')
+
+            @periodic(period=5, start_after=10)
+            async def handler_3(self):
+                log.info('Called handler 3')
     '''
 
     assert period > 0.001, 'period must be more than 0.001 s'
@@ -80,10 +136,20 @@ def periodic(period: Union[int, float], timeout: Union[int, float] = 1,
 
 def cron(spec: str, timeout: Union[int, float] = 1) -> Callable:
     '''
-        Decorator witch mark :class:`MicroAgent` method as shceduling (cron) function
+        Run decorated function by schedule (cron)
 
-        :param spec: Specified running shceduling in cron format
+        :param spec: Specified running scheduling in cron format
         :param timeout: Function timeout in seconds
+
+        .. code-block:: python
+
+            @periodic('0 */4 * * *')
+            async def handler_1(self):
+                log.info('Called handler 1')
+
+            @periodic('*/15 * * * *', timeout=10)
+            async def handler_2(self):
+                log.info('Called handler 2')
     '''
 
     assert timeout > 0.001, 'timeout must be more than 0.001 s'
@@ -101,15 +167,26 @@ def cron(spec: str, timeout: Union[int, float] = 1) -> Callable:
 
 def receiver(*signals: Signal, timeout: int = 60) -> Callable:
     '''
-        Decorator binding handler to receiving signals
+        Binding for signals receiving.
 
-        @receiver(signal_1, signal_2)
-        async def handler_1(self, **kwargs):
-            log.info('Called handler 1 %s', kwargs)
+        Handler can receive **many** signals, and **many** handlers can receiver same signal.
 
-        @receiver(signal_1)
-        async def handle_2(self, **kwargs):
-            log.info('Called handler 2 %s', kwargs)
+        :param signals: List of receiving signals
+        :param timeout: Calling timeout in seconds
+
+        .. code-block:: python
+
+            @receiver(signal_1, signal_2)
+            async def handler_1(self, **kwargs):
+                log.info('Called handler 1 %s', kwargs)
+
+            @receiver(signal_1)
+            async def handle_2(self, **kwargs):
+                log.info('Called handler 2 %s', kwargs)
+
+            @receiver(signal_2, timeout=30)
+            async def handle_3(self, **kwargs):
+                log.info('Called handler 3 %s', kwargs)
     '''
 
     def _decorator(func):
@@ -127,7 +204,23 @@ def receiver(*signals: Signal, timeout: int = 60) -> Callable:
 
 def consumer(queue: Queue, timeout: int = 60, **options) -> Callable:
     '''
-        Decorator binding handler to consume messages from queue
+        Binding for consuming messages from queue.
+
+        Only **one** handler can be bound to **one** queue.
+
+        :param queue: Queue - source of data
+        :param timeout: Calling timeout in seconds
+
+        .. code-block:: python
+
+            @consumer(queue_1)
+            async def handler_1(self, **kwargs):
+                log.info('Called handler 1 %s', kwargs)
+
+            @consumer(queue_2, timeout=30)
+            async def handle_2(self, **kwargs):
+                log.info('Called handler 2 %s', kwargs)
+
     '''
 
     def _decorator(func):
@@ -144,10 +237,30 @@ def consumer(queue: Queue, timeout: int = 60, **options) -> Callable:
 
 def on(label: str) -> Callable:
     '''
-        Hooks for internal events (pre_start, post_start, pre_stop)
-        or running forever servers (server)
+        Hooks for internal events *(pre_start, post_start, pre_stop)*
+        or running forever servers *(server)*.
 
-        :param label: Hook type label string (pre_start, post_start, pre_stop, server)
+        Server-function will be call as run-forever asyncio task.
+
+        :param label: Hook type label string *(pre_start, post_start, pre_stop, server)*
+
+        .. code-block:: python
+
+            @on('pre_start')
+            async def handler_1(self):
+                log.info('Called handler 1')
+
+            @on('post_start')
+            async def handler_2(self):
+                log.info('Called handler 2')
+
+            @on('pre_stop')
+            async def handler_3(self):
+                log.info('Called handler 3')
+
+            @on('server')
+            async def run_server(self):
+                await Server().start()
     '''
     assert label in ('pre_start', 'post_start', 'pre_stop', 'server'), 'Bad label'
 
