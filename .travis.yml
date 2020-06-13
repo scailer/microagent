@@ -1,7 +1,9 @@
 language: python
 python:
   - "3.8"
+install:
+  - pip install codecov
 script:
   - python setup.py test
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+  - codecov
