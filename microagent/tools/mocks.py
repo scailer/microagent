@@ -1,3 +1,18 @@
+'''
+Prepared bus and broker mocks for testing based on unittest.mock.AsyncMock
+
+.. code-block:: python
+
+    from microagent.tools.mocks import BusMock, BrokerMock
+
+    agent = Agent(bus=BusMock(), broker=BrokerMock())
+
+    agent.bus.user_created.send.assert_called()
+    agent.bus.user_created.call.assert_called()
+
+    agent.broker.mailing.send.assert_called()
+    agent.broker.mailing.length.assert_called()
+'''
 from unittest.mock import AsyncMock, MagicMock
 from microagent.bus import AbstractSignalBus
 from microagent.broker import AbstractQueueBroker

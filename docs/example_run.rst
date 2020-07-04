@@ -2,7 +2,7 @@ Configuration, launch and etc.
 ======================================
 
 
-Deploy unit configuration file, for shipped launcher (settings.py)
+Configuration file of deploying unit, for shipped launcher (settings.py)
 
 .. include:: ../examples/settings.py
    :code: python

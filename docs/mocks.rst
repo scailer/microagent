@@ -1,4 +1,4 @@
-Mocks for testing
+Mocks & testing
 ======================================
 
 .. automodule:: microagent.tools.mocks

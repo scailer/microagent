@@ -229,4 +229,5 @@ todo_include_todos = True
 extlinks = {
     'aioredis': ('https://aioredis.readthedocs.io/%s', ''),
     'aioamqp': ('https://aioamqp.readthedocs.io/%s', ''),
+    'kafka': ('https://aiokafka.readthedocs.io/%s', ''),
 }

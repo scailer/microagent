@@ -1,3 +1,6 @@
+'''
+:ref:`Queue Broker <broker>` based on :kafka:`kafka <>`.
+'''
 import urllib
 import asyncio
 import logging
@@ -10,6 +13,34 @@ from ..broker import AbstractQueueBroker, Consumer
 
 
 class KafkaBroker(AbstractQueueBroker):
+    '''
+        Experimental broker based on the Apache Kafka distributed stream processing system.
+
+        :param dsn: string, data source name for connection kafka://localhost:9092
+        :param logger: logging.Logger (optional)
+
+
+        Sending messages.
+
+        .. code-block:: python
+
+            from microagent.tools.kafka import KafkaBroker
+
+            broker = KafkaBroker('kafka://localhost:9092')
+
+            await broker.user_created.send({'user_id': 1})
+
+
+        Consuming messages.
+
+        .. code-block:: python
+
+            class EmailAgent(MicroAgent):
+                @consumer(queues.mailer)
+                async def example_read_queue(self, kafka, **data):
+                    # kafka: AIOKafkaConsumer
+                    process(data)
+    '''
     addr: str
     producer: aiokafka.AIOKafkaProducer
 

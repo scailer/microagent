@@ -10,6 +10,9 @@ Signal bus
 .. autofunction:: microagent.load_signals
 
 
+.. autofunction:: microagent.receiver
+
+
 .. autoclass:: microagent.bus.AbstractSignalBus
     :members:
     :member-order: bysource

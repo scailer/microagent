@@ -1,38 +1,18 @@
 '''
-    Configuration and launch MicroAgents
+Configuration and launch MicroAgents with shipped launcher.
+Configuration file is a python-file with 3 dictionaries:
+AGENT, BUS and BROKER, where specified all settings.
+Launcher can run microagents from one or several files.
 
-    Specify bus, brokers and agents in python-file
+.. code-block::  shell
 
-    .. code-block:: python
+    $ marun myproject.app1 myproject.app2
 
-        BUS = {
-            'default': {
-                'backend': 'microagent.tools.aioredis.AIORedisSignalBus',
-                'dsn': 'redis://localhost',
-                'prefix': 'APP',
-            }
-        }
 
-        BROKER = {
-            'main': {
-                'backend': 'microagent.tools.amqp.AMQPBroker',
-                'dsn': 'amqp://guest:guest@localhost:5671/myhost',
-            }
-        }
-
-        AGENT = {
-            'my_agent': {
-                'backend': 'app.agent.AppAgent',
-                'bus': 'default',
-                'broker': 'main',
-            }
-        }
-
-    Launch all agents
-
-    .. code-block:: bash
-
-        marun myproject.app1 myproject.app2
+Each microagent is launched in a separate system thread, and the launcher works
+as a supervisor. All agents started by a single command are called a deployment
+group and start/stop at the same time. If one of the agents stops, the launcher
+stops the entire group.
 '''
 
 import os

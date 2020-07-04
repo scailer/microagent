@@ -10,6 +10,9 @@ Queue broker
 .. autofunction:: microagent.load_queues
 
 
+.. autofunction:: microagent.consumer
+
+
 .. autoclass:: microagent.broker.AbstractQueueBroker
     :members:
     :member-order: bysource

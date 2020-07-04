@@ -1,5 +1,24 @@
 '''
-Internal hooks
+In practice, it is useful to be able to perform some actions before the microagent
+starts working or after it stops. For this aim there are internal hooks that allow
+you to run methods on pre_start, post_start, and pre_stop.
+
+**pre_start** - is called before the microagent is ready to accept events and
+consume messages. This ensures that handlers will be called when already
+connections established with other services - databases, mail, logs;
+initialized caches, objects, and so on.
+
+**post_start** - called when the microagent has already started accepting events and
+messages. It is can be useful for sending notifications to monitoring service and etc.
+
+**pre_stop** - called when the microagent go shutdown. It can be useful for sending
+notifications to the monitoring service, and so on.
+
+**server** - "run forever" handler. If it crashes with exception microagent will be stopped.
+
+In addition, there is a special mechanism for running nested services. Methods
+marked with the server decorator will be started in "run forever" mode. It's
+allow provide endpoints for microagent, such as http, websocket, smtp or other.
 '''
 
 import inspect
@@ -20,7 +39,7 @@ class Hook:
 
 class Hooks:
     '''
-    Internal hooks
+        Internal hooks
     '''
 
     binds: Dict[str, List[Hook]]
