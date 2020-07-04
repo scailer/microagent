@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="4cm" height="4cm" viewBox="7 6 65 66" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <ellipse style="fill: none; fill-opacity:0; stroke-width: 4; stroke: #000000" cx="40" cy="40" rx="30" ry="30"/>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="47" y1="10" x2="52.9319" y2="13.6672"/>
+    <polygon style="fill: #000000" points="59.3112,17.611 48.1762,16.6055 52.9319,13.6672 53.4346,8.09965 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="59.3112,17.611 48.1762,16.6055 52.9319,13.6672 53.4346,8.09965 "/>
+  </g>
+  <text font-size="40.64" style="fill: #000000;text-anchor:middle;font-family:Z003;font-style:italic;font-weight:500" x="40" y="47.1933">
+    <tspan x="40" y="47.1933">μ</tspan>
+  </text>
+</svg>

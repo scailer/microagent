@@ -8,7 +8,6 @@
         {"name": "comment_created", "providing_args": ["comment_id", "user_id"]}
     ],
     "queues": [
-        {"name": "mailer"},
-        {"name": "emailer"}
+        {"name": "mailer"}
     ]
 }

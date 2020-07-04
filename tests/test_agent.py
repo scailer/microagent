@@ -1,227 +1,319 @@
 import pytest
 import asyncio
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock, MagicMock
 from microagent import MicroAgent, Signal, Queue, receiver, consumer, periodic, cron, on
 from microagent.tools.mocks import BusMock, BrokerMock
 
-test_signal = Signal(name='test_signal', providing_args=['uuid'])
-else_signal = Signal(name='else_signal', providing_args=['uuid'])
-test_queue = Queue(name='test_queue')
+
+@pytest.fixture()
+def test_queue():
+    return Queue(name='test_queue')
 
 
-class DummyReceiverMicroAgent(MicroAgent):
-    @receiver(test_signal)
-    def handler(self, **kw):
-        pass
-
-    @receiver(test_signal, 'else_signal')
-    def else_handler(self, **kw):
-        pass
+@pytest.fixture()
+def test_signal():
+    return Signal(name='test_signal', providing_args=['uuid'])
 
 
-class DummyPeriodMicroAgent(MicroAgent):
-    @on('pre_start')
-    def setup(self):
-        self._setup_called = True
-
-    @periodic(period=60, timeout=60, start_after=60)
-    def handler(self, **kw):
-        pass
-
-    @cron('0 * * * *', timeout=60)
-    def cron_handler(self, **kw):
-        pass
+@pytest.fixture()
+def else_signal():
+    return Signal(name='else_signal', providing_args=['uuid'])
 
 
-class DummyQueueMicroAgent(MicroAgent):
-    @consumer(test_queue, timeout=60)
-    def handler(self, **kw):
-        pass
+@pytest.fixture
+def dummy_receiver(test_signal, else_signal, test_queue):
+    class DummyReceiverMicroAgent(MicroAgent):
+        handler = AsyncMock()
+        handler_sync = Mock()
+
+        @receiver(test_signal)
+        async def handler_one(self, uuid, **kw):
+            await self.handler(kw)
+
+        @receiver(test_signal, else_signal, timeout=10)
+        async def handler_two(self, **kw):
+            await self.handler(kw)
+
+        @receiver(else_signal, timeout=5)
+        def handler_three(self, **kw):
+            self.handler_sync(kw)
+
+    return DummyReceiverMicroAgent(bus=BusMock(), broker=BrokerMock())
 
 
-class DummyHookMicroAgent(MicroAgent):
-    @on('pre_start')
-    def pre_setup(self):
-        self._setup_pre_called = True
+@pytest.fixture
+def dummy_consumer(test_queue):
+    class DummyConsumerMicroAgent(MicroAgent):
+        @consumer(test_queue, timeout=60, option1=1)
+        def handler(self, **kw):
+            pass
 
-    @on('post_start')
-    async def post_setup(self):
-        self._setup_post_called = True
-
-    @periodic(period=60, timeout=60, start_after=0)
-    def periodic_handler(self, **kw):
-        self._periodic_handler_called = True
-
-    @on('pre_periodic_handler')
-    def pre_periodic_handler(self, *args, **kwargs):
-        self._pre_periodic_called = True
-
-    @on('post_periodic_handler')
-    async def post_periodic_handler(self, *args, **kwargs):
-        self._post_periodic_called = True
-
-    @receiver(test_signal)
-    async def receiver_handler(self, **kw):
-        self._receiver_handler_called = True
-
-    @on('pre_receiver_handler')
-    def pre_receiver_handler(self, *args, **kwargs):
-        self._pre_receiver_called = True
-
-    @on('post_receiver_handler')
-    async def post_receiver_handler(self, *args, **kwargs):
-        self._post_receiver_called = True
-
-    @consumer(test_queue, timeout=60)
-    async def consumer_handler(self, **kw):
-        self._consumer_handler_called = True
-
-    @on('pre_consumer_handler')
-    def pre_consumer_handler(self, *args, **kwargs):
-        self._pre_consumer_called = True
-
-    @on('post_consumer_handler')
-    async def post_consumer_handler(self, *args, **kwargs):
-        self._post_consumer_called = True
-
-    @receiver(else_signal)
-    async def receiver_handler_failed(self, **kw):
-        raise Exception('receiver_handler_failed')
-
-    @on('error_receiver_handler_failed')
-    def err_receiver_handler_failed(self, *args, **kw):
-        self._error_receiver_called = True
+    return DummyConsumerMicroAgent(bus=BusMock(), broker=BrokerMock())
 
 
-async def test_hooks_ok():
-    ma = DummyHookMicroAgent(bus=BusMock(), broker=BrokerMock())
-    await ma.start()
+@pytest.fixture
+def dummy_period():
+    class DummyPeriodMicroAgent(MicroAgent):
+        @periodic(period=60, timeout=55, start_after=30)
+        def period_handler(self):
+            pass
 
-    assert ma._setup_pre_called
-    assert ma._setup_post_called
+        @cron('0 * * * *', timeout=60)
+        def cron_handler(self):
+            pass
 
-    await asyncio.sleep(.01)
-
-    assert ma._periodic_handler_called
-    assert ma._pre_periodic_called
-    assert ma._post_periodic_called
-
-    await ma.hook.decorate(ma.receiver_handler)(signal=test_signal)
-
-    assert ma._receiver_handler_called
-    assert ma._pre_receiver_called
-    assert ma._post_receiver_called
-
-    await ma.hook.decorate(ma.consumer_handler)()
-
-    assert ma._consumer_handler_called
-    assert ma._pre_consumer_called
-    assert ma._post_consumer_called
-
-    with pytest.raises(Exception):
-        await ma.hook.decorate(ma.receiver_handler_failed)(signal=else_signal)
-
-    assert ma._error_receiver_called
-
-    with pytest.raises(AttributeError):
-        ma.hook.no_data
+    return DummyPeriodMicroAgent(bus=BusMock(), broker=BrokerMock())
 
 
-def test_init_empty_ok():
+@pytest.fixture
+def dummy_hook():
+    class DummyHookMicroAgent(MicroAgent):
+        @on('pre_start')
+        def pre_setup(self):
+            self._setup_pre_called = True
+
+        @on('pre_start')
+        def pre_start(self):
+            self._start_pre_called = True
+
+        @on('post_start')
+        async def post_setup(self):
+            self._setup_post_called = True
+
+    return DummyHookMicroAgent(bus=BusMock(), broker=BrokerMock())
+
+
+def test_init_empty_agent_ok():
     ma = MicroAgent()
+    assert ma.receivers == []
+    assert ma.periodic_tasks == []
+    assert ma.cron_tasks == []
+    assert ma.consumers == []
+    assert ma.hook.binds == {}
     assert ma.settings == {}
-    assert ma._periodic_tasks == ()
-    assert ma.received_signals == {}
+    assert 'MicroAgent' in str(ma)
 
 
-def test_init_logger_ok():
+def test_init_logger_agent_ok():
     logger = unittest.mock.Mock()
     ma = MicroAgent(logger=logger)
-    assert ma.log == logger
+    assert ma.log is logger
 
 
-async def test_init_periodic_ok():
-    ma = DummyPeriodMicroAgent()
-    await ma.start()
+async def test_init_receiver_agent_ok(dummy_receiver, test_signal, else_signal):
+    assert len(dummy_receiver.receivers) == 4
+    assert dummy_receiver.periodic_tasks == []
+    assert dummy_receiver.cron_tasks == []
+    assert dummy_receiver.consumers == []
+    assert dummy_receiver.hook.binds == {}
+    assert 'MicroAgent' in str(dummy_receiver)
+    assert dummy_receiver.info()
 
-    assert ma.settings == {}
-    assert ma.queue_consumers == ()
-    assert ma.received_signals == {}
+    handlers = {(x.key, x.signal.name): x for x in dummy_receiver.receivers}
+    key = 'dummy_receiver.<locals>.DummyReceiverMicroAgent'
 
-    periodic_tasks = [x.origin.__name__ for x in ma._periodic_tasks]
-    assert ma.handler.__name__ in periodic_tasks
-    assert ma.cron_handler.__name__ in periodic_tasks
-    assert ma._setup_called
-    assert set(x['name'] for x in ma.info()['periodic']) == set(periodic_tasks)
+    handler_one = handlers[(f'{key}.handler_one', 'test_signal')]
+    handler_two_1 = handlers[(f'{key}.handler_two', 'test_signal')]
+    handler_two_2 = handlers[(f'{key}.handler_two', 'else_signal')]
+    handler_three = handlers[(f'{key}.handler_three', 'else_signal')]
 
+    assert handler_one.agent == dummy_receiver
+    assert handler_one.handler == dummy_receiver.handler_one
+    assert handler_one.signal == test_signal
+    assert handler_one.timeout == 60
 
-async def test_init_bus_ok():
-    bus = BusMock()
-    ma = DummyReceiverMicroAgent(bus=bus)
+    assert handler_two_1.agent == dummy_receiver
+    assert handler_two_1.handler == dummy_receiver.handler_two
+    assert handler_two_1.signal == test_signal
+    assert handler_two_1.timeout == 10
 
-    assert ma.settings == {}
-    assert ma._periodic_tasks == ()
-    assert ma.queue_consumers == ()
-    assert test_signal.name in ma.received_signals
-    assert else_signal.name in ma.received_signals
+    assert handler_two_2.agent == dummy_receiver
+    assert handler_two_2.handler == dummy_receiver.handler_two
+    assert handler_two_2.signal == else_signal
+    assert handler_two_2.timeout == 10
 
-    await ma.start()
-
-    assert bus.bind_signal.call_count == 2
-    bus.bind_signal.assert_any_call(test_signal)
-    bus.bind_signal.assert_any_call(else_signal)
-    assert len(ma.info()['receivers']) == len(ma.received_signals)
-
-
-async def test_init_bus_disabled_ok():
-    bus = BusMock()
-    ma = DummyReceiverMicroAgent(bus=bus)
-    await ma.start(enable_receiving_signals=False)
-    bus.bind_signal.assert_not_called()
+    assert handler_three.agent == dummy_receiver
+    assert handler_three.handler == dummy_receiver.handler_three
+    assert handler_three.signal == else_signal
+    assert handler_three.timeout == 5
 
 
-async def test_init_no_bus_ok():
+async def test_init_receiver_agent_fail(test_signal):
+    class FailedReceiverMicroAgent(MicroAgent):
+        @receiver(test_signal)
+        async def handler_one(self, uuid, **kw):
+            pass
+
     with pytest.raises(AssertionError):
-        DummyReceiverMicroAgent()
+        FailedReceiverMicroAgent()
 
-
-async def test_init_queue_ok():
-    broker = BrokerMock()
-    ma = DummyQueueMicroAgent(broker=broker)
-
-    assert ma.settings == {}
-    assert ma._periodic_tasks == ()
-    assert ma.received_signals == {}
-    queue_consumers = [x.__name__ for x in ma.queue_consumers]
-    assert ma.handler.__name__ in queue_consumers
-    assert ma.handler.__name__ in queue_consumers
-
-    await ma.start()
-
-    broker.bind_consumer.assert_called_once()
-    broker.bind_consumer.assert_called_with(ma.handler)
-    assert test_queue == ma.handler.queue
-    assert len(ma.info()['consumers']) == len(queue_consumers)
-
-
-async def test_init_queue_disabled():
-    broker = BrokerMock()
-    ma = DummyQueueMicroAgent(broker=broker)
-    await ma.start(enable_consuming_messages=False)
-    broker.bind_consumer.assert_not_called()
-
-
-async def test_init_no_queue():
     with pytest.raises(AssertionError):
-        DummyQueueMicroAgent()
+        FailedReceiverMicroAgent(bus=1)
 
 
-async def test_stop():
-    ma = MicroAgent(Mock())
-    await ma.stop()
+async def test_init_consumer_agent_ok(dummy_consumer, test_queue):
+    assert len(dummy_consumer.consumers) == 1
+    assert dummy_consumer.receivers == []
+    assert dummy_consumer.periodic_tasks == []
+    assert dummy_consumer.cron_tasks == []
+    assert dummy_consumer.hook.binds == {}
+    assert 'MicroAgent' in str(dummy_consumer)
+    assert dummy_consumer.info()
+
+    handler = dummy_consumer.consumers[0]
+
+    assert handler.queue == test_queue
+    assert handler.timeout == 60
+    assert handler.options == {'option1': 1}
+    assert handler.handler == dummy_consumer.handler
 
 
-async def test_repr():
-    ma = MicroAgent(Mock())
-    assert MicroAgent.__name__ in str(ma)
+async def test_init_consumer_agent_fail(test_queue):
+    class FailedConsumerMicroAgent(MicroAgent):
+        @consumer(test_queue)
+        async def handler_one(self, uuid, **kw):
+            pass
+
+    with pytest.raises(AssertionError):
+        FailedConsumerMicroAgent()
+
+    with pytest.raises(AssertionError):
+        FailedConsumerMicroAgent(broker=1)
+
+
+async def test_init_periodic_agent_ok(dummy_period):
+    assert dummy_period.consumers == []
+    assert dummy_period.receivers == []
+    assert len(dummy_period.periodic_tasks) == 1
+    assert len(dummy_period.cron_tasks) == 1
+    assert dummy_period.hook.binds == {}
+    assert 'MicroAgent' in str(dummy_period)
+    assert dummy_period.info()
+
+    phandler = dummy_period.periodic_tasks[0]
+
+    assert phandler.handler == dummy_period.period_handler
+    assert phandler.period == 60
+    assert phandler.timeout == 55
+    assert phandler.start_after == 30
+
+    chandler = dummy_period.cron_tasks[0]
+
+    assert chandler.handler == dummy_period.cron_handler
+    assert chandler.timeout == 60
+    assert chandler.cron.expanded == [[0], ['*'], ['*'], ['*'], ['*']]
+
+
+async def test_init_hook_agent_ok(dummy_hook):
+    assert dummy_hook.consumers == []
+    assert dummy_hook.receivers == []
+    assert dummy_hook.periodic_tasks == []
+    assert dummy_hook.cron_tasks == []
+    assert len(dummy_hook.hook.binds) == 2
+    assert len(dummy_hook.hook.binds['pre_start']) == 2
+    assert len(dummy_hook.hook.binds['post_start']) == 1
+    assert 'MicroAgent' in str(dummy_hook)
+    assert dummy_hook.info()
+
+    post_start = dummy_hook.hook.binds['post_start'][0]
+    assert post_start.handler == dummy_hook.post_setup
+
+    pre_start1, pre_start2 = dummy_hook.hook.binds['pre_start']
+    assert {pre_start1.handler, pre_start2.handler} == {dummy_hook.pre_setup, dummy_hook.pre_start}
+
+
+async def test_start_receiver_agent_ok(dummy_receiver):
+    await dummy_receiver.start()
+
+    data = set(
+        (x.args[0].key, x.args[0].signal.name)
+        for x in dummy_receiver.bus.bind_receiver.call_args_list
+    )
+
+    assert set((x.key, x.signal.name) for x in dummy_receiver.receivers) == data
+
+
+async def test_start_receiver_agent_disabled_ok(dummy_receiver):
+    await dummy_receiver.start(enable_receiving_signals=False)
+    dummy_receiver.bus.bind_receiver.assert_not_called()
+
+
+async def test_start_consumer_agent_ok(dummy_consumer):
+    await dummy_consumer.start()
+
+    data = set(
+        x.args[0].queue.name for x in dummy_consumer.broker.bind_consumer.call_args_list
+    )
+
+    assert set(x.queue.name for x in dummy_consumer.consumers) == data
+
+
+async def test_start_consumer_agent_disabled_ok(dummy_consumer):
+    await dummy_consumer.start(enable_consuming_messages=False)
+    dummy_consumer.broker.bind_consumer.assert_not_called()
+
+
+async def test_start_period_agent_ok(dummy_period):
+    start1, start2 = Mock(), Mock()
+    dummy_period.periodic_tasks = [MagicMock(start=start1, start_after=None)]
+    dummy_period.cron_tasks = [MagicMock(start=start2, start_after=1000)]
+
+    await dummy_period.start()
+
+    start1.assert_called_once()
+    start2.assert_called_once()
+
+
+async def test_start_period_agent_disabled_ok(dummy_period):
+    start1, start2 = Mock(), Mock()
+    dummy_period.periodic_tasks = [MagicMock(start=start1)]
+    dummy_period.cron_tasks = [MagicMock(start=start2)]
+
+    await dummy_period.start(enable_periodic_tasks=False)
+
+    start1.assert_not_called()
+    start2.assert_not_called()
+
+
+@pytest.fixture
+def dummy_server():
+    class DummyServerMicroAgent(MicroAgent):
+        _server_called = False
+
+        @on('server')
+        async def run_server(self):
+            self._server_called = True
+
+    return DummyServerMicroAgent()
+
+
+async def test_start_hook_server_ok(dummy_server):
+    await dummy_server.start()
+    await asyncio.sleep(.01)
+
+    assert dummy_server._server_called
+
+
+async def test_start_hook_server_disabled_ok(dummy_server):
+    await dummy_server.start(enable_servers_running=False)
+    await asyncio.sleep(.01)
+
+    assert not dummy_server._server_called
+
+
+async def test_start_hook_start_agent_ok(dummy_hook):
+    dummy_hook.hook = MagicMock(pre_start=AsyncMock(), post_start=AsyncMock())
+
+    await dummy_hook.start()
+
+    dummy_hook.hook.pre_start.assert_called_once()
+    dummy_hook.hook.post_start.assert_called_once()
+
+
+async def test_start_hook_stop_agent_ok(dummy_hook):
+    dummy_hook.hook = MagicMock(pre_stop=AsyncMock())
+
+    await dummy_hook.stop()
+
+    dummy_hook.hook.pre_stop.assert_called_once()

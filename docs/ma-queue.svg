@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="11cm" height="4cm" viewBox="-2 13 219 65" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <ellipse style="fill: none; fill-opacity:0; stroke-width: 4; stroke: #000000" cx="109" cy="46" rx="30" ry="30"/>
+  <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="16" y="40" width="12" height="12"/>
+  <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="44" y="40" width="12" height="12"/>
+  <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="0" y="40" width="12" height="12"/>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="56" y1="46" x2="69.2639" y2="46"/>
+    <polygon style="fill: #000000" points="76.7639,46 66.7639,51 69.2639,46 66.7639,41 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="76.7639,46 66.7639,51 69.2639,46 66.7639,41 "/>
+  </g>
+  <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="160" y="40" width="12" height="12"/>
+  <g>
+    <line style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x1="139" y1="46" x2="150.264" y2="46"/>
+    <polygon style="fill: #000000" points="157.764,46 147.764,51 150.264,46 147.764,41 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="157.764,46 147.764,51 150.264,46 147.764,41 "/>
+  </g>
+  <g>
+    <rect style="fill: #000000" x="32" y="44" width="4" height="4"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #ffffff" x="32" y="44" width="4" height="4"/>
+  </g>
+  <g>
+    <rect style="fill: #000000" x="36" y="44" width="4" height="4"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #ffffff" x="36" y="44" width="4" height="4"/>
+  </g>
+  <text font-size="40.64" style="fill: #000000;text-anchor:middle;font-family:Z003;font-style:italic;font-weight:500" x="109" y="53.1933">
+    <tspan x="109" y="53.1933">μ</tspan>
+  </text>
+  <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="176" y="40" width="12" height="12"/>
+  <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="204" y="40" width="12" height="12"/>
+  <g>
+    <rect style="fill: #000000" x="192" y="44" width="4" height="4"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #ffffff" x="192" y="44" width="4" height="4"/>
+  </g>
+  <g>
+    <rect style="fill: #000000" x="196" y="44" width="4" height="4"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #ffffff" x="196" y="44" width="4" height="4"/>
+  </g>
+</svg>

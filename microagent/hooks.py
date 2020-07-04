@@ -1,88 +1,70 @@
+'''
+In practice, it is useful to be able to perform some actions before the microagent
+starts working or after it stops. For this aim there are internal hooks that allow
+you to run methods on pre_start, post_start, and pre_stop.
+
+**pre_start** - is called before the microagent is ready to accept events and
+consume messages. This ensures that handlers will be called when already
+connections established with other services - databases, mail, logs;
+initialized caches, objects, and so on.
+
+**post_start** - called when the microagent has already started accepting events and
+messages. It is can be useful for sending notifications to monitoring service and etc.
+
+**pre_stop** - called when the microagent go shutdown. It can be useful for sending
+notifications to the monitoring service, and so on.
+
+**server** - "run forever" handler. If it crashes with exception microagent will be stopped.
+
+In addition, there is a special mechanism for running nested services. Methods
+marked with the server decorator will be started in "run forever" mode. It's
+allow provide endpoints for microagent, such as http, websocket, smtp or other.
+'''
+
 import inspect
-from functools import partial, wraps
+from dataclasses import dataclass
 from collections import defaultdict
-from inspect import getmembers, ismethod
+from typing import Callable, Dict, List, Iterable, Awaitable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .agent import MicroAgent
 
 
-def on(*hooks: str):
-    '''
-        Bind to internal event
-    '''
-
-    def _decorator(func):
-        func.__hook__ = [f'on_{hook}' for hook in hooks]
-        return func
-
-    return _decorator
-
-
-def hook_decorator(hook):
-    def decorator(method):
-        if not any([
-            f'on_pre_{method.__name__}' in hook.bindings,
-            f'on_error_{method.__name__}' in hook.bindings,
-            f'on_post_{method.__name__}' in hook.bindings
-        ]):
-            return method
-
-        @wraps(method)
-        async def wrapper(*args, **kwargs):
-            context = {'args': args, 'kwargs': kwargs}
-
-            if f'on_pre_{method.__name__}' in hook.bindings:
-                await hook.call_hook(f'on_pre_{method.__name__}', context=context)
-
-            try:
-                response = method(*args, **kwargs)
-
-                if inspect.isawaitable(response):
-                    response = await response
-
-            except Exception as exc:
-                if f'on_error_{method.__name__}' in hook.bindings:
-                    await hook.call_hook(f'on_error_{method.__name__}', exc, context=context)
-                raise
-
-            if f'on_post_{method.__name__}' in hook.bindings:
-                await hook.call_hook(f'on_post_{method.__name__}', response, context=context)
-
-            return response
-        return wrapper
-    return decorator
+@dataclass(frozen=True)
+class Hook:
+    agent: 'MicroAgent'
+    handler: Callable
+    label: str
 
 
 class Hooks:
     '''
-        pre|error|post:method
+        Internal hooks
     '''
-    def __init__(self, agent):
-        binded_methods = defaultdict(list)
 
-        for _, method in getmembers(agent, ismethod):
-            if hasattr(method, '__hook__'):
-                for hook_name in method.__hook__:
-                    binded_methods[hook_name].append(method)
+    binds: Dict[str, List[Hook]]
 
-        self._bindings = dict(binded_methods)
+    def __init__(self, hooks: Iterable[Hook]):
+        self.binds = defaultdict(list)
 
-    @property
-    def bindings(self):
-        return self._bindings
+        for hook in hooks:
+            self.binds[hook.label].append(hook)
 
     @property
-    def decorate(self):
-        return hook_decorator(self)
+    def servers(self) -> Iterable[Callable]:
+        return (hook.handler for hook in self.binds['server'])
 
-    async def call_hook(self, name, *args, **kwargs):
-        methods = self._bindings.get(name)
-        if methods:
-            for method in methods:
-                response = method(*args, **kwargs)
-                if inspect.isawaitable(response):
-                    await response
+    def pre_start(self) -> Awaitable:
+        return self.call('pre_start')
 
-    def __getattr__(self, name: str):
-        if name.startswith('on_'):
-            return partial(self.call_hook, name)
+    def post_start(self) -> Awaitable:
+        return self.call('post_start')
 
-        return getattr(super(), name)
+    def pre_stop(self) -> Awaitable:
+        return self.call('pre_stop')
+
+    async def call(self, label: str) -> None:
+        for hook in self.binds[label]:
+            response = hook.handler()
+            if inspect.isawaitable(response):
+                await response

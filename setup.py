@@ -48,6 +48,11 @@ setup(
         'aioredis': ['aioredis'],
         'amqp': ['aioamqp==0.14'],
         'kafka': ['aiokafka==0.5'],
-        'mock': ['asynctest'],
     },
+
+    entry_points={
+        'console_scripts': [
+            'marun = microagent.launcher:run',
+        ]
+    }
 )

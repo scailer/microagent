@@ -1,31 +1,34 @@
 import logging
 import asyncio
 
-from typing import Optional
+from typing import Callable
 from datetime import datetime
 from collections import defaultdict
 
 
 class RedisBrokerMixin:
-    WAIT_TIME = 15
-    ROLLBACK_ATTEMPTS = 3
+    WAIT_TIME: int = 15
+    BIND_TIME: float = 1
+    ROLLBACK_ATTEMPTS: int = 3
 
-    def __init__(self, dsn: str, logger: Optional[logging.Logger] = None):
-        super().__init__(dsn, logger)
+    log: logging.Logger
+    send: Callable
+    _bindings: dict
+    _rollbacks: dict
+
+    def __init__(self, dsn: str, logger: logging.Logger = None) -> None:
+        super().__init__(dsn, logger)  # type: ignore
         self.transport = None
         self._rollbacks = defaultdict(lambda: 0)
 
     async def new_connection(self):
         return NotImplemented
 
-    async def bind(self, name, handler):
-        if name in self._bindings:
-            self._bindings[name].append(handler)
-        else:
-            self._bindings[name] = [handler]
-            self._loop.call_later(1, lambda: asyncio.ensure_future(self._wait(name)))
+    async def bind(self, name: str) -> None:
+        _loop = asyncio.get_running_loop()
+        _loop.call_later(self.BIND_TIME, lambda: asyncio.ensure_future(self._wait(name)))
 
-    async def _wait(self, name):
+    async def _wait(self, name: str) -> None:
         transport = await self.new_connection()
         while True:
             data = await transport.blpop(name, self.WAIT_TIME)
@@ -33,7 +36,7 @@ class RedisBrokerMixin:
                 _, data = data
                 asyncio.ensure_future(self._handler(name, data))
 
-    async def rollback(self, name, data):
+    async def rollback(self, name: str, data: str):
         _hash = str(hash(name)) + str(hash(data))
         attempt = self._rollbacks[_hash]
 
@@ -42,29 +45,32 @@ class RedisBrokerMixin:
             return
 
         self.log.warning('Back message to queue "%s" attempt %d', name, attempt)
-        self._loop.call_later(
-            attempt ** 2, lambda: asyncio.ensure_future(self.send(name, data)))
+
+        _loop = asyncio.get_running_loop()
+        _loop.call_later(attempt ** 2, lambda: asyncio.ensure_future(self.send(name, data)))
+
         self._rollbacks[_hash] += 1
 
-    async def _handler(self, name, data):
-        for handler in self._bindings[name]:
-            _data = handler.queue.deserialize(data)
+    async def _handler(self, name: str, data: str):
+        consumer = self._bindings[name]
+        _data = consumer.queue.deserialize(data)  # type: dict
+
+        try:
+            response = consumer.handler(**_data)
+        except Exception:
+            self.log.error('Call %s failed', consumer.queue.name, exc_info=True)
+            await self.rollback(consumer.queue.name, data)
+            return
+
+        if asyncio.iscoroutine(response):
+            timer = datetime.now().timestamp()
+
             try:
-                response = handler(**_data)
+                response = await asyncio.wait_for(response, consumer.timeout)
+            except asyncio.TimeoutError:
+                self.log.error('TimeoutError: %s %.2f', consumer,
+                    datetime.now().timestamp() - timer)
+                await self.rollback(name, data)
             except Exception:
-                self.log.error('Call %s failed', handler.queue.name, exc_info=True)
-                await self.rollback(handler.queue.name, data)
-                return
-
-            if asyncio.iscoroutine(response):
-                timer = datetime.now().timestamp()
-
-                try:
-                    response = await asyncio.wait_for(response, handler.timeout)
-                except asyncio.TimeoutError:
-                    self.log.fatal('TimeoutError: %s %.2f', handler.__qualname__,
-                        datetime.now().timestamp() - timer)
-                    await self.rollback(name, data)
-                except Exception:
-                    self.log.error('Call %s failed', handler.queue.name, exc_info=True)
-                    await self.rollback(handler.queue.name, data)
+                self.log.error('Call %s failed', consumer.queue.name, exc_info=True)
+                await self.rollback(consumer.queue.name, data)
