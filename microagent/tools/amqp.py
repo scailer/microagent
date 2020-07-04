@@ -261,3 +261,15 @@ class AMQPBroker(AbstractQueueBroker):
         async with ChannelContext(self) as channel:
             info = await channel.queue_declare(name)
             return int(info['message_count'])
+
+    async def putout(self, amqp: MessageMeta) -> None:
+        '''
+            Send acknowledgement to broker with basic_client_ack
+
+            :param amqp: MessageMeta
+        '''
+        if amqp.channel.is_open:
+            await amqp.channel.basic_client_ack(delivery_tag=amqp.envelope.delivery_tag)
+        else:
+            channel = await self.get_channel()
+            await channel.basic_client_ack(delivery_tag=amqp.envelope.delivery_tag)

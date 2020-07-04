@@ -234,3 +234,31 @@ async def test_broker_wrapper_fail_timeout(amqp_connection):
     await wrapper(channel, '{"a":1}', MagicMock(delivery_tag=1), MagicMock())
 
     channel.basic_client_ack.assert_not_called()
+
+
+async def test_broker_putout_ok():
+    broker = AMQPBroker('amqp://localhost')
+    broker.get_channel = AsyncMock(return_value=MagicMock())
+    amqp = MagicMock(
+        channel=MagicMock(basic_client_ack=AsyncMock(), is_open=True),
+        envelope=MagicMock(delivery_tag=1)
+    )
+
+    await broker.putout(amqp)
+
+    amqp.channel.basic_client_ack.assert_called_once_with(delivery_tag=1)
+
+
+async def test_broker_putout_ok_closed():
+    broker = AMQPBroker('amqp://localhost')
+    channel = MagicMock(basic_client_ack=AsyncMock())
+    broker.get_channel = AsyncMock(return_value=channel)
+    amqp = MagicMock(
+        channel=MagicMock(is_open=False),
+        envelope=MagicMock(delivery_tag=1)
+    )
+
+    await broker.putout(amqp)
+
+    broker.get_channel.assert_called()
+    channel.basic_client_ack.assert_called_once_with(delivery_tag=1)

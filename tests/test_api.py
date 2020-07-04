@@ -41,19 +41,19 @@ def test_load_from_url():
 
 async def test_mock_bus_ok():
     bus = mocks.BusMock()
-    bus.test_signal.send()
+    await bus.test_signal.send()
     bus.test_signal.send.assert_called()
-    bus.test_signal.call()
+    await bus.test_signal.call()
     bus.test_signal.call.assert_called()
     assert str(bus)
 
 
 async def test_mock_broker_ok():
     broker = mocks.BrokerMock()
-    broker.test_queue.send()
+    await broker.test_queue.send()
     broker.test_queue.send.assert_called()
-    broker.test_queue.length()
+    await broker.test_queue.length()
     broker.test_queue.length.assert_called()
-    broker.test_queue.declare()
+    await broker.test_queue.declare()
     broker.test_queue.declare.assert_called()
     assert str(broker)
