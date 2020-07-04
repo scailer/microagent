@@ -1,21 +1,9 @@
-from typing import List, Callable
-from collections import namedtuple
+from typing import List, Dict, Callable, Union, TYPE_CHECKING
+from dataclasses import dataclass
 import ujson
 
-
-LookupKey = namedtuple('LookupKey', ['mod', 'name', 'id'])
-
-
-def _make_id(target):
-    if isinstance(target, str):
-        return target
-    if hasattr(target, 'im_func'):
-        return id(target.im_self), id(target.im_func)
-    return id(target)
-
-
-def _make_lookup_key(receiver, sender):
-    return LookupKey(mod=receiver.__module__, name=receiver.__qualname__, id=_make_id(sender))
+if TYPE_CHECKING:
+    from .agent import MicroAgent
 
 
 class SignalException(Exception):
@@ -23,76 +11,127 @@ class SignalException(Exception):
     pass
 
 
+class SignalNotFound(SignalException):
+    pass
+
+
+class SerializingError(SignalException):
+    pass
+
+
+@dataclass(frozen=True)
 class Signal:
     '''
-        Signal instance is descriptional entity based on redis channel.
+        Dataclass (declaration) for a signal entity with a unique name.
+        Each instance registered at creation.
+        Usually, you don't need to work directly with the Signal-class.
 
-        Format of channel name:
-            <prefix>:<name>:<sender>#<signal_id>
+        .. attribute:: name
 
-        prefix - global channel filter
-        name - signal identificator
-        sender - identificator of app wich send this signal
-        signal_id - identificator of signal (optional)
+            String, signal name, project-wide unique, `[a-z_]+`
 
-        some_signal = Signal(
-            providing_args=['some_arg'],
-            name='some_signal')
+        .. attribute:: providing_args
 
+            List of strings, all available and required parameters of message
+
+        .. attribute:: content_type
+
+            String, content format, `json` by default
+
+
+        Declaration with config-file (signals.json)
+
+        .. code-block:: json
+
+            {
+                "signals": [
+                    {"name": "started", "providing_args": []},
+                    {"name": "user_created", "providing_args": ["user_id"]},
+                ]
+            }
+
+        Manual declaration (not recommended)
+
+        .. code-block:: python
+
+            some_signal = Signal(
+                name='some_signal',
+                providing_args=['some_arg']
+            )
     '''
 
-    _signals: dict = {}
-    receivers: list
+    name: str
+    providing_args: List[str]
+    content_type: str = 'json'
+    _signals = {}  # type: Dict[str, Signal]
 
-    def __new__(cls, *args, **kwargs):
-        name = kwargs.get('name', args[0] if args else None)
-        return cls._signals[name] if name in cls._signals else super().__new__(cls)
+    def __post_init__(self) -> None:
+        self._signals[self.name] = self
 
-    def __init__(self, name: str, providing_args: List[str], serializer=None):
-        if name in self._signals:
-            return
-
-        self.name = name
-        self.providing_args = providing_args
-        self.serializer = serializer or ujson
-        self._signals[name] = self
-        self.receivers = []
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'<Signal {self.name}>'
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Signal):
+            return NotImplemented
         return self.name == other.name
 
-    def connect(self, receiver: Callable, sender: str = None) -> None:
-        ''' Bind method to signal '''
-        lookup_key = LookupKey(
-            mod=receiver.__module__, name=receiver.__qualname__, id=_make_id(sender))
-
-        for key, _ in self.receivers:
-            if (key.mod, key.name) == (lookup_key.mod, lookup_key.name):
-                break
-        else:
-            self.receivers.append((lookup_key, receiver))
-
-    def make_channel_name(self, channel_prefix: str, sender: str = '*') -> str:
-        ''' Make channel name '''
-        return '{}:{}:{}'.format(channel_prefix, self.name, _make_id(sender))
-
-    def serialize(self, data: dict) -> str:
-        return self.serializer.dumps(data)
-
-    def deserialize(self, data: str) -> dict:
-        return self.serializer.loads(data)
-
     @classmethod
-    def get(cls, name: str):
-        ''' Get signal instance by name '''
+    def get(cls, name: str) -> 'Signal':
+        ''' Get the signal instance by name '''
         try:
             return cls._signals[name]
         except KeyError:
-            raise SignalException(f'No such signal {name}')
+            raise SignalNotFound(f'No such signal {name}')
 
     @classmethod
-    def get_all(cls):
+    def get_all(cls) -> Dict[str, 'Signal']:
+        ''' All registered signals '''
         return cls._signals
+
+    def make_channel_name(self, channel_prefix: str, sender: str = '*') -> str:
+        '''
+            Construct a channel name by the signal description
+
+            :param channel_prefix: prefix, often project name
+            :param name: signal name, project-wide unique
+            :param sender: name of signal sender
+        '''
+        return f'{channel_prefix}:{self.name}:{sender}'
+
+    def serialize(self, data: dict) -> str:
+        '''
+            Data serializing method
+
+            :param data: dict of transfered data
+        '''
+        try:
+            return ujson.dumps(data)
+        except (ValueError, TypeError, OverflowError) as exc:
+            raise SerializingError(exc)
+
+    def deserialize(self, data: str) -> dict:
+        '''
+            Data deserializing method
+
+            :param data: serialized transfered data
+        '''
+        try:
+            return ujson.loads(data)
+        except (ValueError, TypeError, OverflowError) as exc:
+            raise SerializingError(exc)
+
+
+@dataclass(frozen=True)
+class Receiver:
+    agent: 'MicroAgent'
+    handler: Callable
+    signal: Signal
+    timeout: Union[int, float]
+
+    @property
+    def key(self) -> str:
+        return self.handler.__qualname__
+
+    def __repr__(self) -> str:
+        return f'<Receiver {self.handler.__name__} of {self.agent} for {self.signal}>'

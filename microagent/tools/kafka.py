@@ -1,24 +1,57 @@
+'''
+:ref:`Queue Broker <broker>` based on :kafka:`kafka <>`.
+'''
 import urllib
 import asyncio
 import logging
 
-from typing import Optional
 from datetime import datetime
 
-from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
+import aiokafka  # type: ignore
 
-from ..broker import AbstractQueueBroker
+from ..broker import AbstractQueueBroker, Consumer
 
 
 class KafkaBroker(AbstractQueueBroker):
+    '''
+        Experimental broker based on the Apache Kafka distributed stream processing system.
 
-    def __init__(self, dsn: str, logger: Optional[logging.Logger] = None):
+        :param dsn: string, data source name for connection kafka://localhost:9092
+        :param logger: logging.Logger (optional)
+
+
+        Sending messages.
+
+        .. code-block:: python
+
+            from microagent.tools.kafka import KafkaBroker
+
+            broker = KafkaBroker('kafka://localhost:9092')
+
+            await broker.user_created.send({'user_id': 1})
+
+
+        Consuming messages.
+
+        .. code-block:: python
+
+            class EmailAgent(MicroAgent):
+                @consumer(queues.mailer)
+                async def example_read_queue(self, kafka, **data):
+                    # kafka: AIOKafkaConsumer
+                    process(data)
+    '''
+    addr: str
+    producer: aiokafka.AIOKafkaProducer
+
+    def __init__(self, dsn: str, logger: logging.Logger = None) -> None:
         super().__init__(dsn, logger)
+        _loop = asyncio.get_running_loop()
         self.addr = urllib.parse.urlparse(dsn).netloc
-        self.producer = AIOKafkaProducer(loop=self._loop, bootstrap_servers=self.addr)
+        self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
 
-    async def send(self, name: str, message: str, **kwargs):
-        if not self.producer._closed:
+    async def send(self, name: str, message: str, **kwargs) -> None:
+        if self.producer._closed:
             await self.producer.start()
 
         try:
@@ -26,42 +59,44 @@ class KafkaBroker(AbstractQueueBroker):
 
         finally:
             await self.producer.stop()
-            self.producer = AIOKafkaProducer(loop=self._loop, bootstrap_servers=self.addr)
+            _loop = asyncio.get_running_loop()
+            self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
 
-    async def bind(self, name: str, handler):
-        consumer = AIOKafkaConsumer(name, loop=self._loop, bootstrap_servers=self.addr)
-        asyncio.ensure_future(self._kafka_wrapper(consumer, handler))
+    async def bind(self, name: str):
+        loop = asyncio.get_running_loop()
+        kafka_consumer = aiokafka.AIOKafkaConsumer(name, loop=loop, bootstrap_servers=self.addr)
+        asyncio.ensure_future(self._kafka_wrapper(kafka_consumer, name))
 
-    async def _kafka_wrapper(self, consumer, handler):
-        await consumer.start()
+    async def _kafka_wrapper(self, kafka_consumer: aiokafka.AIOKafkaConsumer, name: str) -> None:
+        consumer = self._bindings[name]
+        await kafka_consumer.start()
 
         try:
-            async for msg in consumer:
-                data = handler.queue.deserialize(msg.value)
+            async for msg in kafka_consumer:
+                data = consumer.queue.deserialize(msg.value)  # type: dict
                 data['kafka'] = msg
-                asyncio.ensure_future(self._handle(handler, data))
+                asyncio.ensure_future(self._handle(consumer, data))
 
         finally:
-            await consumer.stop()
+            await kafka_consumer.stop()
 
-    async def _handle(self, handler, data):
-        self.log.debug('Calling %s by %s with %s', handler.__qualname__,
-            handler.queue.name, data)
+    async def _handle(self, consumer: Consumer, data: dict) -> None:
+        self.log.debug('Calling %s by %s with %s', consumer, consumer.queue.name, data)
 
         try:
-            response = handler(**data)
+            response = consumer.handler(**data)
         except TypeError:
-            self.log.error('Call %s failed', handler.__qualname__, exc_info=True)
+            self.log.error('Call %s failed', consumer, exc_info=True)
             return
 
         if asyncio.iscoroutine(response):
             timer = datetime.now().timestamp()
 
             try:
-                await asyncio.wait_for(response, handler.timeout)
+                await asyncio.wait_for(response, consumer.timeout)
             except asyncio.TimeoutError:
-                self.log.fatal('TimeoutError: %s %.2f', handler.__qualname__,
+                self.log.error('TimeoutError: %s %.2f', consumer,
                     datetime.now().timestamp() - timer)
 
-    async def queue_length(self, name, **options):
+    async def queue_length(self, name: str, **options):
         pass  # TODO: get queue length

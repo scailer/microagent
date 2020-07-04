@@ -1,4 +1,5 @@
 import re
+import os
 import pathlib
 from setuptools import setup
 
@@ -10,9 +11,15 @@ except IndexError:
     raise RuntimeError('Unable to determine version.')
 
 
+def read(filename):
+    with open(os.path.join(filename), 'rt') as f:
+        return f.read().strip()
+
+
 setup(
     version=version,
     packages=['microagent', 'microagent.tools'],
+    long_description=read('README.rst'),
     include_package_data=True,
     install_requires=[
         'ujson',
@@ -41,6 +48,11 @@ setup(
         'aioredis': ['aioredis'],
         'amqp': ['aioamqp==0.14'],
         'kafka': ['aiokafka==0.5'],
-        'mock': ['asynctest'],
     },
+
+    entry_points={
+        'console_scripts': [
+            'marun = microagent.launcher:run',
+        ]
+    }
 )

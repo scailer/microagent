@@ -1,10 +1,9 @@
+import ssl
 import asyncio
 import logging
-import unittest
 from typing import Optional
 
 from pulsar.apps.data import create_store
-from pulsar.apps.data.redis import RedisServer
 
 from ..bus import AbstractSignalBus
 from ..broker import AbstractQueueBroker
@@ -47,10 +46,20 @@ class QueueBroker(MicroAgentSetting):
     desc = 'DSN queue broker'
 
 
+class BrokerSSLCert(MicroAgentSetting):
+    is_global = True
+    name = 'broker_cert'
+    flags = ['--broker-cert']
+    meta = "FILE"
+    default = ''
+    desc = 'Broker ssl certificate file'
+
+
 class RedisSignalBus(AbstractSignalBus):
     def __init__(self, dsn, prefix='PUBSUB', logger=None):
         super().__init__(dsn, prefix, logger)
-        redis = create_store(dsn, decode_responses=True, loop=self._loop)
+        _loop = asyncio.get_running_loop()
+        redis = create_store(dsn, decode_responses=True, loop=_loop)
         self.transport = redis.pubsub()
         self.transport.add_client(self.receiver)
 
@@ -67,7 +76,8 @@ class RedisSignalBus(AbstractSignalBus):
 class PulsarRedisBroker(RedisBrokerMixin, AbstractQueueBroker):
     def __init__(self, dsn: str, logger: Optional[logging.Logger] = None):
         super().__init__(dsn, logger)
-        self.redis_store = create_store(dsn, decode_responses=True, loop=self._loop)
+        _loop = asyncio.get_running_loop()
+        self.redis_store = create_store(dsn, decode_responses=True, loop=_loop)
         self.transport = self.redis_store.client()
 
     async def new_connection(self):
@@ -103,7 +113,15 @@ class MicroAgentApp(Application):
 
         if queue_broker_dsn.startswith('amqp'):
             from .amqp import AMQPBroker
-            broker = AMQPBroker(queue_broker_dsn)
+
+            ssl_context, cert_file = None, self.cfg.settings.get('broker_cert').value
+
+            if cert_file:
+                ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                ssl_context.check_hostname = False
+                ssl_context.load_verify_locations(cert_file)
+
+            broker = AMQPBroker(queue_broker_dsn, ssl_context=ssl_context)
 
         elif queue_broker_dsn.startswith('kafka'):
             from .kafka import KafkaBroker
@@ -121,31 +139,3 @@ class MicroAgentApp(Application):
 
     def worker_stopping(self, worker, exc=None):
         asyncio.ensure_future(worker.agent.stop())
-
-
-class AgentTestCase(unittest.TestCase):
-    CHANNEL_PREFIX = 'TEST'
-    REDIS_DSN = 'redis://localhost:6379/5'
-    AGENT_CLASS = None
-    SETTINGS = {
-        'redis_server': RedisServer(),
-        'signal_prefix': SignalPrefix(),
-        'signal_bus': SignalBus(),
-        'queue_broker': QueueBroker(),
-    }
-
-    @classmethod
-    async def setUpClass(cls):
-        cls.SETTINGS['redis_server'].set(cls.REDIS_DSN)
-        cls.SETTINGS['signal_bus'].set(cls.REDIS_DSN)
-        cls.SETTINGS['queue_broker'].set(cls.REDIS_DSN)
-        cls.SETTINGS['signal_prefix'].set(cls.CHANNEL_PREFIX)
-        cls.loop = asyncio.get_event_loop()
-        cls.bus = RedisSignalBus(cls.REDIS_DSN, prefix=cls.CHANNEL_PREFIX)
-        cls.agent = cls.AGENT_CLASS(cls.bus, settings=cls.SETTINGS,
-            enable_periodic_tasks=False, enable_receiving_signals=False)
-
-    @classmethod
-    def tearDownClass(cls):
-        del cls.agent
-        del cls.bus
