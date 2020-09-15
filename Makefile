@@ -6,6 +6,10 @@ clean:
 test:
 	python3 setup.py test
 
+release: clean
+	python setup.py sdist bdist_wheel
+	python3 -m twine upload dist/*
+
 run_aioredis_example: 
 	python3 examples/aioredis_server.py
 
