@@ -211,7 +211,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     def _amqp_wrapper(self, consumer: Consumer) -> Callable:
         async def _wrapper(channel, body, envelope, properties):
-            data = consumer.queue.deserialize(body)
+            data = consumer.queue.deserialize(body) or {}
             data['amqp'] = MessageMeta(
                 queue=consumer.queue, channel=channel,
                 envelope=envelope, properties=properties)

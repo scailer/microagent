@@ -94,7 +94,6 @@ class Signal:
             Construct a channel name by the signal description
 
             :param channel_prefix: prefix, often project name
-            :param name: signal name, project-wide unique
             :param sender: name of signal sender
         '''
         return f'{channel_prefix}:{self.name}:{sender}'
