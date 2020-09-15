@@ -108,4 +108,5 @@ class Consumer:
     options: dict
 
     def __repr__(self) -> str:
-        return f'<Consumer {self.handler.__name__} of {self.agent} for {self.queue}>'
+        name = getattr(self.handler, '__name__', 'unknown')
+        return f'<Consumer {name} of {self.agent} for {self.queue}>'
