@@ -223,6 +223,18 @@ async def test_broker_wrapper_fail_type(amqp_connection):
     channel.basic_client_ack.assert_not_called()
 
 
+async def test_broker_wrapper_fail_empty_body(amqp_connection):
+    queue = Queue(name='test_queue')
+    consumer = Consumer(agent=None, handler=1, queue=queue, timeout=1, options={})
+    channel, connection = amqp_connection
+
+    broker = AMQPBroker('amqp://localhost')
+    wrapper = broker._amqp_wrapper(consumer)
+    await wrapper(channel, 'null', MagicMock(delivery_tag=1), MagicMock())
+
+    channel.basic_client_ack.assert_not_called()
+
+
 async def test_broker_wrapper_fail_timeout(amqp_connection):
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=AsyncMock(side_effect=asyncio.TimeoutError),
