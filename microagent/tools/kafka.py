@@ -51,8 +51,7 @@ class KafkaBroker(AbstractQueueBroker):
         self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
 
     async def send(self, name: str, message: str, **kwargs) -> None:
-        if self.producer._closed:
-            await self.producer.start()
+        await self.producer.start()
 
         try:
             await self.producer.send_and_wait(name, bytes(message, 'utf8'), **kwargs)
