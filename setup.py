@@ -36,7 +36,7 @@ setup(
         'pulsar @ git+https://github.com/scailer/pulsar.git@py38',
         'aioredis',
         'aioamqp==0.14.0',
-        'aiokafka==0.5',
+        'aiokafka==0.7',
         'pytest-flake8',
         'flake8-print',
         'flake8-blind-except==0.1.1',
@@ -47,7 +47,7 @@ setup(
         'pulsar': ['pulsar'],
         'aioredis': ['aioredis'],
         'amqp': ['aioamqp==0.14'],
-        'kafka': ['aiokafka==0.5'],
+        'kafka': ['aiokafka==0.7'],
     },
 
     entry_points={
