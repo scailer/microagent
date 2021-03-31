@@ -52,6 +52,10 @@ class GroupInterrupt(SystemExit):
     pass
 
 
+class ServerInterrupt(Exception):
+    pass
+
+
 def load_configuration(config_path: str) -> Iterator[Tuple[str, CFG_T]]:
     '''
         Load configuration from module and prepare it for initializing agents.
@@ -126,10 +130,13 @@ async def run_agent(name: str, backend: str, cfg: Dict[str, Any], pid: int = Non
     try:
         await agent.start()  # wait when servers used
 
-    except (KeyboardInterrupt, GroupInterrupt):
+    except (KeyboardInterrupt, GroupInterrupt, ServerInterrupt) as exc:
+        logger.warning('Catch interrupt %s', exc)
+
         if pid:
             loop = asyncio.get_event_loop()
             loop.stop()
+
         return
 
     except Exception as exc:
@@ -186,10 +193,6 @@ async def _run_master(cfg: List[Tuple[str, CFG_T]]):
 
 def _stop_cb(name, future):
     logger.info('Agent %s stoped with %s', name, future)
-    try:
-        future.result()
-    except Exception as exc:
-        print(exc)  # noqa: T001
 
 
 def _signal_cb(signum, *args, pool):

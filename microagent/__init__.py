@@ -9,11 +9,12 @@ import ujson
 
 from .signal import Signal
 from .queue import Queue
+from .launcher import ServerInterrupt
 from .agent import (MicroAgent, ReceiverHandler, ConsumerHandler,
     PeriodicHandler, CRONHandler, HookHandler)
 
-__all__ = ['Signal', 'Queue', 'MicroAgent', 'receiver', 'consumer', 'periodic',
-           'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
+__all__ = ['Signal', 'Queue', 'MicroAgent', 'ServerInterrupt', 'receiver', 'consumer',
+           'periodic', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
 
 
 def load_stuff(source: str) -> Tuple[object, object]:
