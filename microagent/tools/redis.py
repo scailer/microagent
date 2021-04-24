@@ -26,7 +26,7 @@ class RedisBrokerMixin:
 
     async def bind(self, name: str) -> None:
         _loop = asyncio.get_running_loop()
-        _loop.call_later(self.BIND_TIME, lambda: asyncio.ensure_future(self._wait(name)))
+        _loop.call_later(self.BIND_TIME, lambda: asyncio.create_task(self._wait(name)))
 
     async def _wait(self, name: str) -> None:
         transport = await self.new_connection()
@@ -34,7 +34,7 @@ class RedisBrokerMixin:
             data = await transport.blpop(name, self.WAIT_TIME)
             if data:
                 _, data = data
-                asyncio.ensure_future(self._handler(name, data))
+                asyncio.create_task(self._handler(name, data))
 
     async def rollback(self, name: str, data: str):
         _hash = str(hash(name)) + str(hash(data))
@@ -47,7 +47,7 @@ class RedisBrokerMixin:
         self.log.warning('Back message to queue "%s" attempt %d', name, attempt)
 
         _loop = asyncio.get_running_loop()
-        _loop.call_later(attempt ** 2, lambda: asyncio.ensure_future(self.send(name, data)))
+        _loop.call_later(attempt ** 2, lambda: asyncio.create_task(self.send(name, data)))
 
         self._rollbacks[_hash] += 1
 

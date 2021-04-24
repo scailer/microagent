@@ -64,7 +64,7 @@ class KafkaBroker(AbstractQueueBroker):
     async def bind(self, name: str):
         loop = asyncio.get_running_loop()
         kafka_consumer = aiokafka.AIOKafkaConsumer(name, loop=loop, bootstrap_servers=self.addr)
-        asyncio.ensure_future(self._kafka_wrapper(kafka_consumer, name))
+        asyncio.create_task(self._kafka_wrapper(kafka_consumer, name))
 
     async def _kafka_wrapper(self, kafka_consumer: aiokafka.AIOKafkaConsumer, name: str) -> None:
         consumer = self._bindings[name]
@@ -74,7 +74,7 @@ class KafkaBroker(AbstractQueueBroker):
             async for msg in kafka_consumer:
                 data = consumer.queue.deserialize(msg.value)  # type: dict
                 data['kafka'] = msg
-                asyncio.ensure_future(self._handle(consumer, data))
+                asyncio.create_task(self._handle(consumer, data))
 
         finally:
             await kafka_consumer.stop()

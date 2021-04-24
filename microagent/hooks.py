@@ -15,6 +15,8 @@ messages. It is can be useful for sending notifications to monitoring service an
 notifications to the monitoring service, and so on.
 
 **server** - "run forever" handler. If it crashes with exception microagent will be stopped.
+If you are using a launcher from the library and server run forever,
+it is important correctly to stop the servers with ServerInterrupt exception.
 
 In addition, there is a special mechanism for running nested services. Methods
 marked with the server decorator will be started in "run forever" mode. It's

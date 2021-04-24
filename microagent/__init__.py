@@ -1,15 +1,14 @@
-__version__ = '1.2'
+__version__ = '1.3'
 
 from collections import namedtuple
 from typing import Union, Tuple, Callable, Dict, Iterable, Any
-import time
 
-from croniter import croniter
 import ujson
 
 from .signal import Signal
 from .queue import Queue
 from .launcher import ServerInterrupt
+from .periodic_task import cron_parser
 from .agent import (MicroAgent, ReceiverHandler, ConsumerHandler,
     PeriodicHandler, CRONHandler, HookHandler)
 
@@ -158,7 +157,7 @@ def cron(spec: str, timeout: Union[int, float] = 1) -> Callable:
     def _decorator(func):
         func._cron = CRONHandler(
             handler=func,
-            cron=croniter(spec, time.time()),
+            cron=cron_parser(spec),
             timeout=float(timeout)
         )
         return func
@@ -261,7 +260,8 @@ def on(label: str) -> Callable:
 
             @on('server')
             async def run_server(self):
-                await Server().start()
+                await Server().start()  # run forever
+                raise ServerInterrupt('Exit')  # graceful exit
     '''
     assert label in ('pre_start', 'post_start', 'pre_stop', 'server'), 'Bad label'
 

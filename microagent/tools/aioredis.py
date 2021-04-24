@@ -40,7 +40,7 @@ class AIORedisSignalBus(AbstractSignalBus):
         self.transport = None
         self.pubsub = None
         self._pubsub_lock = asyncio.Lock()  # type: asyncio.Lock
-        asyncio.ensure_future(self._receiver(self.mpsc))
+        asyncio.create_task(self._receiver(self.mpsc))
 
     async def send(self, channel: str, message: str) -> None:
         if not self.transport:

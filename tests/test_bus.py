@@ -200,7 +200,7 @@ async def test_Bus_handle_response_fail(bus):
     bus.response_context = MagicMock(finish=MagicMock())
     bus.response_context.finish.side_effect = asyncio.InvalidStateError()
     bus.handle_response(str(uuid.uuid4().hex), {'q': 1})
-    bus.log.error.assert_called()
+    bus.log.exception.assert_called()
 
 
 async def test_Bus_handle_signal_ok(bus):
@@ -256,7 +256,7 @@ async def test_Bus_broadcast_fail_type_failed(bus, test_signal):
     ret = await bus.broadcast(receiver, test_signal, 'test', {'uuid': 1})
 
     assert ret is None
-    bus.log.error.assert_called()
+    bus.log.exception.assert_called()
 
 
 async def test_Bus_broadcast_fail_timeout(bus, test_signal):

@@ -8,6 +8,9 @@ Launcher and configuration
    :code: python
 
 
+.. autoclass:: microagent.launcher.ServerInterrupt
+
+
 .. autofunction:: microagent.launcher.load_configuration
 
 

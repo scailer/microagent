@@ -80,14 +80,13 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, Iterable, Callable, Union, Dict, Tuple
 from datetime import datetime, timedelta
-import croniter
 
 from .signal import Signal, Receiver
 from .queue import Queue, Consumer
 from .bus import AbstractSignalBus
 from .broker import AbstractQueueBroker
 from .hooks import Hooks, Hook
-from .periodic_task import PeriodicTask, CRONTask
+from .periodic_task import PeriodicTask, CRONTask, CRON
 
 HandlerTypes = Union[Receiver, Consumer, PeriodicTask, CRONTask, Hook]
 
@@ -238,9 +237,9 @@ class MicroAgent:
 
             if start_after > 100:
                 start_at = datetime.now() + timedelta(seconds=start_after)  # type: datetime
-                self.log.debug('Set %s at %s', self, f'{start_at:%H:%M:%S}')
+                self.log.debug('Set %s at %s', task, f'{start_at:%H:%M:%S}')
             else:
-                self.log.debug('Set %s after %d sec', self, start_after)
+                self.log.debug('Set %s after %d sec', task, start_after)
 
             task.start(start_after)
 
@@ -360,7 +359,7 @@ class PeriodicHandler(UnboundHandler):
 @dataclass(frozen=True)
 class CRONHandler(UnboundHandler):
     handler: Callable
-    cron: croniter.croniter
+    cron: CRON
     timeout: Union[int, float]
     target_class = CRONTask
     _register = {}  # type: Dict[Tuple[str, str, str], CRONHandler]

@@ -16,12 +16,14 @@ stops the entire group.
 '''
 
 import os
+import time
 import signal
 import asyncio
 import argparse
 import importlib
 import logging
 import concurrent.futures
+from contextlib import suppress
 from typing import Optional, Iterator, Tuple, Dict, List, Any, TYPE_CHECKING
 from itertools import chain
 from functools import partial
@@ -53,6 +55,7 @@ class GroupInterrupt(SystemExit):
 
 
 class ServerInterrupt(Exception):
+    ''' Graceful server interruption '''
     pass
 
 
@@ -87,15 +90,16 @@ def init_agent(backend: str, cfg: Dict[str, Any]) -> 'MicroAgent':
         initialize it and returns not started MicroAgent instance
     '''
 
-    bus, broker = None, None
+    bus: Optional['AbstractSignalBus'] = None
+    broker: Optional['AbstractQueueBroker'] = None
     _bus: Optional[CFG_T] = cfg.pop('bus', None)
     _broker: Optional[CFG_T] = cfg.pop('broker', None)
 
     if _bus:
-        bus: 'AbstractSignalBus' = _import(_bus[0])(**_bus[1])
+        bus = _import(_bus[0])(**_bus[1])
 
     if _broker:
-        broker: 'AbstractQueueBroker' = _import(_broker[0])(**_broker[1])
+        broker = _import(_broker[0])(**_broker[1])
 
     return _import(backend)(bus=bus, broker=broker, **cfg)
 
@@ -161,11 +165,40 @@ def _master_watcher(pid: int, loop: asyncio.BaseEventLoop):
         os._exit(os.EX_OK)  # noqa: W0212 hard break better than deattached pocesses
 
 
+class ProcessPoolExecutor(concurrent.futures.ProcessPoolExecutor):
+    def __init__(self, max_workers=None):
+        super().__init__(max_workers)
+        self.interrupter_lock = False
+        signal.signal(signal.SIGTERM, self._signal_cb)
+        signal.signal(signal.SIGINT, self._signal_cb)
+
+    def _signal_cb(self, signum, *args):
+        signame = {2: 'INT', 15: 'TERM'}.get(signum, signum)
+        logger.warning('Catch %s %s', signame, list(self._processes))
+        self.close()
+
+    def close(self):
+        if self.interrupter_lock:  # Prevent duble kill
+            logger.warning('Force kill locked')
+            return
+
+        self.interrupter_lock = True
+        logger.warning('Force kill processes %s', list(self._processes))
+
+        for pid, process in self._processes.items():
+            with suppress(ValueError):
+                process.close()
+
+        time.sleep(.1)
+
+        for pid, process in self._processes.items():
+            process.kill()
+
+        logger.info('Forked processes killed')
+
+
 async def _run_master(cfg: List[Tuple[str, CFG_T]]):
-    with concurrent.futures.ProcessPoolExecutor(len(cfg)) as pool:
-        pool.interrupter_lock = False
-        signal.signal(signal.SIGTERM, partial(_signal_cb, pool=pool))
-        signal.signal(signal.SIGINT, partial(_signal_cb, pool=pool))
+    with ProcessPoolExecutor(len(cfg)) as pool:
         futures = []
 
         for name, _cfg in cfg:
@@ -179,7 +212,7 @@ async def _run_master(cfg: List[Tuple[str, CFG_T]]):
 
             # If one of agents stoped, close all agents (one fail, all fail)
             if data.not_done:
-                _close_pool(pool)
+                pool.close()
 
         except KeyboardInterrupt:
             logger.warning('Quit')
@@ -193,29 +226,6 @@ async def _run_master(cfg: List[Tuple[str, CFG_T]]):
 
 def _stop_cb(name, future):
     logger.info('Agent %s stoped with %s', name, future)
-
-
-def _signal_cb(signum, *args, pool):
-    signame = {2: 'INT', 15: 'TERM'}.get(signum, signum)
-    logger.warning('Catch %s %s', signame, list(pool._processes))
-    _close_pool(pool)
-
-
-def _close_pool(pool):
-    if pool.interrupter_lock:  # Prevent duble kill
-        logger.warning('Force kill locked')
-        return
-
-    pool.interrupter_lock = True
-    logger.warning('Force kill processes %s', list(pool._processes))
-
-    for pid in pool._processes:
-        try:
-            os.kill(pid, signal.SIGINT)
-        except ProcessLookupError:
-            logger.info('Process %s already killed', pid)
-
-    logger.info('Forked processes killed')
 
 
 async def main():

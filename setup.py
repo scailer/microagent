@@ -24,7 +24,6 @@ setup(
     install_requires=[
         'ujson',
         'requests',
-        'croniter'
     ],
 
     setup_requires=["pytest-runner"],
@@ -33,7 +32,6 @@ setup(
         'pytest-asyncio',
         'asynctest',
         'pytest-cov',
-        'pulsar @ git+https://github.com/scailer/pulsar.git@py38',
         'aioredis',
         'aioamqp==0.14.0',
         'aiokafka==0.7',
@@ -44,7 +42,6 @@ setup(
     ],
 
     extras_require={
-        'pulsar': ['pulsar'],
         'aioredis': ['aioredis'],
         'amqp': ['aioamqp==0.14'],
         'kafka': ['aiokafka==0.7'],

@@ -89,7 +89,6 @@ Tool provide features:
    aioredis
    amqp
    kafka
-   pulsar
    mocks
 
 .. toctree::
