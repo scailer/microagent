@@ -17,4 +17,7 @@ Launcher and configuration
 .. autofunction:: microagent.launcher.init_agent
 
 
+.. autoclass:: microagent.launcher.AgentsManager
+
+
 .. autoclass:: microagent.launcher.GroupInterrupt

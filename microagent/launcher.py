@@ -9,7 +9,7 @@ Launcher can run microagents from one or several files.
     $ marun myproject.app1 myproject.app2
 
 
-Each microagent is launched in a separate system thread, and the launcher works
+Each microagent is launched in a separate os process, and the launcher works
 as a supervisor. All agents started by a single command are called a deployment
 group and start/stop at the same time. If one of the agents stops, the launcher
 stops the entire group.
@@ -162,6 +162,12 @@ def _master_watcher(pid: int, loop: asyncio.BaseEventLoop):
 
 
 class AgentsManager:
+    '''
+        AgentsManager is a supervisor for launching and control group of microagents.
+        When we run AgentsManager, it fork daemon process, strat microagent in the it,
+        and wait when it finished or failed, then send SIGTERM for all other working processes.
+    '''
+
     mp_ctx: multiprocessing.context.BaseContext
     processes: Dict[int, multiprocessing.process.BaseProcess]
     cfg: List[Tuple[str, CFG_T]]
