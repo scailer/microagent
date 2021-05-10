@@ -138,7 +138,7 @@ class AbstractQueueBroker(abc.ABC):
             :param message: string, serialized object
             :param \*\*kwargs: specific parameters for each broker implementation
         '''  # noqa: W605
-        return NotImplemented  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
     @abc.abstractmethod
     async def bind(self, name: str) -> None:
@@ -147,7 +147,7 @@ class AbstractQueueBroker(abc.ABC):
 
             :param name: string, queue name
         '''
-        return NotImplemented  # pragma: no cover
+        raise NotImplementedError  # pragma: no cover
 
     async def bind_consumer(self, consumer: Consumer) -> None:
         '''
