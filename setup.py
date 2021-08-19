@@ -32,7 +32,7 @@ setup(
         'pytest-asyncio',
         'asynctest',
         'pytest-cov',
-        'aioredis==1.3',
+        'aioredis==2.0',
         'aioamqp==0.14.0',
         'aiokafka==0.7',
         'pytest-flake8',
@@ -42,7 +42,7 @@ setup(
     ],
 
     extras_require={
-        'aioredis': ['aioredis==1.3'],
+        'aioredis': ['aioredis==2.0'],
         'amqp': ['aioamqp==0.14'],
         'kafka': ['aiokafka==0.7'],
     },
