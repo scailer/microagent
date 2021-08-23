@@ -2,6 +2,13 @@
 Changelog
 =========
 
+1.4 (2021-08-22)
+================
+
+- Update for aioredis 2.0
+- Enable support python 3.10
+
+
 1.3 (2021-05-10)
 ================
 
