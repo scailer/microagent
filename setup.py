@@ -7,6 +7,7 @@ from setuptools import setup
 try:
     version = re.findall(r"^__version__ = '([^']+)'\r?$",
         (pathlib.Path(__file__).parent / 'microagent' / '__init__.py').read_text('utf-8'), re.M)[0]
+
 except IndexError:
     raise RuntimeError('Unable to determine version.')
 
