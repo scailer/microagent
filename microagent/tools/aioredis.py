@@ -1,7 +1,6 @@
 '''
 :ref:`Signal Bus <bus>` and :ref:`Queue Broker <broker>` based on :aioredis:`aioredis <>`.
 '''
-import functools
 import asyncio
 import logging
 from typing import Optional
@@ -30,33 +29,40 @@ class AIORedisSignalBus(AbstractSignalBus):
 
 
     '''
-    mpsc: aioredis.pubsub.Receiver
-    transport: Optional[aioredis.Redis]
-    pubsub: Optional[aioredis.Redis]
+    connection: Optional[aioredis.Redis] = None
 
     def __init__(self, dsn: str, prefix: str = 'PUBSUB', logger: logging.Logger = None) -> None:
         super().__init__(dsn, prefix, logger)
-        self.mpsc = aioredis.pubsub.Receiver(loop=asyncio.get_running_loop())
-        self.transport = None
-        self.pubsub = None
         self._pubsub_lock = asyncio.Lock()  # type: asyncio.Lock
-        asyncio.create_task(self._receiver(self.mpsc))
+
+    def get_connection(self):
+        if not self.connection:
+            self.connection = aioredis.Redis.from_url(self.dsn, decode_responses=True)
+        return self.connection
 
     async def send(self, channel: str, message: str) -> None:
-        if not self.transport:
-            self.transport = await aioredis.create_redis(self.dsn)
-        await self.transport.publish(channel, message)
+        await self.get_connection().publish(channel, message)
 
     async def bind(self, channel: str) -> None:
         async with self._pubsub_lock:
-            if not self.pubsub:
-                self.pubsub = await aioredis.create_redis(self.dsn)
-            await self.pubsub.psubscribe(self.mpsc.pattern(channel))
+            pubsub = self.get_connection().pubsub()
+            asyncio.create_task(self._receiver(pubsub, channel))
 
-    async def _receiver(self, mpsc: aioredis.pubsub.Receiver) -> None:
-        async for chl, msg in mpsc.iter():
-            channel, message = map(functools.partial(str, encoding='utf8'), msg)
-            self.receiver(channel, message)
+    async def _receiver(self, pubsub: aioredis.client.PubSub, channel: str) -> None:
+        async with pubsub as psub:
+            await pubsub.psubscribe(channel)
+
+            try:
+                async for message in psub.listen():
+                    if message['type'] in psub.PUBLISH_MESSAGE_TYPES:
+                        self.receiver(message['channel'], message['data'])
+
+            except aioredis.ConnectionError as exc:
+                self.log.exception(exc)
+                self.log.warning('Resubscribe %s %s', channel, self)
+                self.connection = None
+                await asyncio.sleep(1)
+                await self.bind(channel)
 
 
 class AIORedisBroker(RedisBrokerMixin, AbstractQueueBroker):
@@ -84,15 +90,15 @@ class AIORedisBroker(RedisBrokerMixin, AbstractQueueBroker):
             BLPOP option (by default: 15)
     '''
 
-    async def new_connection(self) -> aioredis.Redis:
-        return await aioredis.create_redis(self.dsn)
+    def new_connection(self) -> aioredis.Redis:
+        return aioredis.Redis.from_url(self.dsn, decode_responses=True)
 
     async def send(self, name: str, message: str, **kwargs) -> None:
         if not self.transport:
-            self.transport = await self.new_connection()
+            self.transport = self.new_connection()
         await self.transport.rpush(name, message)  # type: ignore
 
     async def queue_length(self, name: str, **options) -> int:
         if not self.transport:
-            self.transport = await self.new_connection()
+            self.transport = self.new_connection()
         return int(await self.transport.llen(name))  # type: ignore

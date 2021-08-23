@@ -13,51 +13,53 @@ def test_signal():
 
 
 async def test_bus_receive_ok(monkeypatch):
-    async def mpsc_iter():
-        yield '', (b'channel', b'{}')
+    class PubSub:
+        PUBLISH_MESSAGE_TYPES = ("message", "pmessage")
+        psubscribe = AsyncMock()
 
-    receiver = MagicMock(**{'iter': mpsc_iter, 'pattern': Mock(return_value='pattern')})
-    create_redis = MagicMock(psubscribe=AsyncMock())
-    monkeypatch.setattr(aioredis.pubsub, 'Receiver', lambda loop: receiver)
-    monkeypatch.setattr(aioredis, 'create_redis', AsyncMock(return_value=create_redis))
+        async def __aenter__(self):
+            return MagicMock(PUBLISH_MESSAGE_TYPES=("message", "pmessage"), listen=self.listen)
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            pass
+
+        async def listen(self):
+            yield {'type': 'pmessage', 'channel': 'pattern1', 'data': 'data'}
+            raise aioredis.ConnectionError()
+
+    conn = MagicMock(pubsub=lambda: PubSub())
+    monkeypatch.setattr(aioredis.Redis, 'from_url', Mock(return_value=conn))
 
     bus = AIORedisSignalBus('redis://localhost')
     bus.receiver = Mock()
-    await asyncio.sleep(.01)
-
-    assert bus.mpsc is receiver
-    assert bus.pubsub is create_redis
-    assert bus.transport is None
-    bus.receiver.assert_called_once_with('channel', '{}')
-    create_redis.psubscribe.assert_called_once_with('pattern')
 
     await bus.bind('pattern1')
+    await asyncio.sleep(.02)
 
-    assert create_redis.psubscribe.call_count == 2
+    assert 'pattern1' in [x[0][0] for x in PubSub.psubscribe.call_args_list]
+    assert 'pattern1' in [x[0][0] for x in bus.receiver.call_args_list]
 
 
 async def test_bus_send_ok(monkeypatch):
-    create_redis = MagicMock(publish=AsyncMock())
-    monkeypatch.setattr(aioredis.pubsub, 'Receiver', lambda loop: MagicMock())
-    monkeypatch.setattr(AIORedisSignalBus, '_receiver', AsyncMock())
-    monkeypatch.setattr(aioredis, 'create_redis', AsyncMock(return_value=create_redis))
+    conn = MagicMock(publish=AsyncMock())
+    monkeypatch.setattr(aioredis.Redis, 'from_url', Mock(return_value=conn))
 
     bus = AIORedisSignalBus('redis://localhost')
-    await bus.send('PUBSUB', '{}')
-
-    assert bus.transport is create_redis
-    create_redis.publish.assert_called_once_with('PUBSUB', '{}')
 
     await bus.send('PUBSUB', '{}')
 
-    assert create_redis.publish.call_count == 2
+    conn.publish.assert_called_once_with('PUBSUB', '{}')
+
+    await bus.send('PUBSUB', '{}')
+
+    assert conn.publish.call_count == 2
 
 
 async def test_broker_consume_ok(monkeypatch):
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
     create_redis = MagicMock(blpop=AsyncMock(side_effect=[('ch', '{}'), None, Exception]))
-    monkeypatch.setattr(aioredis, 'create_redis', AsyncMock(return_value=create_redis))
+    monkeypatch.setattr(aioredis, 'Redis', MagicMock(from_url=Mock(return_value=create_redis)))
 
     broker = AIORedisBroker('redis://localhost')
     broker.BIND_TIME = .01
@@ -67,7 +69,7 @@ async def test_broker_consume_ok(monkeypatch):
 
 async def test_broker_send_ok(monkeypatch):
     create_redis = MagicMock(rpush=AsyncMock())
-    monkeypatch.setattr(aioredis, 'create_redis', AsyncMock(return_value=create_redis))
+    monkeypatch.setattr(aioredis, 'Redis', MagicMock(from_url=Mock(return_value=create_redis)))
 
     broker = AIORedisBroker('redis://localhost')
     await broker.send('test_queue', '{}')
@@ -81,7 +83,7 @@ async def test_broker_send_ok(monkeypatch):
 
 async def test_broker_queue_length_ok(monkeypatch):
     create_redis = MagicMock(llen=AsyncMock())
-    monkeypatch.setattr(aioredis, 'create_redis', AsyncMock(return_value=create_redis))
+    monkeypatch.setattr(aioredis, 'Redis', MagicMock(from_url=Mock(return_value=create_redis)))
 
     broker = AIORedisBroker('redis://localhost')
     await broker.queue_length('test_queue')
