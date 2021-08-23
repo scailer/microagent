@@ -108,13 +108,8 @@ With kafka_ backend provide queues over Kafka (experemental)::
 
     pip install 'microagent[kafka]'
 
-With pulsar_ backend provide signal bus (Redis) and list-based queues (Redis)::
-
-    pip install 'microagent[pulsar]'
-
 
 .. _aioredis: https://pypi.org/project/aioredis/
 .. _aioamqp: https://pypi.org/project/aioamqp/
 .. _kafka: https://pypi.org/project/aiokafka/
-.. _pulsar: https://pypi.org/project/pulsar/
 .. _documentation: https://microagent.readthedocs.io/

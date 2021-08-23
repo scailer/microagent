@@ -202,7 +202,7 @@ async def test_init_periodic_agent_ok(dummy_period):
 
     assert chandler.handler == dummy_period.cron_handler
     assert chandler.timeout == 60
-    assert chandler.cron.expanded == [[0], ['*'], ['*'], ['*'], ['*']]
+    assert chandler.cron.minutes == [0]
 
 
 async def test_init_hook_agent_ok(dummy_hook):

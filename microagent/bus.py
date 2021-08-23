@@ -309,7 +309,7 @@ class AbstractSignalBus(abc.ABC):
         try:
             self.response_context.finish(signal_id, message)
         except asyncio.InvalidStateError as exc:
-            self.log.error('Response handle failed: %s', exc, exc_info=True)
+            self.log.exception('Response handle failed: %s', exc)
 
     async def handle_signal(self, signal: Signal, sender: str,
             signal_id: Optional[str], message: dict) -> None:
@@ -338,7 +338,7 @@ class AbstractSignalBus(abc.ABC):
         try:
             response = receiver.handler(signal=signal, sender=sender, **message)
         except TypeError:
-            self.log.error('Call %s failed', signal.name, exc_info=True)
+            self.log.exception('Call %s failed', signal.name)
             return None
 
         if inspect.isawaitable(response):
