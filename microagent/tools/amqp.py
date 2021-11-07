@@ -162,7 +162,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     async def rebind(self, name: str) -> None:
         if self._bind_attempts[name] > self.REBIND_ATTEMPTS:
-            self.log.error('Failed all attempts to rebind queue "%s"', name, exc_info=True)
+            self.log.exception('Failed all attempts to rebind queue "%s"', name)
             return
 
         await asyncio.sleep(self._bind_attempts[name] ** 2)
@@ -175,7 +175,7 @@ class AMQPBroker(AbstractQueueBroker):
             return True
 
         except (OSError, aioamqp.AmqpClosedConnection, aioamqp.ChannelClosed) as exc:
-            self.log.error('Failed rebind queue "%s": %s', name, exc, exc_info=True)
+            self.log.exception('Failed rebind queue "%s": %s', name, exc)
             asyncio.create_task(self.rebind(name))
             return False
 
@@ -227,7 +227,7 @@ class AMQPBroker(AbstractQueueBroker):
             try:
                 response = consumer.handler(**data)
             except TypeError:
-                self.log.error('Call %s failed', consumer, exc_info=True)
+                self.log.exception('Call %s failed', consumer)
                 return
 
             if asyncio.iscoroutine(response):

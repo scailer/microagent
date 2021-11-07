@@ -85,7 +85,7 @@ class KafkaBroker(AbstractQueueBroker):
         try:
             response = consumer.handler(**data)
         except TypeError:
-            self.log.error('Call %s failed', consumer, exc_info=True)
+            self.log.exception('Call %s failed', consumer)
             return
 
         if asyncio.iscoroutine(response):
