@@ -49,88 +49,15 @@ import uuid
 import logging
 import asyncio
 import inspect
+import contextlib
 import ujson
 
 from collections import defaultdict
-from typing import Optional, List, Union, Dict, Any, Tuple, Type
+from typing import Optional, List, Union, Dict, Any
 from datetime import datetime
 
 from .signal import Signal, Receiver, SerializingError
-
-
-class ResponseContext:
-    _responses: Dict[str, 'ResponseContext'] = {}
-    signal_id: str
-    await_from: List[str]
-    timeout: int
-    response: Dict[str, Any]
-    fut: asyncio.Future
-
-    def __init__(self, await_from: List[str] = None, timeout: int = 60) -> None:
-        self.signal_id = uuid.uuid4().hex
-        self.await_from = await_from or []
-        self.timeout = timeout
-        self.response = {}
-
-    async def __aenter__(self) -> Tuple[str, asyncio.Future]:
-        _loop = asyncio.get_running_loop()
-
-        self.fut = _loop.create_future()
-        self._responses[self.signal_id] = self
-        _loop.call_later(self.timeout, self.close)
-
-        return self.signal_id, self.fut
-
-    async def __aexit__(self, exc_type, exc, traceback) -> None:
-        self.close()
-
-    def close(self) -> None:
-        if not self.fut.done():
-            self.fut.cancel()
-        self._responses.pop(self.signal_id, None)
-
-    def complete(self) -> None:
-        if self.await_from:
-            result = {k: v for k, v in self.response.items() if k in self.await_from}
-        else:
-            result = self.response
-
-        self.fut.set_result(result)
-        self.close()
-
-    @classmethod
-    def get(cls, signal_id: str) -> Optional['ResponseContext']:
-        return cls._responses.get(signal_id)
-
-    @classmethod
-    def finish(cls, signal_id: str, message: Dict[str, Union[str, int, None]]) -> None:
-        resp = cls.get(signal_id)  # type: Optional[ResponseContext]
-
-        if not resp:  # already closed
-            return None
-
-        resp.response.update(message)
-
-        if not resp.await_from:  # return first
-            resp.complete()
-
-        elif not (set(resp.await_from) - set(x.split('.')[0] for x in resp.response.keys())):
-            resp.complete()
-
-        else:
-            return None
-
-
-def response_context_factory() -> Type[ResponseContext]:
-    '''
-        Make isolated response context
-
-    '''
-
-    class BoundResponseContext(ResponseContext):
-        _responses: dict = {}
-
-    return BoundResponseContext
+from .utils import IterQueue, raise_timeout
 
 
 class AbstractSignalBus(abc.ABC):
@@ -176,15 +103,13 @@ class AbstractSignalBus(abc.ABC):
             Dict of all binded receivers
     '''
 
-    RESPONSE_TIMEOUT: int = 60  # sec
-
     dsn: str
     prefix: str
     log: logging.Logger
 
     uid: str
     receivers: Dict[str, List[Receiver]]
-    response_context: Type[ResponseContext]
+    _responses: dict[str, IterQueue]
 
     def __new__(cls, dsn, **kwargs) -> 'AbstractSignalBus':
         bus = super(AbstractSignalBus, cls).__new__(cls)
@@ -193,14 +118,12 @@ class AbstractSignalBus(abc.ABC):
         bus.log = logging.getLogger('microagent.bus')
         bus.receivers = defaultdict(list)
 
-        # isolate responses context for preventing rase of handlers
-        bus.response_context = response_context_factory()
-
         return bus
 
     def __init__(self, dsn: str, prefix: str = 'PUBSUB', logger: logging.Logger = None) -> None:
         self.dsn = dsn
         self.prefix = prefix
+        self._responses = {}
 
         if logger:
             self.log = logger
@@ -245,16 +168,20 @@ class AbstractSignalBus(abc.ABC):
             await self.bind(receiver.signal.make_channel_name(self.prefix))
         self.receivers[receiver.signal.name].append(receiver)
 
-    async def call(self, channel: str, message: str, await_from: List[str] = None
-                ) -> Dict[str, Union[int, str, None]]:
+    @contextlib.asynccontextmanager
+    async def call(self, channel: str, message: str, timeout: int):
         '''
             RPC over pub/sub. Pair of signals - sending and responsing. Response-signal
             is an internal construction enabled by default. When we call `call` we send
             a ordinary declared by user signal with a unique id and awaiting a response
             with same id. The response can contain a string value or an integer that is
-            returned by the signal receiver. By default, it will catch only first value
-            if we have multiple signal receivers, but we can specify the name of the
-            target receiver that will respond to us.
+            returned by the signal receiver.
+
+            Signal-attached method `call` will catch only first value.
+            To process multiple responses, you can use async context `waiter`, which
+            will return an async generator of response data.
+            You can break it or return value when it needed. `waiter`-method has the
+            `timeout` argument set to 60 by default.
 
             Answer: ```{"<Class>.<method>": <value>}```
 
@@ -267,10 +194,22 @@ class AbstractSignalBus(abc.ABC):
 
                 response = await bus.rpc_comments_count.call('user_agent', user_id=1)
                 value = response['CommentAgent.example_rpc_handler']
+
+                async with bus.rpc_comments_count.waiter('user_agent', user_id=1) as queue:
+                    async for x in queue:
+                        logging.info('Get response %s', x)
+                        break
         '''
-        async with self.response_context(await_from, self.RESPONSE_TIMEOUT) as (signal_id, future):
-            await self.send(f'{channel}#{signal_id}', message)
-            return await future
+
+        queue: IterQueue = IterQueue()
+        request_id = uuid.uuid4().hex
+        self._responses[request_id] = queue
+
+        try:
+            raise_timeout(timeout)
+            yield queue
+        finally:
+            self._responses.pop(request_id, None)
 
     def receiver(self, channel: str, message: str) -> None:
         '''
@@ -306,10 +245,8 @@ class AbstractSignalBus(abc.ABC):
         asyncio.create_task(self.handle_signal(signal, sender, signal_id, data))
 
     def handle_response(self, signal_id: str, message: Dict[str, Union[int, str, None]]) -> None:
-        try:
-            self.response_context.finish(signal_id, message)
-        except asyncio.InvalidStateError as exc:
-            self.log.exception('Response handle failed: %s', exc)
+        if queue := self._responses.get(signal_id):
+            queue.put_nowait(message)
 
     async def handle_signal(self, signal: Signal, sender: str,
             signal_id: Optional[str], message: dict) -> None:
@@ -369,7 +306,26 @@ class BoundSignal:
             self.signal.make_channel_name(self.bus.prefix, sender),
             self.signal.serialize(kwargs))
 
-    async def call(self, sender: str, **kwargs: Any) -> Dict[str, Union[str, int, None]]:
-        return await self.bus.call(
+    async def call(self, sender: str, timeout: int = 60, **kwargs: Any):
+        gen = self.bus.call(
             self.signal.make_channel_name(self.bus.prefix, sender),
-            self.signal.serialize(kwargs))
+            self.signal.serialize(kwargs),
+            timeout=timeout
+        )
+
+        async with gen as queue:
+            async for value in queue:
+                return value
+
+    def waiter(self, sender: str, timeout: int = 60, **kwargs: Any):
+        '''
+            async with bus.iter(sender='name', a=1, timeout=10) as queue:
+                async for x in queue:
+                    logging.info('Get response %s', x)
+                    break
+        '''
+        return self.bus.call(
+            self.signal.make_channel_name(self.bus.prefix, sender),
+            self.signal.serialize(kwargs),
+            timeout=timeout
+        )

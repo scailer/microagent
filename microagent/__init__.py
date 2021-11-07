@@ -1,4 +1,4 @@
-__version__ = '1.4'
+__version__ = '1.5'
 
 from collections import namedtuple
 from typing import Union, Tuple, Callable, Dict, Iterable, Any
