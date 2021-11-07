@@ -162,7 +162,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     async def rebind(self, name: str) -> None:
         if self._bind_attempts[name] > self.REBIND_ATTEMPTS:
-            self.log.exception('Failed all attempts to rebind queue "%s"', name)
+            self.log.exception('Failed all attempts to rebind queue "%s" ', name)
             return
 
         await asyncio.sleep(self._bind_attempts[name] ** 2)
