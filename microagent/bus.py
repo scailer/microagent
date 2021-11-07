@@ -109,7 +109,7 @@ class AbstractSignalBus(abc.ABC):
 
     uid: str
     receivers: Dict[str, List[Receiver]]
-    _responses: dict[str, IterQueue]
+    _responses: Dict[str, IterQueue]
 
     def __new__(cls, dsn, **kwargs) -> 'AbstractSignalBus':
         bus = super(AbstractSignalBus, cls).__new__(cls)
