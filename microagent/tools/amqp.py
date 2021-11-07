@@ -160,10 +160,10 @@ class AMQPBroker(AbstractQueueBroker):
 
         asyncio.create_task(self.rebind(name))
 
-    async def rebind(self, name: str) -> None:
+    async def rebind(self, name: str) -> bool:
         if self._bind_attempts[name] > self.REBIND_ATTEMPTS:
-            self.log.exception('Failed all attempts to rebind queue "%s" ', name)
-            return
+            self.log.exception('Failed all attempts to rebind queue "%s"', name)
+            return False
 
         await asyncio.sleep(self._bind_attempts[name] ** 2)
         self._bind_attempts[name] += 1
