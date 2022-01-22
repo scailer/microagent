@@ -21,10 +21,7 @@ setup(
     packages=['microagent', 'microagent.tools'],
     long_description=read('README.rst'),
     include_package_data=True,
-    install_requires=[
-        'ujson',
-        'requests',
-    ],
+    install_requires=[],
 
     package_data={
         'microagent': ['py.typed'],
@@ -33,6 +30,7 @@ setup(
     setup_requires=["pytest-runner"],
 
     tests_require=[
+        'ujson',
         'pytest',
         'pytest-asyncio',
         'pytest-mypy',
@@ -45,8 +43,6 @@ setup(
         'flake8-print',
         'flake8-blind-except==0.1.1',
         'flake8-builtins==1.4.1',
-        'types-ujson',
-        'types-requests',
     ],
 
     extras_require={

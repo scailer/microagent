@@ -50,7 +50,6 @@ import logging
 import asyncio
 import inspect
 import contextlib
-import ujson
 
 from collections import defaultdict
 from typing import Optional, List, Union, Dict, Any
@@ -261,7 +260,7 @@ class AbstractSignalBus(abc.ABC):
         if signal_id:
             await self.send(
                 f'{self.prefix}:response:{self.uid}#{signal_id}',
-                ujson.dumps({
+                Signal._jsonlib.dumps({
                     rec.key: res for rec, res in zip(receivers, responses)
                 })
             )
