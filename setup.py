@@ -26,19 +26,27 @@ setup(
         'requests',
     ],
 
+    package_data={
+        'microagent': ['py.typed'],
+    },
+
     setup_requires=["pytest-runner"],
+
     tests_require=[
         'pytest',
         'pytest-asyncio',
+        'pytest-mypy',
         'asynctest',
         'pytest-cov',
         'aioredis==2.0',
-        'aioamqp==0.14.0',
+        'aioamqp==0.14',
         'aiokafka==0.7',
         'pytest-flake8',
         'flake8-print',
         'flake8-blind-except==0.1.1',
         'flake8-builtins==1.4.1',
+        'types-ujson',
+        'types-requests',
     ],
 
     extras_require={

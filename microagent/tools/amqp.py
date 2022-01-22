@@ -257,7 +257,7 @@ class AMQPBroker(AbstractQueueBroker):
             self.log.info('Declare/get queue "%(queue)s" with %(message_count)s '
                 'messages, %(consumer_count)s consumers', info)
 
-    async def queue_length(self, name: str) -> int:
+    async def queue_length(self, name: str, **options: Any) -> int:
         '''
             Get a queue length with queue_declare method.
 

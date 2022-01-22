@@ -293,6 +293,8 @@ class AbstractSignalBus(abc.ABC):
         if isinstance(response, (int, str)):
             return response
 
+        return None
+
 
 class BoundSignal:
     __slots__ = ('bus', 'signal')

@@ -47,7 +47,7 @@ class KafkaBroker(AbstractQueueBroker):
     def __init__(self, dsn: str, logger: logging.Logger = None) -> None:
         super().__init__(dsn, logger)
         _loop = asyncio.get_running_loop()
-        self.addr = urllib.parse.urlparse(dsn).netloc
+        self.addr = urllib.parse.urlparse(dsn).netloc  # type: ignore
         self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
 
     async def send(self, name: str, message: str, **kwargs) -> None:
