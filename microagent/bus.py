@@ -204,6 +204,8 @@ class AbstractSignalBus(abc.ABC):
         request_id = uuid.uuid4().hex
         self._responses[request_id] = queue
 
+        await self.send(f'{channel}#{request_id}', message)
+
         try:
             raise_timeout(timeout)
             yield queue
