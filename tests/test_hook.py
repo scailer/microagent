@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import pytest
 from unittest.mock import Mock, AsyncMock
 from microagent.hooks import Hook, Hooks

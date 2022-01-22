@@ -1,7 +1,7 @@
 import re
 import os
 import pathlib
-from setuptools import setup
+from setuptools import setup  # type: ignore
 
 
 try:

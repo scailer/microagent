@@ -28,7 +28,7 @@ def load_stuff(source: str) -> Tuple[object, object]:
         with open(source.replace('file://', ''), 'r') as f:
             data.update(json.loads(f.read().replace('\n', '')))
     else:
-        with urllib.request.urlopen('http://python.org/') as response:
+        with urllib.request.urlopen(source) as response:
             data.update(json.loads(response.read()))
 
     for _data in data.get('signals', []):

@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import os
 from microagent import MicroAgent, on, consumer, load_stuff
 

@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import pytest
 import logging
 from unittest.mock import MagicMock, AsyncMock
