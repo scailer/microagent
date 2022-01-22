@@ -58,7 +58,7 @@ class RedisBrokerMixin:
         try:
             response = consumer.handler(**_data)
         except Exception:
-            self.log.error('Call %s failed', consumer.queue.name, exc_info=True)
+            self.log.exception('Call %s failed', consumer.queue.name)
             await self.rollback(consumer.queue.name, data)
             return
 
@@ -72,5 +72,5 @@ class RedisBrokerMixin:
                     datetime.now().timestamp() - timer)
                 await self.rollback(name, data)
             except Exception:
-                self.log.error('Call %s failed', consumer.queue.name, exc_info=True)
+                self.log.exception('Call %s failed', consumer.queue.name)
                 await self.rollback(consumer.queue.name, data)

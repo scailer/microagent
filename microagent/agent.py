@@ -245,13 +245,15 @@ class MicroAgent:
 
     async def bind_receivers(self, receivers: Iterable[Receiver]) -> None:
         ''' Bind signal receivers to bus subscribers '''
-        for receiver in receivers:
-            await self.bus.bind_receiver(receiver)
+        if self.bus:
+            for receiver in receivers:
+                await self.bus.bind_receiver(receiver)
 
     async def bind_consumers(self, consumers: Iterable[Consumer]) -> None:
         ''' Bind message consumers to queues '''
-        for consumer in consumers:
-            await self.broker.bind_consumer(consumer)
+        if self.broker:
+            for consumer in consumers:
+                await self.broker.bind_consumer(consumer)
 
     def info(self) -> dict:
         '''

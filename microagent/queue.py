@@ -1,6 +1,6 @@
 from typing import Dict, Callable, Union, TYPE_CHECKING
 from dataclasses import dataclass
-import ujson
+import json
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -51,6 +51,7 @@ class Queue:
     '''
     name: str
     _queues = {}  # type: Dict[str, Queue]
+    _jsonlib = json
 
     def __post_init__(self):
         self._queues[self.name] = self
@@ -62,6 +63,10 @@ class Queue:
         if not isinstance(other, Queue):
             return NotImplemented
         return self.name == other.name
+
+    @classmethod
+    def set_jsonlib(self, jsonlib) -> None:
+        self._jsonlib = jsonlib
 
     @classmethod
     def get(cls, name: str) -> 'Queue':
@@ -83,7 +88,7 @@ class Queue:
             :param data: dict of transfered data
         '''
         try:
-            return ujson.dumps(data)
+            return self._jsonlib.dumps(data)
         except (ValueError, TypeError, OverflowError) as exc:
             raise SerializingError(exc)
 
@@ -94,7 +99,7 @@ class Queue:
             :param data: serialized transfered data
         '''
         try:
-            return ujson.loads(data)
+            return self._jsonlib.loads(data)
         except (ValueError, TypeError, OverflowError) as exc:
             raise SerializingError(exc)
 

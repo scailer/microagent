@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import uuid
 import json
 import asyncio
@@ -149,13 +150,40 @@ async def test_Bus_send_ok(bus, test_signal):
 
 async def test_Bus_call_ok(bus, test_signal):
     def finish():
-        for uid in bus.response_context._responses:
-            bus.response_context.finish(uid, {'q': 42})
+        for uid in bus._responses:
+            bus.handle_response(uid, {'q': 42})
 
-    loop = asyncio.get_running_loop()
-    loop.call_later(0.01, finish)
+    asyncio.get_running_loop().call_later(0.01, finish)
 
     assert await bus.test_signal.call(sender='test', uuid=1) == {'q': 42}
+
+
+async def test_Bus_waiter_ok(bus, test_signal):
+    def finish():
+        for uid in bus._responses:
+            bus.handle_response(uid, {'q': 42})
+            bus.handle_response(uid, {'q': 43})
+
+    asyncio.get_running_loop().call_later(0.01, finish)
+    q = 42
+
+    async with bus.test_signal.waiter(sender='name', a=1, timeout=.1) as queue:
+        async for x in queue:
+            assert x == {'q': q}
+            q += 1
+
+
+async def test_Bus_waiter_fail_timeout(bus, test_signal):
+    def finish():
+        for uid in bus._responses:
+            bus.handle_response(uid, {'q': 42})
+
+    asyncio.get_running_loop().call_later(0.1, finish)
+
+    async with bus.test_signal.waiter(sender='name', a=1, timeout=.05) as queue:
+        async for x in queue:
+            assert False
+        assert True
 
 
 async def test_Bus_receiver_ok(bus, test_signal):
@@ -187,20 +215,18 @@ async def test_Bus_receiver_ok_missed_args(bus, test_signal):
 
 async def test_Bus_response_ok(bus):
     uid = str(uuid.uuid4().hex)
-    bus.response_context = MagicMock(finish=MagicMock())
+    queue = MagicMock(put_nowait=MagicMock())
+    bus._responses = {uid: queue}
 
     bus.receiver(f'TEST:response:test#{uid}', '{"uuid": 1}')
     await asyncio.sleep(.001)
 
-    bus.response_context.finish.assert_called()
-    bus.response_context.finish.assert_called_with(uid, {"uuid": 1})
+    queue.put_nowait.assert_called_with({'uuid': 1})
 
 
-async def test_Bus_handle_response_fail(bus):
-    bus.response_context = MagicMock(finish=MagicMock())
-    bus.response_context.finish.side_effect = asyncio.InvalidStateError()
-    bus.handle_response(str(uuid.uuid4().hex), {'q': 1})
-    bus.log.exception.assert_called()
+async def test_Bus_response_fail_no_waiter(bus):
+    uid = str(uuid.uuid4().hex)
+    bus.receiver(f'TEST:response:test#{uid}', '{"uuid": 1}')
 
 
 async def test_Bus_handle_signal_ok(bus):
@@ -272,31 +298,3 @@ async def test_Bus_broadcast_fail_timeout(bus, test_signal):
 
     assert ret is None
     bus.log.error.assert_called()
-
-
-async def test_ResponseContext_ok(bus):
-    async with bus.response_context(None, 1) as (signal_id, future):
-        assert signal_id in bus.response_context._responses
-        bus.response_context.finish(signal_id, {'q': 1})
-        assert signal_id not in bus.response_context._responses
-        assert await future == {'q': 1}
-
-
-async def test_ResponseContext_ok_await_for(bus):
-    async with bus.response_context('b', 1) as (signal_id, future):
-        assert signal_id in bus.response_context._responses
-        bus.response_context.finish(signal_id, {'a': 1})
-        assert signal_id in bus.response_context._responses
-        bus.response_context.finish(signal_id, {'b': 2})
-        assert signal_id not in bus.response_context._responses
-        assert await future == {'b': 2}
-
-
-async def test_ResponseContext_fail_already_closed(bus):
-    async with bus.response_context(None, 1) as (signal_id, future):
-        bus.response_context._responses[signal_id].close()
-        assert signal_id not in bus.response_context._responses
-        bus.response_context.finish(signal_id, {'q': 1})
-
-        with pytest.raises(asyncio.CancelledError):
-            await future

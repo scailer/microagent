@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 from pathlib import Path
 from microagent import (MicroAgent, Signal, Queue, receiver, consumer,  # noqa
     periodic, cron, load_stuff, load_signals, load_queues, __version__)  # noqa
@@ -30,7 +31,7 @@ def test_load_queues():
 
 
 def test_load_from_url():
-    source = 'https://gist.githubusercontent.com/scailer/ee0baed54a9444f328c9d0fd4ed84bed/raw/dfae17935813ee6a0ef0d441cbebc19572f8488c/stuff.json'  # noqa
+    source = 'http://lwr.pw/matest'  # noqa
     signals, queues = load_stuff(source)
     assert len(signals) == 2
     assert len(queues) == 1

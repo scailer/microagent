@@ -1,7 +1,7 @@
 import re
 import os
 import pathlib
-from setuptools import setup
+from setuptools import setup  # type: ignore
 
 
 try:
@@ -21,19 +21,23 @@ setup(
     packages=['microagent', 'microagent.tools'],
     long_description=read('README.rst'),
     include_package_data=True,
-    install_requires=[
-        'ujson',
-        'requests',
-    ],
+    install_requires=[],
+
+    package_data={
+        'microagent': ['py.typed'],
+    },
 
     setup_requires=["pytest-runner"],
+
     tests_require=[
+        'ujson',
         'pytest',
         'pytest-asyncio',
+        'pytest-mypy',
         'asynctest',
         'pytest-cov',
         'aioredis==2.0',
-        'aioamqp==0.14.0',
+        'aioamqp==0.14',
         'aiokafka==0.7',
         'pytest-flake8',
         'flake8-print',

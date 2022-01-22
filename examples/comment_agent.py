@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import os
 import asyncio
 from collections import defaultdict

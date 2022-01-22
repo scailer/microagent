@@ -1,9 +1,10 @@
-__version__ = '1.4'
+__version__ = '1.5'
 
+import json
+import importlib
+import urllib.request
 from collections import namedtuple
 from typing import Union, Tuple, Callable, Dict, Iterable, Any
-
-import ujson
 
 from .signal import Signal
 from .queue import Queue
@@ -25,16 +26,21 @@ def load_stuff(source: str) -> Tuple[object, object]:
 
     if source.startswith('file://'):
         with open(source.replace('file://', ''), 'r') as f:
-            data.update(ujson.loads(f.read().replace('\n', '')))
+            data.update(json.loads(f.read().replace('\n', '')))
     else:
-        import requests
-        data.update(requests.get(source).json())
+        with urllib.request.urlopen(source) as response:
+            data.update(json.loads(response.read()))
 
     for _data in data.get('signals', []):
         Signal(name=_data['name'], providing_args=_data['providing_args'])
 
     for _data in data.get('queues', []):
         Queue(name=_data['name'])
+
+    if data.get('jsonlib'):
+        jsonlib = importlib.import_module(data['jsonlib'])  # type: ignore
+        Signal.set_jsonlib(jsonlib)
+        Queue.set_jsonlib(jsonlib)
 
     return (
         namedtuple('signals', Signal.get_all().keys())(*Signal.get_all().values()),  # type: ignore
