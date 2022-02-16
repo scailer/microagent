@@ -26,6 +26,20 @@ def else_signal():
     return Signal(name='else_signal', providing_args=['uuid'])
 
 
+@pytest.fixture()
+def typed_signal():
+    return Signal(
+        name='typed_signal',
+        providing_args=['uuid', 'code', 'flag', 'ids'],
+        type_map={
+            'uuid': (str, ),
+            'code': (int, type(None)),
+            'flag': (bool, ),
+            'ids': (list, )
+        }
+    )
+
+
 async def test_Signal_register_ok(test_signal, else_signal):
     assert Signal.get_all()['test_signal'] is test_signal
     assert Signal.get_all()['else_signal'] is else_signal
@@ -148,6 +162,25 @@ async def test_Bus_send_ok(bus, test_signal):
     assert json.loads(bus.send.call_args[0][1]) == {'uuid': 1}
 
 
+async def test_Bus_send_ok_typed(bus, typed_signal):
+    await bus.typed_signal.send(sender='test', uuid='1', code=1, flag=True, ids=[1])
+    bus.send.assert_called_once()
+    assert bus.send.call_args[0][0] == 'TEST:typed_signal:test'
+    assert json.loads(bus.send.call_args[0][1]) == {
+        'code': 1, 'flag': True, 'ids': [1], 'uuid': '1'
+    }
+
+
+async def test_Bus_send_ok_typed_warnings(bus, typed_signal):
+    await bus.typed_signal.send(sender='test', uuid=1, code=1, flag=True, ids2=[1])
+    bus.send.assert_called_once()
+    bus.log.warning.assert_called()
+    assert bus.send.call_args[0][0] == 'TEST:typed_signal:test'
+    assert json.loads(bus.send.call_args[0][1]) == {
+        'code': 1, 'flag': True, 'ids2': [1], 'uuid': 1
+    }
+
+
 async def test_Bus_call_ok(bus, test_signal):
     def finish():
         for uid in bus._responses:
@@ -156,6 +189,17 @@ async def test_Bus_call_ok(bus, test_signal):
     asyncio.get_running_loop().call_later(0.01, finish)
 
     assert await bus.test_signal.call(sender='test', uuid=1) == {'q': 42}
+
+
+async def test_Bus_call_ok_typed(bus, typed_signal):
+    def finish():
+        for uid in bus._responses:
+            bus.handle_response(uid, {'q': 42})
+
+    asyncio.get_running_loop().call_later(0.01, finish)
+
+    data = await bus.typed_signal.call(sender='test', uuid=1, code=1, flag=True, ids2=[1])
+    assert data == {'q': 42}
 
 
 async def test_Bus_waiter_ok(bus, test_signal):
@@ -192,6 +236,14 @@ async def test_Bus_receiver_ok(bus, test_signal):
     await asyncio.sleep(.001)
     bus.handle_signal.assert_called()
     bus.handle_signal.assert_called_with(test_signal, 'test', None, {"uuid": 1})
+
+
+async def test_Bus_receiver_ok_typed(bus, typed_signal):
+    bus.handle_signal = AsyncMock()
+    bus.receiver('TEST:typed_signal:test', '{"uuid": 1}')
+    await asyncio.sleep(.001)
+    bus.handle_signal.assert_called()
+    bus.handle_signal.assert_called_with(typed_signal, 'test', None, {"uuid": 1})
 
 
 async def test_Bus_receiver_fail_bad_msg(bus, test_signal):

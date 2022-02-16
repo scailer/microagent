@@ -47,7 +47,7 @@ setup(
 
     extras_require={
         'aioredis': ['aioredis==2.0'],
-        'amqp': ['aioamqp==0.14'],
+        'amqp': ['aioamqp@git+https://github.com/Polyconseil/aioamqp.git@e2028401be975c93ffa1c56540fb94e562a9f7e4'],
         'kafka': ['aiokafka==0.7'],
     },
 

@@ -211,7 +211,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     def _amqp_wrapper(self, consumer: Consumer) -> Callable:
         async def _wrapper(channel, body, envelope, properties):
-            data = consumer.queue.deserialize(body)
+            data = self.prepared_data(consumer, body)
 
             if not data:
                 self.log.debug('Calling %s by %s without data', consumer, consumer.queue.name)

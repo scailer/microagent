@@ -8,19 +8,28 @@ from microagent.tools import mocks
 def test_load_from_file():
     source = 'file://' + str(Path(__file__).parent / 'stuff.json')
     signals, queues = load_stuff(source)
-    assert len(signals) == 2
+    assert len(signals) == 3
     assert len(queues) == 1
     assert signals.test_signal.name == 'test_signal'
     assert signals.else_signal.name == 'else_signal'
+    assert signals.typed_signal.name == 'typed_signal'
     assert queues.test_queue.name == 'test_queue'
 
 
 def test_load_signals():
     source = 'file://' + str(Path(__file__).parent / 'stuff.json')
     signals = load_signals(source)
-    assert len(signals) == 2
+    assert len(signals) == 3
     assert signals.test_signal.name == 'test_signal'
     assert signals.else_signal.name == 'else_signal'
+    assert signals.typed_signal.name == 'typed_signal'
+
+    assert signals.typed_signal.type_map == {
+        'uuid': (str, ),
+        'code': (int, type(None)),
+        'flag': (bool, ),
+        'ids': (list, )
+    }
 
 
 def test_load_queues():

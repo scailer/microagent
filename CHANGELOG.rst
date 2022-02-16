@@ -2,6 +2,13 @@
 Changelog
 =========
 
+1.6 (2022-02-20)
+================
+
+- Optional runtime type checking for signals (send, call, receiver)
+- Optional DTO for consumers
+
+
 1.5 (2022-01-22)
 ================
 

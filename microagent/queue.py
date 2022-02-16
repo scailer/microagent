@@ -1,4 +1,4 @@
-from typing import Dict, Callable, Union, TYPE_CHECKING
+from typing import Dict, Callable, Union, Optional, TYPE_CHECKING
 from dataclasses import dataclass
 import json
 
@@ -111,6 +111,8 @@ class Consumer:
     queue: Queue
     timeout: Union[int, float]
     options: dict
+    dto_class: Optional[type] = None
+    dto_name: Optional[str] = None
 
     def __repr__(self) -> str:
         name = getattr(self.handler, '__name__', 'unknown')

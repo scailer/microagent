@@ -1,9 +1,15 @@
 {
-    "version": 1,
+    "version": 2,
     "jsonlib": "ujson",
     "signals": [
         {"name": "test_signal", "providing_args": ["uuid"]},
-        {"name": "else_signal", "providing_args": ["uuid"]}
+        {"name": "else_signal", "providing_args": ["uuid"]},
+        {"name": "typed_signal", "providing_args": {
+            "uuid": "string",
+            "code": ["number", "null"],
+            "flag": "boolean",
+            "ids": "array"
+        }}
     ],
     "queues": [
         {"name": "test_queue"}
