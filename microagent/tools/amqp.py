@@ -148,7 +148,8 @@ class AMQPBroker(AbstractQueueBroker):
             :param \*\*kwargs: dict, other basic_publish options
         '''  # noqa: W605
         async with ChannelContext(self) as channel:
-            await channel.basic_publish(message, routing_key=name, exchange_name=exchange, **kwargs)
+            await channel.basic_publish(message.encode(), routing_key=name,
+                exchange_name=exchange, **kwargs)
 
     def _on_amqp_error(self, name: str, exception: Exception):
         self.log.warning('Catch AMPQ exception %s on queue "%s"', exception, name)
