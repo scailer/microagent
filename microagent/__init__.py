@@ -1,4 +1,4 @@
-__version__ = '1.6b3'
+__version__ = '1.6'
 
 import json
 import importlib
