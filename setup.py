@@ -47,7 +47,7 @@ setup(
 
     extras_require={
         'aioredis': ['aioredis==2.0'],
-        'amqp': ['aioamqp==0.14'],
+        'amqp': ['aioamqp==0.15'],
         'kafka': ['aiokafka==0.7'],
     },
 

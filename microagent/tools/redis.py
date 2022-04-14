@@ -13,6 +13,7 @@ class RedisBrokerMixin:
 
     log: logging.Logger
     send: Callable
+    prepared_data: Callable
     _bindings: dict
     _rollbacks: dict
 
@@ -53,7 +54,7 @@ class RedisBrokerMixin:
 
     async def _handler(self, name: str, data: str):
         consumer = self._bindings[name]
-        _data = consumer.queue.deserialize(data)  # type: dict
+        _data = self.prepared_data(consumer, data)
 
         try:
             response = consumer.handler(**_data)

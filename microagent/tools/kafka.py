@@ -72,7 +72,7 @@ class KafkaBroker(AbstractQueueBroker):
 
         try:
             async for msg in kafka_consumer:
-                data = consumer.queue.deserialize(msg.value)  # type: dict
+                data = self.prepared_data(consumer, msg.value)
                 data['kafka'] = msg
                 asyncio.create_task(self._handle(consumer, data))
 

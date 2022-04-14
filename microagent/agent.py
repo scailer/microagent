@@ -343,6 +343,8 @@ class ConsumerHandler(UnboundHandler):
     handler: Callable
     queue: Queue
     timeout: Union[int, float]
+    dto_class: Optional[type]
+    dto_name: Optional[str]
     options: dict
     target_class = Consumer
     _register = {}  # type: Dict[Tuple[str, str, str], ConsumerHandler]

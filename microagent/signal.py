@@ -1,4 +1,4 @@
-from typing import List, Dict, Callable, Union, TYPE_CHECKING
+from typing import List, Dict, Callable, Union, Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
 import json
 
@@ -32,14 +32,19 @@ class Signal:
 
         .. attribute:: providing_args
 
-            List of strings, all available and required parameters of message
+            All available and required parameters of message, can be simple list
+            of argument names, or dictionary with declared types for each argument.
+            If types declared, will be enabled soft type checking (warning log)
+            for input data in runtime. Type checking works in `bus.send`,
+            `bus.call` and on receiving signals. Supported only json-types:
+            string, number, boolean, array, object, null.
 
         .. attribute:: content_type
 
             String, content format, `json` by default
 
 
-        Declaration with config-file (signals.json)
+        Declaration with config-file (signals.json).
 
         .. code-block:: json
 
@@ -47,6 +52,12 @@ class Signal:
                 "signals": [
                     {"name": "started", "providing_args": []},
                     {"name": "user_created", "providing_args": ["user_id"]},
+                    {"name": "typed_signal", "providing_args": {
+                        "uuid": "string",
+                        "code": ["number", "null"],
+                        "flag": "boolean",
+                        "ids": "array"
+                    }}
                 ]
             }
 
@@ -62,6 +73,7 @@ class Signal:
 
     name: str
     providing_args: List[str]
+    type_map: Optional[Dict[str, Tuple[type, ...]]] = None
     content_type: str = 'json'
     _signals = {}  # type: Dict[str, Signal]
     _jsonlib = json

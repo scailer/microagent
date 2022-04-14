@@ -59,6 +59,15 @@ from .signal import Signal, Receiver, SerializingError
 from .utils import IterQueue, raise_timeout
 
 
+def check_types(signal: Signal, data: Dict, log: logging.Logger):
+    if signal.type_map:
+        for key, value in data.items():
+            if key not in signal.type_map:
+                log.warning('Receiver get unknown arg "%s" %s', key, value)
+            elif not isinstance(value, signal.type_map[key]):
+                log.warning('Receiver get wrong type for "%s" %s', key, value)
+
+
 class AbstractSignalBus(abc.ABC):
     '''
         Signal bus is an abstract interface with two basic methods - send and bind.
@@ -143,6 +152,7 @@ class AbstractSignalBus(abc.ABC):
     def send(self, channel: str, message: str):
         '''
             Send raw message to channel.
+            Available optional type checking for input data.
 
             :param channel: string, channel name
             :param message: string, serialized object
@@ -184,6 +194,8 @@ class AbstractSignalBus(abc.ABC):
 
             Answer: ```{"<Class>.<method>": <value>}```
 
+            Available optional type checking for input data.
+
             .. code-block:: python
 
                 class CommentAgent(MicroAgent):
@@ -215,6 +227,7 @@ class AbstractSignalBus(abc.ABC):
     def receiver(self, channel: str, message: str) -> None:
         '''
             Handler of raw incoming messages.
+            Available optional type checking for input data.
         '''
 
         signal_id = None  # type: Optional[str]
@@ -237,6 +250,9 @@ class AbstractSignalBus(abc.ABC):
 
         if name == 'response' and signal_id:
             return self.handle_response(signal_id, data)
+
+        if signal.type_map:
+            check_types(signal, data, self.log)
 
         diff_args = set(signal.providing_args) ^ set(data.keys())
 
@@ -305,11 +321,17 @@ class BoundSignal:
         self.signal = signal
 
     async def send(self, sender: str, **kwargs: Any) -> None:
+        if self.signal.type_map:
+            check_types(self.signal, kwargs, self.bus.log)
+
         await self.bus.send(
             self.signal.make_channel_name(self.bus.prefix, sender),
             self.signal.serialize(kwargs))
 
     async def call(self, sender: str, timeout: int = 60, **kwargs: Any):
+        if self.signal.type_map:
+            check_types(self.signal, kwargs, self.bus.log)
+
         gen = self.bus.call(
             self.signal.make_channel_name(self.bus.prefix, sender),
             self.signal.serialize(kwargs),

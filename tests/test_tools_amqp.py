@@ -118,7 +118,8 @@ async def test_broker_send_ok(amqp_connection):
     broker = AMQPBroker('amqp://localhost')
     await broker.send('test_queue', '{}')
 
-    channel.basic_publish.assert_called_once_with('{}', routing_key='test_queue', exchange_name='')
+    channel.basic_publish.assert_called_once_with(
+        b'{}', routing_key='test_queue', exchange_name='')
     channel.close.assert_called()
     assert broker.protocol is connection
 

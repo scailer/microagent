@@ -1,10 +1,10 @@
-__version__ = '1.5.1'
+__version__ = '1.6'
 
 import json
 import importlib
 import urllib.request
 from collections import namedtuple
-from typing import Union, Tuple, Callable, Dict, Iterable, Any
+from typing import Union, Tuple, Callable, Dict, Iterable, Any, Optional, List
 
 from .signal import Signal
 from .queue import Queue
@@ -16,8 +16,23 @@ from .agent import (MicroAgent, ReceiverHandler, ConsumerHandler,
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'ServerInterrupt', 'receiver', 'consumer',
            'periodic', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
 
+JSON_TYPES = {
+    'string': str,
+    'number': int,
+    'object': dict,
+    'array': list,
+    'boolean': bool,
+    'null': type(None)
+}
 
-def load_stuff(source: str) -> Tuple[object, object]:
+
+def get_types(value: Union[str, List[str]]) -> Tuple[type, ...]:
+    if isinstance(value, str):
+        value = [value]
+    return tuple(JSON_TYPES[x] for x in value)
+
+
+def load_stuff(source: str) -> Tuple[Any, Any]:
     '''
         Init signals from json-file loaded from disk or http request
     '''
@@ -32,7 +47,13 @@ def load_stuff(source: str) -> Tuple[object, object]:
             data.update(json.loads(response.read()))
 
     for _data in data.get('signals', []):
-        Signal(name=_data['name'], providing_args=_data['providing_args'])
+        providing_args, type_map = _data['providing_args'], None
+
+        if isinstance(providing_args, dict):
+            type_map = {name: get_types(_type) for name, _type in providing_args.items()}
+            providing_args = list(providing_args)
+
+        Signal(name=_data['name'], providing_args=providing_args, type_map=type_map)
 
     for _data in data.get('queues', []):
         Queue(name=_data['name'])
@@ -48,7 +69,7 @@ def load_stuff(source: str) -> Tuple[object, object]:
     )
 
 
-def load_signals(source: str) -> object:
+def load_signals(source: str) -> Any:
     '''
         Load Signal-entities from file or by web.
 
@@ -68,13 +89,19 @@ def load_signals(source: str) -> object:
                 "signals": [
                     {"name": "started", "providing_args": []},
                     {"name": "user_created", "providing_args": ["user_id"]},
+                    {"name": "typed_signal", "providing_args": {
+                        "uuid": "string",
+                        "code": ["number", "null"],
+                        "flag": "boolean",
+                        "ids": "array"
+                    }}
                 ]
             }
     '''
     return load_stuff(source)[0]
 
 
-def load_queues(source: str) -> object:
+def load_queues(source: str) -> Any:
     '''
         Load Queue-entities from file or by web.
 
@@ -208,7 +235,8 @@ def receiver(*signals: Signal, timeout: int = 60) -> Callable:
     return _decorator
 
 
-def consumer(queue: Queue, timeout: int = 60, **options) -> Callable:
+def consumer(queue: Queue, timeout: int = 60, dto_class: Optional[type] = None,
+        dto_name: Optional[str] = None, **options) -> Callable:
     '''
         Binding for consuming messages from queue.
 
@@ -216,6 +244,8 @@ def consumer(queue: Queue, timeout: int = 60, **options) -> Callable:
 
         :param queue: Queue - source of data
         :param timeout: Calling timeout in seconds
+        :param dto_class: DTO-class, wrapper for consuming data
+        :param dto_name: DTO name in consumer method kwargs
 
         .. code-block:: python
 
@@ -227,6 +257,13 @@ def consumer(queue: Queue, timeout: int = 60, **options) -> Callable:
             async def handle_2(self, **kwargs):
                 log.info('Called handler 2 %s', kwargs)
 
+            @consumer(queue_3, dto_class=MyDTO)
+            async def handle_3(self, dto: MyDTO, **kwargs):
+                log.info('Called handler 3 %s', dto)  # dto = MyDTO(**kwargs)
+
+            @consumer(queue_4, timeout=30, dto_class=MyDTO, dto_name='obj')
+            async def handle_4(self, obj: MyDTO, **kwargs):
+                log.info('Called handler 4 %s', obj)  # obj = MyDTO(**kwargs)
     '''
 
     def _decorator(func):
@@ -234,6 +271,8 @@ def consumer(queue: Queue, timeout: int = 60, **options) -> Callable:
             handler=func,
             queue=queue,
             timeout=timeout,
+            dto_class=dto_class,
+            dto_name=dto_name,
             options=options
         )
         return func

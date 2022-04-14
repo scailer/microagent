@@ -1,11 +1,18 @@
 # mypy: ignore-errors
 import pytest
 import logging
+from dataclasses import dataclass
 from unittest.mock import MagicMock, AsyncMock
 from microagent.broker import AbstractQueueBroker, Queue, Consumer
 from microagent.queue import QueueNotFound, SerializingError
 
 DSN = 'redis://localhost'
+
+
+@dataclass(frozen=True)
+class DTOTest:
+    uuid: int
+    code: str
 
 
 class Handler(AsyncMock):
@@ -126,6 +133,13 @@ async def test_Broker_bind_fail(broker, test_queue):
 async def test_Broker_send_ok(broker, test_queue):
     await broker.test_queue.send({'uid': 1})
     broker.send.assert_called_once_with('test_queue', '{"uid":1}')
+
+
+async def test_Broker_prepared_data_ok(broker, test_queue):
+    consumer = Consumer(agent=None, handler=Handler(), queue=test_queue, timeout=60,
+        dto_class=DTOTest, dto_name='obj', options={})
+    data = broker.prepared_data(consumer, '{"uuid": 1, "code": "code"}')
+    assert data == {'uuid': 1, 'code': 'code', 'obj': DTOTest(uuid=1, code='code')}
 
 
 async def test_Broker_length_ok(broker, test_queue):

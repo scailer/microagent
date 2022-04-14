@@ -163,6 +163,12 @@ class AbstractQueueBroker(abc.ABC):
 
         self.log.debug('Bind %s to queue "%s"', consumer, consumer.queue.name)
 
+    def prepared_data(self, consumer: Consumer, raw_data: str) -> dict:
+        data = consumer.queue.deserialize(raw_data)
+        if consumer.dto_class:
+            data[consumer.dto_name or 'dto'] = consumer.dto_class(**data)
+        return data
+
     @abc.abstractmethod
     async def queue_length(self, name: str, **options) -> int:
         '''
