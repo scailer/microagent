@@ -80,6 +80,19 @@ async def test_broker_rebind_ok():
     broker.bind.assert_called_once_with('test_queue')
 
 
+async def test_broker_rebind_ok_twice():
+    broker = AMQPBroker('amqp://localhost')
+    broker._bind_attempts['test_queue'] = 0
+    broker._bindings['test_queue'] = AsyncMock()
+    broker.bind = AsyncMock()
+
+    broker._on_amqp_error('test_queue', aioamqp.ChannelClosed())
+    broker._on_amqp_error('test_queue', aioamqp.ChannelClosed())
+    await asyncio.sleep(.001)
+
+    broker.bind.assert_called_once()
+
+
 async def test_broker_rebind_fail_limit():
     broker = AMQPBroker('amqp://localhost')
     broker.bind = AsyncMock()

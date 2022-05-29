@@ -110,12 +110,14 @@ class AMQPBroker(AbstractQueueBroker):
     protocol: Optional[aioamqp.AmqpProtocol]
     ssl_context: Optional[SSLContext]
     _bind_attempts: dict
+    _bind_running: set
 
     def __init__(self, dsn: str, ssl_context: SSLContext = None, logger: logging.Logger = None):
         super().__init__(dsn, logger)
 
         self.protocol = None
         self._bind_attempts = defaultdict(lambda: 1)
+        self._bind_running = set()
         self.ssl_context = ssl_context
 
     @property
@@ -153,10 +155,14 @@ class AMQPBroker(AbstractQueueBroker):
 
     def _on_amqp_error(self, name: str, exception: Exception):
         self.log.warning('Catch AMPQ exception %s on queue "%s"', exception, name)
-        handler = self._bindings.pop(name, None)
+        handler = self._bindings.get(name, None)
 
         if not handler:
             self.log.error('Failed rebind queue "%s" without handler', name)
+            return
+
+        if name in self._bind_running:
+            self.log.warning('Already rebinding queue "%s"', name)
             return
 
         asyncio.create_task(self.rebind(name))
@@ -179,6 +185,9 @@ class AMQPBroker(AbstractQueueBroker):
             self.log.exception('Failed rebind queue "%s": %s', name, exc)
             asyncio.create_task(self.rebind(name))
             return False
+
+        finally:
+            self._bind_running.discard(name)
 
     async def bind(self, name: str):
         _, protocol = await self.connect(on_error=partial(self._on_amqp_error, name))
