@@ -19,13 +19,17 @@ Exceptions are written to the logger in the associated Microagent.
         async def cron_handler(self):
             pass  # code here
 '''
-import re
-import time
 import asyncio
 import inspect
-from datetime import datetime, timedelta
+import re
+import time
+
 from dataclasses import dataclass
-from typing import List, Union, Callable, NamedTuple, TYPE_CHECKING
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Callable, ClassVar, List, NamedTuple, TypedDict, Union
+
+from .types import BoundKey, PeriodicFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -44,10 +48,10 @@ class CRON(NamedTuple):
     months: List[int]  # 1-12
     weekdays: List[int]  # 0-7
 
-    def next(self):  # noqa A003
+    def next(self) -> datetime:  # noqa A003
         return next_moment(self, datetime.now())
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'[{self.spec}]'
 
 
@@ -73,24 +77,39 @@ class PeriodicMixin:
         asyncio.get_running_loop().call_later(start_after, _periodic, self)
 
 
-@dataclass(frozen=True)
-class PeriodicTask(PeriodicMixin):
-    agent: 'MicroAgent'
-    handler: Callable
+class PeriodicArgs(TypedDict):
     period: float
     timeout: float
     start_after: float
+
+
+@dataclass(frozen=True)
+class PeriodicTask(PeriodicMixin):
+    agent: 'MicroAgent'
+    handler: PeriodicFunc
+    period: float
+    timeout: float
+    start_after: float
+
+    _register: ClassVar[dict[BoundKey, PeriodicArgs]] = {}
 
     def __repr__(self) -> str:
         return f'<PeriodicTask {self.handler.__name__} of {self.agent} every {self.period} sec>'
 
 
+class CRONArgs(TypedDict):
+    cron: CRON
+    timeout: float
+
+
 @dataclass(frozen=True)
 class CRONTask(PeriodicMixin):
     agent: 'MicroAgent'
-    handler: Callable
+    handler: PeriodicFunc
     cron: CRON
     timeout: float
+
+    _register: ClassVar[dict[BoundKey, CRONArgs]] = {}
 
     def __repr__(self) -> str:
         return f'<CRONTask {self.handler.__name__} of {self.agent} every {self.cron}>'
@@ -138,7 +157,7 @@ def cron_parser(spec: str) -> CRON:
                 )
             )
         )
-        for rng, val in zip(RANGES, spec.split())
+        for rng, val in zip(RANGES, spec.split(), strict=True)
     )
 
     for i, val in enumerate(norm_spec):

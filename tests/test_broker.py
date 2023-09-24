@@ -80,6 +80,9 @@ async def test_Consumer_ok(test_queue):
 
 
 class Broker(AbstractQueueBroker):
+    dsn: str
+    uid: str
+
     async def send(self, channel: str, message: str):
         pass
 

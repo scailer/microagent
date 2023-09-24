@@ -1,21 +1,26 @@
-__version__ = '1.6.1'
+__version__ = '1.7.0.rc1'
 
-import json
 import importlib
+import json
 import urllib.request
-from collections import namedtuple
-from typing import Union, Tuple, Callable, Dict, Iterable, Any, Optional, List
 
-from .signal import Signal
-from .queue import Queue
+from collections import namedtuple
+from typing import Any, Callable, Iterable
+
+from .agent import MicroAgent
+from .hooks import Hook, HookArgs
 from .launcher import ServerInterrupt
-from .periodic_task import cron_parser
-from .agent import (MicroAgent, ReceiverHandler, ConsumerHandler,
-    PeriodicHandler, CRONHandler, HookHandler)
+from .periodic_task import CRONArgs, CRONTask, PeriodicArgs, PeriodicTask, cron_parser
+from .queue import Consumer, ConsumerArgs, Queue
+from .signal import Receiver, ReceiverArgs, Signal
+from .types import ConsumerFunc, HookFunc, PeriodicFunc, ReceiverFunc
+from .utils import make_bound_key
+
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'ServerInterrupt', 'receiver', 'consumer',
            'periodic', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
 
+MIN_TIMEOUT = .001
 JSON_TYPES = {
     'string': str,
     'number': int,
@@ -26,18 +31,18 @@ JSON_TYPES = {
 }
 
 
-def get_types(value: Union[str, List[str]]) -> Tuple[type, ...]:
+def get_types(value: str | list[str]) -> tuple[type, ...]:
     if isinstance(value, str):
         value = [value]
     return tuple(JSON_TYPES[x] for x in value)
 
 
-def load_stuff(source: str) -> Tuple[Any, Any]:
+def load_stuff(source: str) -> tuple[Any, Any]:
     '''
         Init signals from json-file loaded from disk or http request
     '''
 
-    data: Dict[str, Iterable[Dict[str, Any]]] = {}
+    data: dict[str, Iterable[dict[str, Any]]] = {}
 
     if source.startswith('file://'):
         with open(source.replace('file://', ''), 'r') as f:
@@ -127,8 +132,8 @@ def load_queues(source: str) -> Any:
     return load_stuff(source)[1]
 
 
-def periodic(period: Union[int, float], timeout: Union[int, float] = 1,
-        start_after: Union[int, float] = 0) -> Callable:
+def periodic(period: int | float, timeout: int | float = 1, start_after: int | float = 0
+        ) -> Callable[[PeriodicFunc], PeriodicFunc]:
     '''
         Run decorated handler periodically.
 
@@ -151,13 +156,12 @@ def periodic(period: Union[int, float], timeout: Union[int, float] = 1,
                 log.info('Called handler 3')
     '''
 
-    assert period > 0.001, 'period must be more than 0.001 s'
-    assert timeout > 0.001, 'timeout must be more than 0.001 s'
+    assert period > MIN_TIMEOUT, 'period must be more than 0.001 s'
+    assert timeout > MIN_TIMEOUT, 'timeout must be more than 0.001 s'
     assert start_after >= 0, 'start_after must be a positive'
 
-    def _decorator(func):
-        func._periodic = PeriodicHandler(
-            handler=func,
+    def _decorator(func: PeriodicFunc) -> PeriodicFunc:
+        PeriodicTask._register[make_bound_key(func)] = PeriodicArgs(
             period=float(period),
             timeout=float(timeout),
             start_after=float(start_after)
@@ -167,7 +171,7 @@ def periodic(period: Union[int, float], timeout: Union[int, float] = 1,
     return _decorator
 
 
-def cron(spec: str, timeout: Union[int, float] = 1) -> Callable:
+def cron(spec: str, timeout: int | float = 1) -> Callable[[PeriodicFunc], PeriodicFunc]:
     '''
         Run decorated function by schedule (cron)
 
@@ -185,11 +189,10 @@ def cron(spec: str, timeout: Union[int, float] = 1) -> Callable:
                 log.info('Called handler 2')
     '''
 
-    assert timeout > 0.001, 'timeout must be more than 0.001 s'
+    assert timeout > MIN_TIMEOUT, 'timeout must be more than 0.001 s'
 
-    def _decorator(func):
-        func._cron = CRONHandler(
-            handler=func,
+    def _decorator(func: PeriodicFunc) -> PeriodicFunc:
+        CRONTask._register[make_bound_key(func)] = CRONArgs(
             cron=cron_parser(spec),
             timeout=float(timeout)
         )
@@ -198,7 +201,7 @@ def cron(spec: str, timeout: Union[int, float] = 1) -> Callable:
     return _decorator
 
 
-def receiver(*signals: Signal, timeout: int = 60) -> Callable:
+def receiver(*signals: Signal, timeout: int = 60) -> Callable[[ReceiverFunc], ReceiverFunc]:
     '''
         Binding for signals receiving.
 
@@ -222,21 +225,20 @@ def receiver(*signals: Signal, timeout: int = 60) -> Callable:
                 log.info('Called handler 3 %s', kwargs)
     '''
 
-    def _decorator(func):
+    def _decorator(func: ReceiverFunc) -> ReceiverFunc:
+        base_key = func.__module__, *func.__qualname__.split('.')
+
         for _signal in signals:
-            func._receiver = ReceiverHandler(
-                handler=func,
-                signal=_signal,
-                timeout=timeout
-            )
+            key = (*base_key[:-1], f'{base_key[-1]}:{_signal.name}')
+            Receiver._register[key] = ReceiverArgs(signal=_signal, timeout=timeout)
 
         return func
 
     return _decorator
 
 
-def consumer(queue: Queue, timeout: int = 60, dto_class: Optional[type] = None,
-        dto_name: Optional[str] = None, **options) -> Callable:
+def consumer(queue: Queue, timeout: int = 60, dto_class: type | None = None,
+         dto_name: str | None = None, **options: Any) -> Callable[[ConsumerFunc], ConsumerFunc]:
     '''
         Binding for consuming messages from queue.
 
@@ -266,9 +268,8 @@ def consumer(queue: Queue, timeout: int = 60, dto_class: Optional[type] = None,
                 log.info('Called handler 4 %s', obj)  # obj = MyDTO(**kwargs)
     '''
 
-    def _decorator(func):
-        func._consumer = ConsumerHandler(
-            handler=func,
+    def _decorator(func: ConsumerFunc) -> ConsumerFunc:
+        Consumer._register[make_bound_key(func)] = ConsumerArgs(
             queue=queue,
             timeout=timeout,
             dto_class=dto_class,
@@ -280,7 +281,7 @@ def consumer(queue: Queue, timeout: int = 60, dto_class: Optional[type] = None,
     return _decorator
 
 
-def on(label: str) -> Callable:
+def on(label: str) -> Callable[[HookFunc], HookFunc]:
     '''
         Hooks for internal events *(pre_start, post_start, pre_stop)*
         or running forever servers *(server)*.
@@ -310,11 +311,8 @@ def on(label: str) -> Callable:
     '''
     assert label in ('pre_start', 'post_start', 'pre_stop', 'server'), 'Bad label'
 
-    def _decorator(func):
-        func._hook = HookHandler(
-            handler=func,
-            label=label
-        )
+    def _decorator(func: HookFunc) -> HookFunc:
+        Hook._register[make_bound_key(func)] = HookArgs(label=label)
         return func
 
     return _decorator

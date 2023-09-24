@@ -15,26 +15,27 @@ group and start/stop at the same time. If one of the agents stops, the launcher
 stops the entire group.
 '''
 
-import os
-import time
-import signal
-import asyncio
 import argparse
+import asyncio
 import importlib
 import logging
 import multiprocessing
+import os
+import signal
+import time
 
-from typing import Optional, Iterator, Tuple, Dict, List, Any, TYPE_CHECKING
-from itertools import chain
 from functools import partial
+from itertools import chain
+from typing import TYPE_CHECKING, Any, Iterator
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
-    from .bus import AbstractSignalBus
     from .broker import AbstractQueueBroker
+    from .bus import AbstractSignalBus
 
 
-CFG_T = Tuple[str, Dict[str, Any]]
+CFG_T = tuple[str, dict[str, Any]]
 
 __all__ = (
     'GroupInterrupt',
@@ -58,7 +59,7 @@ class ServerInterrupt(Exception):
     pass
 
 
-def load_configuration(config_path: str) -> Iterator[Tuple[str, CFG_T]]:
+def load_configuration(config_path: str) -> Iterator[tuple[str, CFG_T]]:
     '''
         Load configuration from module and prepare it for initializing agents.
         Returns list of unfolded configs for each agent.
@@ -76,23 +77,23 @@ def load_configuration(config_path: str) -> Iterator[Tuple[str, CFG_T]]:
         yield name, (backend, cfg)
 
 
-def _configuration(data: Dict[str, Dict[str, str]]) -> Iterator[Tuple[str, CFG_T]]:
+def _configuration(data: dict[str, dict[str, str]]) -> Iterator[tuple[str, CFG_T]]:
     for name, params in data.items():
         backend = params.pop('backend', None)
         if backend:
             yield name, (backend, params)
 
 
-def init_agent(backend: str, cfg: Dict[str, Any]) -> 'MicroAgent':
+def init_agent(backend: str, cfg: dict[str, Any]) -> 'MicroAgent':
     '''
         Import and load all using backends from config,
         initialize it and returns not started MicroAgent instance
     '''
 
-    bus: Optional['AbstractSignalBus'] = None
-    broker: Optional['AbstractQueueBroker'] = None
-    _bus: Optional[CFG_T] = cfg.pop('bus', None)
-    _broker: Optional[CFG_T] = cfg.pop('broker', None)
+    bus: 'AbstractSignalBus' | None = None
+    broker: 'AbstractQueueBroker' | None = None
+    _bus: CFG_T | None = cfg.pop('bus', None)
+    _broker: CFG_T | None = cfg.pop('broker', None)
 
     if _bus:
         bus = _import(_bus[0])(**_bus[1])
@@ -103,12 +104,12 @@ def init_agent(backend: str, cfg: Dict[str, Any]) -> 'MicroAgent':
     return _import(backend)(bus=bus, broker=broker, **cfg)
 
 
-def _import(path: str):
+def _import(path: str) -> Any:
     mod = importlib.import_module('.'.join(path.split('.')[:-1]))
     return getattr(mod, path.split('.')[-1])
 
 
-def _run_agent(name: str, backend: str, cfg: Dict[str, Any], parent_pid: int) -> None:
+def _run_agent(name: str, backend: str, cfg: dict[str, Any], parent_pid: int) -> None:
     '''
         Initialize MicroAgent instance from config and run it forever
         Contains handling for process control
@@ -120,7 +121,7 @@ def _run_agent(name: str, backend: str, cfg: Dict[str, Any], parent_pid: int) ->
     logger.info('Stoped Agent %s pid#%s', name, os.getpid())
 
 
-async def run_agent(name: str, backend: str, cfg: Dict[str, Any], parent_pid: int) -> None:
+async def run_agent(name: str, backend: str, cfg: dict[str, Any], parent_pid: int) -> None:
     loop = asyncio.get_event_loop()
 
     # Interrupt process when master shutdown
@@ -147,12 +148,12 @@ async def run_agent(name: str, backend: str, cfg: Dict[str, Any], parent_pid: in
         raise
 
 
-def _interrupter(sig):
+def _interrupter(sig: str) -> None:
     logger.warning('Catch %s signal', sig)
     raise GroupInterrupt(sig)
 
 
-def _master_watcher(pid: int, loop: asyncio.BaseEventLoop):
+def _master_watcher(pid: int, loop: asyncio.BaseEventLoop) -> None:
     loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, pid, loop)
     try:
         os.kill(pid, 0)  # check master process
@@ -169,12 +170,12 @@ class AgentsManager:
     '''
 
     mp_ctx: multiprocessing.context.BaseContext
-    processes: Dict[int, multiprocessing.process.BaseProcess]
-    cfg: List[Tuple[str, CFG_T]]
+    processes: dict[int, multiprocessing.process.BaseProcess]
+    cfg: list[tuple[str, CFG_T]]
     running: bool
     intlock: bool
 
-    def __init__(self, cfg: List[Tuple[str, CFG_T]]) -> None:
+    def __init__(self, cfg: list[tuple[str, CFG_T]]) -> None:
         self.mp_ctx = multiprocessing.get_context()
         self.processes = {}
         self.cfg = cfg
@@ -184,7 +185,7 @@ class AgentsManager:
         signal.signal(signal.SIGTERM, self._signal_cb)
         signal.signal(signal.SIGINT, self._signal_cb)
 
-    def _signal_cb(self, signum: int, *args) -> None:
+    def _signal_cb(self, signum: int, *args: Any) -> None:
         signame = {2: 'INT', 15: 'TERM'}.get(signum, signum)
         logger.warning('Catch %s %s', signame, list(self.processes))
         self.running = False
@@ -223,7 +224,7 @@ class AgentsManager:
         logger.info('Agents stoped')
         self.close()
 
-    def close(self):
+    def close(self) -> None:
         ''' Terminating dependent processes '''
 
         if self.intlock:  # Prevent duble kill
@@ -240,14 +241,12 @@ class AgentsManager:
         logger.info('Forked processes killed')
 
 
-def run():
+def run() -> None:
     ''' Parse input and run '''
 
     parser = argparse.ArgumentParser(description='Run microagents')
     parser.add_argument('modules', metavar='MODULE_PATH', type=str, nargs='+',
         help='configuration modeles path')
-    # parser.add_argument('--bind', metavar='HOST:POST', type=str, dest='bind',
-    #     help='Bind duty interface')
 
     call_args = parser.parse_args()
     cfg = list(chain(*[load_configuration(module) for module in call_args.modules]))

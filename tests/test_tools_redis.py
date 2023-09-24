@@ -1,11 +1,11 @@
 # mypy: ignore-errors
 import asyncio
 import pytest
-import aioredis
+import redis.asyncio as redis
 from unittest.mock import MagicMock, AsyncMock, Mock
 from microagent.signal import Signal
 from microagent.queue import Queue, Consumer
-from microagent.tools.aioredis import AIORedisSignalBus, AIORedisBroker
+from microagent.tools.redis import AIORedisSignalBus, AIORedisBroker
 
 
 @pytest.fixture()
@@ -26,10 +26,10 @@ async def test_bus_receive_ok(monkeypatch):
 
         async def listen(self):
             yield {'type': 'pmessage', 'channel': 'pattern1', 'data': 'data'}
-            raise aioredis.ConnectionError()
+            raise redis.ConnectionError()
 
     conn = MagicMock(pubsub=lambda: PubSub())
-    monkeypatch.setattr(aioredis.Redis, 'from_url', Mock(return_value=conn))
+    monkeypatch.setattr(redis.Redis, 'from_url', Mock(return_value=conn))
 
     bus = AIORedisSignalBus('redis://localhost')
     bus.receiver = Mock()
@@ -43,7 +43,7 @@ async def test_bus_receive_ok(monkeypatch):
 
 async def test_bus_send_ok(monkeypatch):
     conn = MagicMock(publish=AsyncMock())
-    monkeypatch.setattr(aioredis.Redis, 'from_url', Mock(return_value=conn))
+    monkeypatch.setattr(redis.Redis, 'from_url', Mock(return_value=conn))
 
     bus = AIORedisSignalBus('redis://localhost')
 
@@ -60,7 +60,7 @@ async def test_broker_consume_ok(monkeypatch):
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
     create_redis = MagicMock(blpop=AsyncMock(side_effect=[('ch', '{}'), None, Exception]))
-    monkeypatch.setattr(aioredis, 'Redis', MagicMock(from_url=Mock(return_value=create_redis)))
+    monkeypatch.setattr(redis, 'Redis', MagicMock(from_url=Mock(return_value=create_redis)))
 
     broker = AIORedisBroker('redis://localhost')
     broker.BIND_TIME = .01
@@ -69,31 +69,27 @@ async def test_broker_consume_ok(monkeypatch):
 
 
 async def test_broker_send_ok(monkeypatch):
-    create_redis = MagicMock(rpush=AsyncMock())
-    monkeypatch.setattr(aioredis, 'Redis', MagicMock(from_url=Mock(return_value=create_redis)))
-
     broker = AIORedisBroker('redis://localhost')
+    broker.connection = MagicMock(rpush=AsyncMock())
     await broker.send('test_queue', '{}')
 
-    create_redis.rpush.assert_called_once_with('test_queue', '{}')
+    broker.connection.rpush.assert_called_once_with('test_queue', '{}')
 
     await broker.send('test_queue', '{}')
 
-    assert create_redis.rpush.call_count == 2
+    assert broker.connection.rpush.call_count == 2
 
 
 async def test_broker_queue_length_ok(monkeypatch):
-    create_redis = MagicMock(llen=AsyncMock())
-    monkeypatch.setattr(aioredis, 'Redis', MagicMock(from_url=Mock(return_value=create_redis)))
-
     broker = AIORedisBroker('redis://localhost')
+    broker.connection = MagicMock(llen=AsyncMock())
     await broker.queue_length('test_queue')
 
-    create_redis.llen.assert_called_once_with('test_queue')
+    broker.connection.llen.assert_called_once_with('test_queue')
 
     await broker.queue_length('test_queue')
 
-    assert create_redis.llen.call_count == 2
+    assert broker.connection.llen.call_count == 2
 
 
 async def test_broker_handling_async_ok():

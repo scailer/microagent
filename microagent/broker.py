@@ -9,7 +9,7 @@ The message has a free structure, fully defined in the user area.
 
 Implementations:
 
-* :ref:`aioredis <tools-aioredis>`
+* :ref:`redis <tools-redis>`
 * :ref:`aioamqp <tools-amqp>`
 * :ref:`kafka <tools-kafka>`
 
@@ -19,7 +19,7 @@ Using QueueBroker separately (sending only)
 .. code-block:: python
 
     from microagent import load_queues
-    from microagent.tools.aioredis import AIORedisBroker
+    from microagent.tools.redis import AIORedisBroker
 
     queues = load_queues('file://queues.json')
 
@@ -32,7 +32,7 @@ Using with MicroAgent
 .. code-block:: python
 
     from microagent import MicroAgent, load_queues
-    from microagent.tools.aioredis import AIORedisSignalBus
+    from microagent.tools.redis import AIORedisSignalBus
 
     queues = load_queues('file://queues.json')
 
@@ -45,12 +45,12 @@ Using with MicroAgent
     email_agent = EmailAgent(broker=broker)
     await email_agent.start()
 '''
-import abc
-import uuid
 import logging
+import uuid
 
-from typing import Dict, Optional
-from .queue import Queue, Consumer
+from typing import Any, Protocol, runtime_checkable
+
+from .queue import Consumer, Queue
 
 
 class BoundQueue:
@@ -63,14 +63,15 @@ class BoundQueue:
         self.broker = broker
         self.queue = queue
 
-    async def send(self, message: dict, **options) -> None:
+    async def send(self, message: dict, **options: Any) -> None:
         await self.broker.send(self.queue.name, self.queue.serialize(message), **options)
 
     async def length(self) -> int:
         return await self.broker.queue_length(self.queue.name)
 
 
-class AbstractQueueBroker(abc.ABC):
+@runtime_checkable
+class AbstractQueueBroker(Protocol):
     '''
         Broker is an abstract interface with two basic methods - send and bind.
 
@@ -109,9 +110,9 @@ class AbstractQueueBroker(abc.ABC):
     uid: str
     dsn: str
     log: logging.Logger
-    _bindings: Dict[str, Consumer]
+    _bindings: dict[str, Consumer]
 
-    def __new__(cls, dsn, **kwargs) -> 'AbstractQueueBroker':
+    def __new__(cls, dsn: str, **kwargs: Any) -> 'AbstractQueueBroker':
         broker = super(AbstractQueueBroker, cls).__new__(cls)
 
         broker.uid = uuid.uuid4().hex
@@ -120,7 +121,7 @@ class AbstractQueueBroker(abc.ABC):
 
         return broker
 
-    def __init__(self, dsn: str, logger: Optional[logging.Logger] = None):
+    def __init__(self, dsn: str, logger: logging.Logger | None = None):
         self.dsn = dsn
 
         if logger:
@@ -129,8 +130,7 @@ class AbstractQueueBroker(abc.ABC):
     def __getattr__(self, name: str) -> BoundQueue:
         return BoundQueue(self, Queue.get(name))
 
-    @abc.abstractmethod
-    async def send(self, name: str, message: str, **kwargs) -> None:
+    async def send(self, name: str, message: str, **kwargs: Any) -> None:
         '''
             Write a raw message to queue.
 
@@ -138,16 +138,15 @@ class AbstractQueueBroker(abc.ABC):
             :param message: string, serialized object
             :param \*\*kwargs: specific parameters for each broker implementation
         '''  # noqa: W605
-        raise NotImplementedError  # pragma: no cover
+        ...
 
-    @abc.abstractmethod
     async def bind(self, name: str) -> None:
         '''
             Start reading queue.
 
             :param name: string, queue name
         '''
-        raise NotImplementedError  # pragma: no cover
+        ...
 
     async def bind_consumer(self, consumer: Consumer) -> None:
         '''
@@ -163,18 +162,17 @@ class AbstractQueueBroker(abc.ABC):
 
         self.log.debug('Bind %s to queue "%s"', consumer, consumer.queue.name)
 
-    def prepared_data(self, consumer: Consumer, raw_data: str) -> dict:
+    def prepared_data(self, consumer: Consumer, raw_data: str | bytes) -> dict:
         data = consumer.queue.deserialize(raw_data)
         if consumer.dto_class:
             data[consumer.dto_name or 'dto'] = consumer.dto_class(**data)
         return data
 
-    @abc.abstractmethod
-    async def queue_length(self, name: str, **options) -> int:
+    async def queue_length(self, name: str, **options: Any) -> int:
         '''
             Get the current queue length.
 
             :param name: string, queue name
             :param \*\*options: specific parameters for each broker implementation
         '''  # noqa: W605
-        return NotImplemented  # pragma: no cover
+        ...

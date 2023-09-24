@@ -40,9 +40,9 @@ def test_load_queues():
 
 
 def test_load_from_url():
-    source = 'http://lwr.pw/matest'  # noqa
+    source = 'https://raw.githubusercontent.com/scailer/microagent/master/tests/stuff.json'
     signals, queues = load_stuff(source)
-    assert len(signals) == 2
+    assert len(signals) == 3
     assert len(queues) == 1
     assert signals.test_signal.name == 'test_signal'
     assert signals.else_signal.name == 'else_signal'

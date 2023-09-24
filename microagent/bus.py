@@ -10,7 +10,7 @@ We can send a signal from many sources and listen it with many receivers.
 
 Implementations:
 
-* :ref:`aioredis <tools-aioredis>`
+* :ref:`redis <tools-redis>`
 
 
 Using SignalBus separately (sending only)
@@ -18,7 +18,7 @@ Using SignalBus separately (sending only)
 .. code-block:: python
 
     from microagent import load_signals
-    from microagent.tools.aioredis import AIORedisSignalBus
+    from microagent.tools.redis import AIORedisSignalBus
 
     signals = load_signals('file://signals.json')
 
@@ -31,7 +31,7 @@ Using with MicroAgent
 .. code-block:: python
 
     from microagent import MicroAgent, load_signals
-    from microagent.tools.aioredis import AIORedisSignalBus
+    from microagent.tools.redis import AIORedisSignalBus
 
     signals = load_signals('file://signals.json')
 
@@ -44,22 +44,21 @@ Using with MicroAgent
     user_agent = UserAgent(bus=bus)
     await user_agent.start()
 '''
-import abc
-import uuid
-import logging
 import asyncio
-import inspect
 import contextlib
+import inspect
+import logging
+import uuid
 
 from collections import defaultdict
-from typing import Optional, List, Union, Dict, Any
 from datetime import datetime
+from typing import Any, Protocol, runtime_checkable
 
-from .signal import Signal, Receiver, SerializingError
+from .signal import Receiver, SerializingError, Signal
 from .utils import IterQueue, raise_timeout
 
 
-def check_types(signal: Signal, data: Dict, log: logging.Logger):
+def check_types(signal: Signal, data: dict, log: logging.Logger) -> None:
     if signal.type_map:
         for key, value in data.items():
             if key not in signal.type_map:
@@ -68,7 +67,8 @@ def check_types(signal: Signal, data: Dict, log: logging.Logger):
                 log.warning('Receiver get wrong type for "%s" %s', key, value)
 
 
-class AbstractSignalBus(abc.ABC):
+@runtime_checkable
+class AbstractSignalBus(Protocol):
     '''
         Signal bus is an abstract interface with two basic methods - send and bind.
 
@@ -116,10 +116,10 @@ class AbstractSignalBus(abc.ABC):
     log: logging.Logger
 
     uid: str
-    receivers: Dict[str, List[Receiver]]
-    _responses: Dict[str, IterQueue]
+    receivers: dict[str, list[Receiver]]
+    _responses: dict[str, IterQueue]
 
-    def __new__(cls, dsn, **kwargs) -> 'AbstractSignalBus':
+    def __new__(cls, dsn: str, **kwargs: Any) -> 'AbstractSignalBus':
         bus = super(AbstractSignalBus, cls).__new__(cls)
 
         bus.uid = uuid.uuid4().hex
@@ -128,7 +128,9 @@ class AbstractSignalBus(abc.ABC):
 
         return bus
 
-    def __init__(self, dsn: str, prefix: str = 'PUBSUB', logger: logging.Logger = None) -> None:
+    def __init__(self, dsn: str, prefix: str = 'PUBSUB',
+            logger: logging.Logger | None = None) -> None:
+
         self.dsn = dsn
         self.prefix = prefix
         self._responses = {}
@@ -148,8 +150,7 @@ class AbstractSignalBus(abc.ABC):
         signal = Signal.get(name)
         return BoundSignal(self, signal)
 
-    @abc.abstractmethod
-    def send(self, channel: str, message: str):
+    async def send(self, channel: str, message: str) -> None:
         '''
             Send raw message to channel.
             Available optional type checking for input data.
@@ -157,16 +158,15 @@ class AbstractSignalBus(abc.ABC):
             :param channel: string, channel name
             :param message: string, serialized object
         '''
-        return NotImplemented  # pragma: no cover
+        ...
 
-    @abc.abstractmethod
-    def bind(self, signal: str):
+    async def bind(self, signal: str) -> None:
         '''
             Subscribe to channel.
 
             :param signal: string, signal name for subscribe
         '''
-        return NotImplemented  # pragma: no cover
+        ...
 
     async def bind_receiver(self, receiver: Receiver) -> None:
         '''
@@ -178,7 +178,7 @@ class AbstractSignalBus(abc.ABC):
         self.receivers[receiver.signal.name].append(receiver)
 
     @contextlib.asynccontextmanager
-    async def call(self, channel: str, message: str, timeout: int):
+    async def call(self, channel: str, message: str, timeout: int) -> Any:
         '''
             RPC over pub/sub. Pair of signals - sending and responsing. Response-signal
             is an internal construction enabled by default. When we call `call` we send
@@ -230,22 +230,18 @@ class AbstractSignalBus(abc.ABC):
             Available optional type checking for input data.
         '''
 
-        signal_id = None  # type: Optional[str]
+        signal_id: str | None = None
 
         if '#' in channel:
             channel, signal_id = channel.split('#')
 
         pref, name, sender = channel.split(':')
-        signal = Signal.get(name)  # type: Signal
+        signal = Signal.get(name)
 
         try:
             data = signal.deserialize(message)  # type: dict
         except SerializingError:
             self.log.error('Invalid pubsub message: %s', message)
-            return
-
-        if not isinstance(data, dict):
-            self.log.error('Invalid pubsub message: not dict')
             return
 
         if name == 'response' and signal_id:
@@ -261,30 +257,30 @@ class AbstractSignalBus(abc.ABC):
 
         asyncio.create_task(self.handle_signal(signal, sender, signal_id, data))
 
-    def handle_response(self, signal_id: str, message: Dict[str, Union[int, str, None]]) -> None:
+    def handle_response(self, signal_id: str, message: dict[str, int | str | None]) -> None:
         if queue := self._responses.get(signal_id):
             queue.put_nowait(message)
 
     async def handle_signal(self, signal: Signal, sender: str,
-            signal_id: Optional[str], message: dict) -> None:
+            signal_id: str | None, message: dict) -> None:
 
-        receivers = self.receivers.get(signal.name, [])  # type: List[Receiver]
+        receivers: list[Receiver] = self.receivers.get(signal.name, [])
 
-        responses = await asyncio.gather(*[
+        responses: list[int | str | None] = await asyncio.gather(*[
             self.broadcast(receiver, signal, sender, message)
             for receiver in receivers
-        ])  # type: List[Union[int, str, None]]
+        ])
 
         if signal_id:
             await self.send(
                 f'{self.prefix}:response:{self.uid}#{signal_id}',
                 Signal._jsonlib.dumps({
-                    rec.key: res for rec, res in zip(receivers, responses)
+                    rec.key: res for rec, res in zip(receivers, responses, strict=True)
                 })
             )
 
     async def broadcast(self, receiver: Receiver, signal: Signal,
-            sender: str, message: dict) -> Union[int, str, None]:
+            sender: str, message: dict) -> int | str | None:
 
         self.log.debug('Calling %s by %s:%s with %s', receiver.handler,
             signal.name, sender, str(message).encode('utf-8'))
@@ -328,7 +324,7 @@ class BoundSignal:
             self.signal.make_channel_name(self.bus.prefix, sender),
             self.signal.serialize(kwargs))
 
-    async def call(self, sender: str, timeout: int = 60, **kwargs: Any):
+    async def call(self, sender: str, timeout: int = 60, **kwargs: Any) -> int | str | None:
         if self.signal.type_map:
             check_types(self.signal, kwargs, self.bus.log)
 
@@ -342,7 +338,9 @@ class BoundSignal:
             async for value in queue:
                 return value
 
-    def waiter(self, sender: str, timeout: int = 60, **kwargs: Any):
+        return None
+
+    def waiter(self, sender: str, timeout: int = 60, **kwargs: Any) -> Any:
         '''
             async with bus.iter(sender='name', a=1, timeout=10) as queue:
                 async for x in queue:

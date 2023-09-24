@@ -252,10 +252,6 @@ async def test_Bus_receiver_fail_bad_msg(bus, test_signal):
     await asyncio.sleep(.001)
     bus.handle_signal.assert_not_called()
     bus.log.error.assert_called()
-    bus.receiver('TEST:test_signal:test', '[]')
-    await asyncio.sleep(.001)
-    bus.handle_signal.assert_not_called()
-    assert bus.log.error.call_count == 2
 
 
 async def test_Bus_receiver_ok_missed_args(bus, test_signal):

@@ -2,7 +2,7 @@
 import sys
 import asyncio
 import logging
-from microagent.tools.aioredis import AIORedisSignalBus, AIORedisBroker
+from microagent.tools.redis import AIORedisSignalBus, AIORedisBroker
 
 from user_agent import UserAgent
 from comment_agent import CommentAgent

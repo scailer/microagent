@@ -24,19 +24,29 @@ allow provide endpoints for microagent, such as http, websocket, smtp or other.
 '''
 
 import inspect
-from dataclasses import dataclass
+
 from collections import defaultdict
-from typing import Callable, Dict, List, Iterable, Awaitable, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Awaitable, Callable, ClassVar, Iterable, TypedDict
+
+from .types import BoundKey, HookFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
 
 
+class HookArgs(TypedDict):
+    label: str
+
+
 @dataclass(frozen=True)
 class Hook:
     agent: 'MicroAgent'
-    handler: Callable
+    handler: HookFunc
     label: str
+
+    _register: ClassVar[dict[BoundKey, 'HookArgs']] = {}
 
 
 class Hooks:
@@ -44,7 +54,7 @@ class Hooks:
         Internal hooks
     '''
 
-    binds: Dict[str, List[Hook]]
+    binds: dict[str, list[Hook]]
 
     def __init__(self, hooks: Iterable[Hook]):
         self.binds = defaultdict(list)

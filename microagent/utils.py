@@ -1,26 +1,32 @@
 import asyncio
 
+from typing import Any, Callable
+
 
 class IterQueue(asyncio.Queue):
     ''' Queue as async generator '''
 
-    def __aiter__(self):
+    def __aiter__(self) -> asyncio.Queue:
         return self
 
-    async def __anext__(self):
+    async def __anext__(self) -> Any:
         try:
             value = await self.get()
             self.task_done()
             return value
 
-        except asyncio.CancelledError:
-            raise StopAsyncIteration
+        except asyncio.CancelledError as err:
+            raise StopAsyncIteration from err
 
 
-def raise_timeout(timeout: float):
+def make_bound_key(func: Callable) -> tuple[str, ...]:
+    return func.__module__, *func.__qualname__.split('.')
+
+
+def raise_timeout(timeout: float) -> None:
     ''' Interupt current corutine by timer '''
 
-    def _timeout(task):
+    def _timeout(task: asyncio.Task) -> None:
         if task._fut_waiter and not task._fut_waiter.cancelled():
             task.cancel()
 

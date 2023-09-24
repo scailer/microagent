@@ -10,5 +10,5 @@ release: clean
 	python setup.py sdist bdist_wheel
 	python3 -m twine upload dist/*
 
-run_aioredis_example: 
+run_redis_example: 
 	python3 examples/aioredis_server.py

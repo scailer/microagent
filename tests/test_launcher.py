@@ -8,7 +8,7 @@ def test_load_configuration_ok(monkeypatch):
     cfg = MagicMock(
         BUS={
             'default': {
-                'backend': 'microagent.tools.aioredis.AIORedisSignalBus',
+                'backend': 'microagent.tools.redis.AIORedisSignalBus',
                 'dsn': 'redis://localhost',
                 'prefix': 'APP',
             },
@@ -22,7 +22,7 @@ def test_load_configuration_ok(monkeypatch):
                 'dsn': 'amqp://guest:guest@localhost:5671/myhost',
             },
             'bro': {
-                'backend': 'microagent.tools.aioredis.AIORedisSignalBus',
+                'backend': 'microagent.tools.redis.AIORedisSignalBus',
                 'dsn': 'redis://localhost',
             },
             'failed': {
@@ -53,7 +53,7 @@ def test_load_configuration_ok(monkeypatch):
     )
 
     _BUS = (
-        'microagent.tools.aioredis.AIORedisSignalBus',
+        'microagent.tools.redis.AIORedisSignalBus',
         {'dsn': 'redis://localhost', 'prefix': 'APP'}
     )
 
@@ -63,7 +63,7 @@ def test_load_configuration_ok(monkeypatch):
     )
 
     _BROKER2 = (
-        'microagent.tools.aioredis.AIORedisSignalBus',
+        'microagent.tools.redis.AIORedisSignalBus',
         {'dsn': 'redis://localhost'}
     )
 
@@ -80,7 +80,7 @@ def test_load_configuration_ok(monkeypatch):
 
 def test_init_agent_ok(monkeypatch):
     _BUS = (
-        'microagent.tools.aioredis.AIORedisSignalBus',
+        'microagent.tools.redis.AIORedisSignalBus',
         {'dsn': 'redis://localhost', 'prefix': 'APP'}
     )
 

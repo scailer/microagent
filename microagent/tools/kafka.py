@@ -1,13 +1,14 @@
 '''
 :ref:`Queue Broker <broker>` based on :kafka:`kafka <>`.
 '''
-import urllib
 import asyncio
 import logging
+import urllib
 
 from datetime import datetime
+from typing import Any
 
-import aiokafka  # type: ignore
+import aiokafka
 
 from ..broker import AbstractQueueBroker, Consumer
 
@@ -44,13 +45,13 @@ class KafkaBroker(AbstractQueueBroker):
     addr: str
     producer: aiokafka.AIOKafkaProducer
 
-    def __init__(self, dsn: str, logger: logging.Logger = None) -> None:
+    def __init__(self, dsn: str, logger: logging.Logger | None = None) -> None:
         super().__init__(dsn, logger)
         _loop = asyncio.get_running_loop()
         self.addr = urllib.parse.urlparse(dsn).netloc  # type: ignore
         self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
 
-    async def send(self, name: str, message: str, **kwargs) -> None:
+    async def send(self, name: str, message: str, **kwargs: Any) -> None:
         await self.producer.start()
 
         try:
@@ -61,7 +62,7 @@ class KafkaBroker(AbstractQueueBroker):
             _loop = asyncio.get_running_loop()
             self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
 
-    async def bind(self, name: str):
+    async def bind(self, name: str) -> None:
         loop = asyncio.get_running_loop()
         kafka_consumer = aiokafka.AIOKafkaConsumer(name, loop=loop, bootstrap_servers=self.addr)
         asyncio.create_task(self._kafka_wrapper(kafka_consumer, name))

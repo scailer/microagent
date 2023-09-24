@@ -22,8 +22,8 @@ Tool is intended for developing:
 Tool provide features:
 
 * running a **periodical tasks** (interval or as CRON)
-* specification of signals (events), their sending and receiving via the bus (:ref:`aioredis <bus>`)
-* description of queues, sending and receiving messages via the queue broker (amqp_, kafka_, aioredis_)
+* specification of signals (events), their sending and receiving via the bus (:ref:`redis <bus>`)
+* description of queues, sending and receiving messages via the queue broker (amqp_, kafka_, redis_)
 * limited **RPC** via signal bus
 * launching sub-services (in the same process)
 * launching a group of microagents (each in a separate process)
@@ -86,7 +86,7 @@ Tool provide features:
    :maxdepth: 1
    :caption: Tools:
 
-   aioredis
+   redis
    amqp
    kafka
    mocks
@@ -106,6 +106,6 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 
-.. _aioredis: https://aioredis.readthedocs.io
+.. _redis: https://redis.readthedocs.io
 .. _kafka: kafka.html
 .. _amqp: amqp.html

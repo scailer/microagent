@@ -1,6 +1,10 @@
-from typing import List, Dict, Callable, Union, Optional, Tuple, TYPE_CHECKING
-from dataclasses import dataclass
 import json
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
+
+from .types import BoundKey, ReceiverFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -72,10 +76,11 @@ class Signal:
     '''
 
     name: str
-    providing_args: List[str]
-    type_map: Optional[Dict[str, Tuple[type, ...]]] = None
+    providing_args: list[str]
+    type_map: dict[str, tuple[type, ...]] | None = None
     content_type: str = 'json'
-    _signals = {}  # type: Dict[str, Signal]
+
+    _signals: ClassVar[dict[str, 'Signal']] = {}
     _jsonlib = json
 
     def __post_init__(self) -> None:
@@ -90,7 +95,7 @@ class Signal:
         return self.name == other.name
 
     @classmethod
-    def set_jsonlib(self, jsonlib) -> None:
+    def set_jsonlib(self, jsonlib: Any) -> None:
         self._jsonlib = jsonlib
 
     @classmethod
@@ -98,11 +103,11 @@ class Signal:
         ''' Get the signal instance by name '''
         try:
             return cls._signals[name]
-        except KeyError:
-            raise SignalNotFound(f'No such signal {name}')
+        except KeyError as exc:
+            raise SignalNotFound(f'No such signal {name}') from exc
 
     @classmethod
-    def get_all(cls) -> Dict[str, 'Signal']:
+    def get_all(cls) -> dict[str, 'Signal']:
         ''' All registered signals '''
         return cls._signals
 
@@ -124,7 +129,7 @@ class Signal:
         try:
             return self._jsonlib.dumps(data)
         except (ValueError, TypeError, OverflowError) as exc:
-            raise SerializingError(exc)
+            raise SerializingError(exc) from exc
 
     def deserialize(self, data: str) -> dict:
         '''
@@ -133,17 +138,24 @@ class Signal:
             :param data: serialized transfered data
         '''
         try:
-            return self._jsonlib.loads(data)
+            return dict(self._jsonlib.loads(data))
         except (ValueError, TypeError, OverflowError) as exc:
-            raise SerializingError(exc)
+            raise SerializingError(exc) from exc
+
+
+class ReceiverArgs(TypedDict):
+    signal: Signal
+    timeout: float
 
 
 @dataclass(frozen=True)
 class Receiver:
     agent: 'MicroAgent'
-    handler: Callable
+    handler: ReceiverFunc
     signal: Signal
-    timeout: Union[int, float]
+    timeout: float
+
+    _register: ClassVar[dict[BoundKey, ReceiverArgs]] = {}
 
     @property
     def key(self) -> str:

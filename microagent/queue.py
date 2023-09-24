@@ -1,6 +1,10 @@
-from typing import Dict, Callable, Union, Optional, TYPE_CHECKING
-from dataclasses import dataclass
 import json
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
+
+from .types import BoundKey, ConsumerFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -50,10 +54,11 @@ class Queue:
             )
     '''
     name: str
-    _queues = {}  # type: Dict[str, Queue]
+
+    _queues: ClassVar[dict[str, 'Queue']] = {}
     _jsonlib = json
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self._queues[self.name] = self
 
     def __repr__(self) -> str:
@@ -65,7 +70,7 @@ class Queue:
         return self.name == other.name
 
     @classmethod
-    def set_jsonlib(self, jsonlib) -> None:
+    def set_jsonlib(self, jsonlib: Any) -> None:
         self._jsonlib = jsonlib
 
     @classmethod
@@ -73,11 +78,11 @@ class Queue:
         ''' Get the queue instance by name '''
         try:
             return cls._queues[name]
-        except KeyError:
-            raise QueueNotFound(f'No such queue {name}')
+        except KeyError as exc:
+            raise QueueNotFound(f'No such queue {name}') from exc
 
     @classmethod
-    def get_all(cls) -> Dict[str, 'Queue']:
+    def get_all(cls) -> dict[str, 'Queue']:
         ''' All registered queues '''
         return cls._queues
 
@@ -90,9 +95,9 @@ class Queue:
         try:
             return self._jsonlib.dumps(data)
         except (ValueError, TypeError, OverflowError) as exc:
-            raise SerializingError(exc)
+            raise SerializingError(exc) from exc
 
-    def deserialize(self, data: str) -> dict:
+    def deserialize(self, data: str | bytes) -> dict:
         '''
             Data deserializing method
 
@@ -101,18 +106,28 @@ class Queue:
         try:
             return self._jsonlib.loads(data)
         except (ValueError, TypeError, OverflowError) as exc:
-            raise SerializingError(exc)
+            raise SerializingError(exc) from exc
+
+
+class ConsumerArgs(TypedDict):
+    queue: Queue
+    timeout: float
+    dto_class: type | None
+    dto_name: str | None
+    options: dict
 
 
 @dataclass(frozen=True)
 class Consumer:
     agent: 'MicroAgent'
-    handler: Callable
+    handler: ConsumerFunc
     queue: Queue
-    timeout: Union[int, float]
+    timeout: float
     options: dict
-    dto_class: Optional[type] = None
-    dto_name: Optional[str] = None
+    dto_class: type | None = None
+    dto_name: str | None = None
+
+    _register: ClassVar[dict[BoundKey, ConsumerArgs]] = {}
 
     def __repr__(self) -> str:
         name = getattr(self.handler, '__name__', 'unknown')

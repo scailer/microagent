@@ -39,7 +39,7 @@ Agent initiation.
 .. code-block:: python
 
     import logging
-    from microagent.tools.aioredis import AIORedisSignalBus, AIORedisBroker
+    from microagent.tools.redis import AIORedisSignalBus, AIORedisBroker
 
     # Initialize bus, broker and logger
     bus = AIORedisSignalBus('redis://localhost/7')
@@ -77,18 +77,19 @@ Using MicroAgent resources.
 
 import asyncio
 import logging
-from dataclasses import dataclass
-from typing import Optional, Iterable, Callable, Union, Dict, Tuple
+
 from datetime import datetime, timedelta
+from typing import Any, Callable, Iterable, TypeVar
 
-from .signal import Signal, Receiver
-from .queue import Queue, Consumer
-from .bus import AbstractSignalBus
 from .broker import AbstractQueueBroker
-from .hooks import Hooks, Hook
-from .periodic_task import PeriodicTask, CRONTask, CRON
+from .bus import AbstractSignalBus
+from .hooks import Hook, Hooks
+from .periodic_task import CRONTask, PeriodicTask
+from .queue import Consumer
+from .signal import Receiver
 
-HandlerTypes = Union[Receiver, Consumer, PeriodicTask, CRONTask, Hook]
+
+HandlerTypes = TypeVar('HandlerTypes', Receiver, Consumer, PeriodicTask, CRONTask, Hook)
 
 
 class MicroAgent:
@@ -137,9 +138,9 @@ class MicroAgent:
     '''
 
     log: logging.Logger
-    bus: Optional[AbstractSignalBus]
-    broker: Optional[AbstractQueueBroker]
-    settings: Dict
+    bus: AbstractSignalBus | None
+    broker: AbstractQueueBroker | None
+    settings: dict
 
     periodic_tasks: Iterable[PeriodicTask]
     cron_tasks: Iterable[CRONTask]
@@ -147,14 +148,15 @@ class MicroAgent:
     consumers: Iterable[Consumer]
     hook: Hooks
 
-    def __new__(cls, **kwargs) -> 'MicroAgent':
+    def __new__(cls, **kwargs: Any) -> 'MicroAgent':
+
         agent = super(MicroAgent, cls).__new__(cls)
 
-        agent.periodic_tasks = PeriodicHandler.bound(agent)
-        agent.cron_tasks = CRONHandler.bound(agent)
-        agent.receivers = ReceiverHandler.bound(agent)
-        agent.consumers = ConsumerHandler.bound(agent)
-        agent.hook = Hooks(HookHandler.bound(agent))
+        agent.periodic_tasks = agent._bound_handler(PeriodicTask)
+        agent.cron_tasks = agent._bound_handler(CRONTask)
+        agent.receivers = agent._bound_handler(Receiver)
+        agent.consumers = agent._bound_handler(Consumer)
+        agent.hook = Hooks(agent._bound_handler(Hook))
         agent.log = logging.getLogger('microagent')
         agent.settings = {}
 
@@ -173,10 +175,10 @@ class MicroAgent:
         return agent
 
     def __init__(self,
-                bus: AbstractSignalBus = None,
-                broker: AbstractQueueBroker = None,
-                logger: logging.Logger = None,
-                settings: dict = None
+                bus: AbstractSignalBus | None = None,
+                broker: AbstractQueueBroker | None = None,
+                logger: logging.Logger | None = None,
+                settings: dict | None = None
             ) -> None:
 
         self.bus = bus
@@ -192,10 +194,10 @@ class MicroAgent:
         return f'<MicroAgent {self.__class__.__name__}>'
 
     async def start(self,
-                enable_periodic_tasks: Optional[bool] = True,
-                enable_receiving_signals: Optional[bool] = True,
-                enable_consuming_messages: Optional[bool] = True,
-                enable_servers_running: Optional[bool] = True
+                enable_periodic_tasks: bool = True,
+                enable_receiving_signals: bool = True,
+                enable_consuming_messages: bool = True,
+                enable_servers_running: bool = True
             ) -> None:
         '''
             Starting MicroAgent to receive signals, consume messages
@@ -233,7 +235,7 @@ class MicroAgent:
             cron_tasks: Iterable[CRONTask]) -> None:
 
         for task in [*periodic_tasks, *cron_tasks]:
-            start_after = getattr(task, 'start_after', None) or 0  # type: Union[int, float]
+            start_after: float = getattr(task, 'start_after', None) or 0.0
 
             if start_after > 100:
                 start_at = datetime.now() + timedelta(seconds=start_after)  # type: datetime
@@ -293,85 +295,19 @@ class MicroAgent:
             ],
         }
 
-
-class UnboundHandler:
-    handler: Callable
-    target_class: type
-    _register: Dict
-
-    def __post_init__(self):
-        key = self.handler.__module__, *self.handler.__qualname__.split('.')
-        self._register[key] = self
-
-    @classmethod
-    def bound(cls, agent: MicroAgent):
+    def _bound_handler(self, handler_type: type[HandlerTypes]) -> list[HandlerTypes]:
         classes, result = [], []
 
-        for _cls in agent.__class__.__mro__:
+        for _cls in self.__class__.__mro__:
             if _cls.__module__ != 'builtins' and _cls.__name__ != 'MicroAgent':
                 classes.append((_cls.__module__, *_cls.__qualname__.split('.')))
 
-        for lookup_key, unbound in cls._register.items():
-            args = unbound.__dict__
-            args.pop('handler', None)
-
+        for lookup_key, args in handler_type._register.items():
             if tuple(lookup_key[:-1]) in classes:
-                result.append(cls.target_class(
-                    agent=agent,
-                    handler=getattr(agent, lookup_key[-1].split(':')[0]),
+                result.append(handler_type(
+                    agent=self,
+                    handler=getattr(self, lookup_key[-1].split(':')[0]),
                     **args
                 ))
 
         return result
-
-
-@dataclass(frozen=True)
-class ReceiverHandler(UnboundHandler):
-    handler: Callable
-    signal: Signal
-    timeout: Union[int, float]
-    target_class = Receiver
-    _register = {}  # type: Dict[Tuple[str, str, str], ReceiverHandler]
-
-    def __post_init__(self):
-        key = self.handler.__module__, *self.handler.__qualname__.split('.')
-        self._register[(*key[:-1], f'{key[-1]}:{self.signal.name}')] = self
-
-
-@dataclass(frozen=True)
-class ConsumerHandler(UnboundHandler):
-    handler: Callable
-    queue: Queue
-    timeout: Union[int, float]
-    dto_class: Optional[type]
-    dto_name: Optional[str]
-    options: dict
-    target_class = Consumer
-    _register = {}  # type: Dict[Tuple[str, str, str], ConsumerHandler]
-
-
-@dataclass(frozen=True)
-class PeriodicHandler(UnboundHandler):
-    handler: Callable
-    period: Union[int, float]
-    timeout: Union[int, float]
-    start_after: Union[int, float]
-    target_class = PeriodicTask
-    _register = {}  # type: Dict[Tuple[str, str, str], PeriodicHandler]
-
-
-@dataclass(frozen=True)
-class CRONHandler(UnboundHandler):
-    handler: Callable
-    cron: CRON
-    timeout: Union[int, float]
-    target_class = CRONTask
-    _register = {}  # type: Dict[Tuple[str, str, str], CRONHandler]
-
-
-@dataclass(frozen=True)
-class HookHandler(UnboundHandler):
-    handler: Callable
-    label: str
-    target_class = Hook
-    _register = {}  # type: Dict[Tuple[str, str, str], HookHandler]

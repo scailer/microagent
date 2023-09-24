@@ -1,0 +1,104 @@
+[build-system]
+requires = ['setuptools', 'setuptools-scm']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'microagent'
+authors = [
+    {name = 'Dmitriy Vlasov', email = 'scailer@yandex.ru'},
+]
+readme = 'README.md'
+requires-python = '>=3.10'
+license = {file = 'LICENSE.md'}
+description = 'Tool for agent ecosystem'
+keywords = ['async', 'pubsub', 'queue', 'agent', 'periodic', 'cron']
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Plugins',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: MIT License',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+    'Framework :: AsyncIO'
+]
+dependencies = []
+dynamic = ['version']
+
+[project.urls]
+Homepage = 'https://github.com/scailer/microagent'
+Documentation = 'https://microagent.readthedocs.io/en/stable/'
+Repository = 'https://github.com/scailer/microagent.git'
+Changelog = 'https://github.com/scailer/microagent/blob/master/CHANGELOG.rst'
+
+[project.optional-dependencies]
+aioredis = ['redis[hiredis]==5.0.0']
+redis = ['redis[hiredis]==5.0.0']
+amqp = ['aiormq==6.7.7']
+kafka = ['aiokafka==0.7']
+dev = [
+    'pytest',
+    'pytest-runner',
+    'pytest-asyncio',
+    'pytest-cov',
+    'coverage',
+    'mypy',
+    'ruff',
+    'redis==5.0.0',
+    'aiormq==6.7.7',
+    'aiokafka==0.7',
+]
+
+[project.entry-points.'console_scripts']
+marun = 'microagent.launcher:run'
+
+[tool.setuptools.dynamic]
+version = {attr = 'microagent.__version__'}
+
+[tool.setuptools]
+packages = ['microagent', 'microagent.tools']
+
+[tool.setuptools.package-data]
+microagent = ['py.typed']
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    '@abc.abstractmethod',
+    '@abstractmethod',
+    'return NotImplemented',
+    'from .agent import MicroAgent',
+    '    \.\.\.'
+]
+
+[tool.ruff]
+line-length = 100
+target-version = 'py310'
+select = ['E', 'F', 'W', 'B', 'I', 'A', 'PL', 'C90', 'T20', 'BLE',
+    'E221', 'E222', 'E223', 'E224', 'E225', 'E226', 'E227', 'E228']
+
+[tool.ruff.mccabe]
+max-complexity = 10
+
+[tool.ruff.isort]
+case-sensitive = true
+combine-as-imports = true
+lines-after-imports = 2
+lines-between-types = 1
+split-on-trailing-comma = false
+
+[tool.mypy]
+warn_unused_ignores = true
+warn_unreachable = true
+warn_no_return = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = '--verbose --asyncio-mode=auto --cov=microagent --cov-report=html --ignore archive/'
