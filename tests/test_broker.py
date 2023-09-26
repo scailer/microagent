@@ -57,7 +57,7 @@ async def test_Queue_get_fail_not_found():
 
 
 async def test_Queue_serialize_ok(test_queue):
-    assert test_queue.serialize({'a': 1}) == '{"a":1}'
+    assert test_queue.serialize({'a': 1}) == '{"a": 1}'
 
 
 async def test_Queue_serialize_fail(test_queue):
@@ -139,7 +139,7 @@ async def test_Broker_bind_fail(broker, test_queue):
 
 async def test_Broker_send_ok(broker, test_queue):
     await broker.test_queue.send({'uid': 1})
-    broker.send.assert_called_once_with('test_queue', '{"uid":1}')
+    broker.send.assert_called_once_with('test_queue', '{"uid": 1}')
 
 
 async def test_Broker_prepared_data_ok(broker, test_queue):

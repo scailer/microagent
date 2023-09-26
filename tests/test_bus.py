@@ -72,7 +72,7 @@ async def test_Signal_make_channel_name_ok(test_signal):
 
 
 async def test_Signal_serialize_ok(test_signal):
-    assert test_signal.serialize({'a': 1}) == '{"a":1}'
+    assert test_signal.serialize({'a': 1}) == '{"a": 1}'
 
 
 async def test_Signal_serialize_fail(test_signal):
@@ -305,7 +305,7 @@ async def test_Bus_handle_signal_ok_response(bus):
 
     bus.broadcast.assert_called_with(receiver, some_signal, 'test', {})
     bus.send.assert_called_with(
-        f'{bus.prefix}:response:{bus.uid}#{uid}', f'{{"{receiver.key}":42}}')
+        f'{bus.prefix}:response:{bus.uid}#{uid}', f'{{"{receiver.key}": 42}}')
 
 
 async def test_Bus_broadcast_ok(bus, test_signal):
