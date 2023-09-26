@@ -3,7 +3,7 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 
-from .types import BoundKey, ReceiverFunc
+from .abc import BoundKey, ReceiverFunc
 
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ class SerializingError(SignalException):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class Signal:
     '''
         Dataclass (declaration) for a signal entity with a unique name.
@@ -42,10 +42,6 @@ class Signal:
             for input data in runtime. Type checking works in `bus.send`,
             `bus.call` and on receiving signals. Supported only json-types:
             string, number, boolean, array, object, null.
-
-        .. attribute:: content_type
-
-            String, content format, `json` by default
 
 
         Declaration with config-file (signals.json).
@@ -78,7 +74,6 @@ class Signal:
     name: str
     providing_args: list[str]
     type_map: dict[str, tuple[type, ...]] | None = None
-    content_type: str = 'json'
 
     _signals: ClassVar[dict[str, 'Signal']] = {}
     _jsonlib = json
@@ -93,6 +88,9 @@ class Signal:
         if not isinstance(other, Signal):
             return NotImplemented
         return self.name == other.name
+
+    def __hash__(self) -> int:
+        return id(self)
 
     @classmethod
     def set_jsonlib(self, jsonlib: Any) -> None:
@@ -148,7 +146,7 @@ class ReceiverArgs(TypedDict):
     timeout: float
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class Receiver:
     agent: 'MicroAgent'
     handler: ReceiverFunc

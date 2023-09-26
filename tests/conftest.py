@@ -3,7 +3,8 @@ import asyncio
 import inspect
 
 import pytest
-from microagent import Signal, Queue
+
+from microagent import Queue, Signal
 
 
 @pytest.fixture(scope='module')

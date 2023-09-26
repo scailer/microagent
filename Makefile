@@ -4,7 +4,9 @@ clean:
 	find . -name '*.pyc' | xargs rm -rf
 
 test:
-	python3 setup.py test
+	ruff microagent
+	mypy microagent
+	pytest tests
 
 release: clean
 	python setup.py sdist bdist_wheel

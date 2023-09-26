@@ -1,11 +1,14 @@
 # mypy: ignore-errors
 import asyncio
+
+from unittest.mock import AsyncMock, MagicMock, Mock
+
 import pytest
 import redis.asyncio as redis
-from unittest.mock import MagicMock, AsyncMock, Mock
+
+from microagent.queue import Consumer, Queue
 from microagent.signal import Signal
-from microagent.queue import Queue, Consumer
-from microagent.tools.redis import AIORedisSignalBus, AIORedisBroker
+from microagent.tools.redis import AIORedisBroker, AIORedisSignalBus
 
 
 @pytest.fixture()

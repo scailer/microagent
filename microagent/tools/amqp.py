@@ -4,7 +4,7 @@
 import asyncio
 import logging
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Awaitable, Callable
 
@@ -22,65 +22,7 @@ REBIND_ATTEMPTS = 3
 REBIND_BASE_DELAY = 10
 
 
-class ReConnection(Connection):
-    ''' AMQP connection with close callback '''
-
-    def __init__(self, close_callback: Callable, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.close_callback = close_callback
-
-    async def _on_close(self, ex: ExceptionType | None = ConnectionClosedDefault) -> None:
-        try:
-            await super()._on_close(ex)
-        finally:
-            await self.close_callback()
-
-
 @dataclass
-class ManagedConnection:
-    ''' Binded connection with rebind logic '''
-    dsn: str
-    queue_name: str
-    handler: Callable
-    bind_attempts: int = 0
-    bind_running: bool = False
-
-    async def bind(self) -> None:
-        ''' Start connection and bind consumer '''
-        connection = ReConnection(self.rebind, self.dsn)
-        await connection.connect()
-        channel = await connection.channel()
-        log.warning('Declare queue "%s"', self.queue_name)
-        await channel.queue_declare(self.queue_name)
-        await channel.basic_consume(self.queue_name, self.handler)
-
-    async def rebind(self) -> bool:
-        if self.bind_running:
-            log.exception('Already rebinding queue "%s"', self.queue_name)
-            return False
-
-        if self.bind_attempts > REBIND_ATTEMPTS:
-            log.exception('Failed all attempts to rebind queue "%s"', self.queue_name)
-            return False
-
-        await asyncio.sleep((self.bind_attempts ** 2) * REBIND_BASE_DELAY)
-        self.bind_attempts += 1
-
-        try:
-            await self.bind()
-            log.info('Success rebind queue "%s"', self.queue_name)
-            self.bind_attempts = 0
-            return True
-
-        except (AMQPError, OSError) as exc:
-            log.exception('Failed rebind queue "%s": %s', self.queue_name, exc)
-            asyncio.create_task(self.rebind())
-            return False
-
-        finally:
-            self.bind_running = False
-
-
 class AMQPBroker(AbstractQueueBroker):
     '''
         The broker is based on the basic_consume method of the AMQP and sends
@@ -88,7 +30,7 @@ class AMQPBroker(AbstractQueueBroker):
         The consumer takes an exclusive channel. Sending an reuse the channels.
 
         :param dsn: string, data source name for connection amqp://guest@localhost:5672/
-        :param logger: logging.Logger (optional)
+        :param log: logging.Logger (optional)
 
         .. code-block:: python
 
@@ -110,18 +52,16 @@ class AMQPBroker(AbstractQueueBroker):
                     await amqp.channel.basic_client_ack(delivery_tag=amqp.delivery_tag)
 
 
-        Handler will takes one required positional argument -
-        :ref:`pamqp.DeliveredMessage <amqp_meta>`.
+        Handler will takes one required positional argument - :ref:`pamqp.DeliveredMessage`.
         Consumer will be reconnect and subscribe to queue on disconnect.
         It make 3 attempts of reconnect after 1, 4, 9 seconds.
         if the queue does not exist, it will be declared with the default parameters when binding.
 
     '''
-    connection: AbstractConnection
+    connection: AbstractConnection = field(init=False)
 
-    def __init__(self, dsn: str, logger: logging.Logger | None = None) -> None:
-        super().__init__(dsn, logger)
-        self.connection = Connection(dsn)
+    def __post_init__(self) -> None:
+        self.connection = Connection(self.dsn)
 
     async def get_channel(self) -> AbstractChannel:
         '''
@@ -164,26 +104,21 @@ class AMQPBroker(AbstractQueueBroker):
 
             log.debug('Calling %s by %s with %s', consumer,
                 consumer.queue.name, str(data).encode('utf-8'))
+            timer = datetime.now().timestamp()
 
             try:
                 data['amqp'] = message
-                response = consumer.handler(**data)
+                await asyncio.wait_for(consumer.handler(**data), consumer.timeout)
+
+                if consumer.options.get('autoack', True) and message.delivery_tag:
+                    await message.channel.basic_ack(delivery_tag=message.delivery_tag)
+
             except TypeError:
                 log.exception('Call %s failed', consumer)
-                return
 
-            if asyncio.iscoroutine(response):
-                timer = datetime.now().timestamp()
-
-                try:
-                    await asyncio.wait_for(response, consumer.timeout)
-                except asyncio.TimeoutError:
-                    log.fatal('TimeoutError: %s %.2f', consumer,
-                        datetime.now().timestamp() - timer)
-                    return
-
-            if consumer.options.get('autoack', True) and message.delivery_tag:
-                await message.channel.basic_ack(delivery_tag=message.delivery_tag)
+            except asyncio.TimeoutError:
+                log.fatal('TimeoutError: %s %.2f', consumer,
+                    datetime.now().timestamp() - timer)
 
         return _wrapper
 
@@ -210,9 +145,14 @@ class AMQPBroker(AbstractQueueBroker):
 
         channel = await self.get_channel()
         info = await channel.queue_declare(name)
-        return int(info['message_count'])
 
-    async def putout(self, amqp: DeliveredMessage) -> None:
+        if isinstance(info['message_count'], (int, str, bytes)):
+            return int(info['message_count'])
+        else:
+            return 0
+
+    @staticmethod
+    async def putout(amqp: DeliveredMessage) -> None:
         '''
             Send acknowledgement to broker with basic_client_ack
 
@@ -220,3 +160,62 @@ class AMQPBroker(AbstractQueueBroker):
         '''
         if amqp.delivery_tag:
             await amqp.channel.basic_ack(delivery_tag=amqp.delivery_tag)
+
+
+class ReConnection(Connection):
+    ''' AMQP connection with close callback '''
+
+    def __init__(self, close_callback: Callable, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.close_callback = close_callback
+
+    async def _on_close(self, ex: ExceptionType | None = ConnectionClosedDefault) -> None:
+        try:
+            await super()._on_close(ex)
+        finally:
+            await self.close_callback()
+
+
+@dataclass(slots=True)
+class ManagedConnection:
+    ''' Binded connection with rebind logic '''
+    dsn: str
+    queue_name: str
+    handler: Callable
+    bind_attempts: int = 0
+    bind_running: bool = False
+
+    async def bind(self) -> None:
+        ''' Start connection and bind consumer '''
+        connection = ReConnection(self.rebind, self.dsn)
+        await connection.connect()
+        channel = await connection.channel()
+        log.warning('Declare queue "%s"', self.queue_name)
+        await channel.queue_declare(self.queue_name)
+        await channel.basic_consume(self.queue_name, self.handler)
+
+    async def rebind(self) -> bool:
+        if self.bind_running:
+            log.exception('Already rebinding queue "%s"', self.queue_name)
+            return False
+
+        if self.bind_attempts > REBIND_ATTEMPTS:
+            log.exception('Failed all attempts to rebind queue "%s"', self.queue_name)
+            return False
+
+        await asyncio.sleep((self.bind_attempts ** 2) * REBIND_BASE_DELAY)
+        self.bind_attempts += 1
+
+        try:
+            await self.bind()
+            log.info('Success rebind queue "%s"', self.queue_name)
+            self.bind_attempts = 0
+            return True
+
+        except (AMQPError, OSError) as exc:
+            log.exception('Failed rebind queue "%s": %s', self.queue_name, exc)
+            asyncio.create_task(self.rebind())
+            return False
+
+        finally:
+            self.bind_running = False

@@ -7,13 +7,13 @@ import urllib.request
 from collections import namedtuple
 from typing import Any, Callable, Iterable
 
+from .abc import ConsumerFunc, HookFunc, PeriodicFunc, ReceiverFunc
 from .agent import MicroAgent
 from .hooks import Hook, HookArgs
 from .launcher import ServerInterrupt
 from .periodic_task import CRONArgs, CRONTask, PeriodicArgs, PeriodicTask, cron_parser
 from .queue import Consumer, ConsumerArgs, Queue
 from .signal import Receiver, ReceiverArgs, Signal
-from .types import ConsumerFunc, HookFunc, PeriodicFunc, ReceiverFunc
 from .utils import make_bound_key
 
 

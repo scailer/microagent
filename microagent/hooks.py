@@ -29,7 +29,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Awaitable, Callable, ClassVar, Iterable, TypedDict
 
-from .types import BoundKey, HookFunc
+from .abc import BoundKey, HookFunc
 
 
 if TYPE_CHECKING:

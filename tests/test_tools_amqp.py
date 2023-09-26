@@ -1,13 +1,15 @@
 # mypy: ignore-errors
 import asyncio
-import pytest
+
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 #from aiormq import Connection
 import aiormq
-from unittest.mock import MagicMock, AsyncMock, Mock
-from microagent.queue import Queue, Consumer
-from microagent.tools.amqp import AMQPBroker, Connection, ReConnection, ManagedConnection
+import pytest
+
+from microagent.queue import Consumer, Queue
 from microagent.tools import amqp
+from microagent.tools.amqp import AMQPBroker, Connection, ManagedConnection, ReConnection
 
 
 @pytest.fixture()

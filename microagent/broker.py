@@ -48,30 +48,16 @@ Using with MicroAgent
 import logging
 import uuid
 
-from typing import Any, Protocol, runtime_checkable
+from abc import abstractmethod
+from dataclasses import dataclass, field
+from typing import Any
 
+from .abc import BrokerProtocol, QueueProtocol
 from .queue import Consumer, Queue
 
 
-class BoundQueue:
-    __slots__ = ('broker', 'queue')
-
-    broker: 'AbstractQueueBroker'
-    queue: Queue
-
-    def __init__(self, broker: 'AbstractQueueBroker', queue: Queue):
-        self.broker = broker
-        self.queue = queue
-
-    async def send(self, message: dict, **options: Any) -> None:
-        await self.broker.send(self.queue.name, self.queue.serialize(message), **options)
-
-    async def length(self) -> int:
-        return await self.broker.queue_length(self.queue.name)
-
-
-@runtime_checkable
-class AbstractQueueBroker(Protocol):
+@dataclass(slots=True)
+class AbstractQueueBroker(BrokerProtocol):
     '''
         Broker is an abstract interface with two basic methods - send and bind.
 
@@ -107,29 +93,16 @@ class AbstractQueueBroker(Protocol):
             Dict of all bound consumers
     '''
 
-    uid: str
     dsn: str
-    log: logging.Logger
-    _bindings: dict[str, Consumer]
+    uid: str = field(default_factory=lambda: uuid.uuid4().hex)
+    log: logging.Logger = logging.getLogger('microagent.broker')
 
-    def __new__(cls, dsn: str, **kwargs: Any) -> 'AbstractQueueBroker':
-        broker = super(AbstractQueueBroker, cls).__new__(cls)
+    _bindings: dict[str, Consumer] = field(default_factory=dict)
 
-        broker.uid = uuid.uuid4().hex
-        broker.log = logging.getLogger('microagent.broker')
-        broker._bindings = {}
-
-        return broker
-
-    def __init__(self, dsn: str, logger: logging.Logger | None = None):
-        self.dsn = dsn
-
-        if logger:
-            self.log = logger
-
-    def __getattr__(self, name: str) -> BoundQueue:
+    def __getattr__(self, name: str) -> 'BoundQueue':
         return BoundQueue(self, Queue.get(name))
 
+    @abstractmethod
     async def send(self, name: str, message: str, **kwargs: Any) -> None:
         '''
             Write a raw message to queue.
@@ -140,6 +113,7 @@ class AbstractQueueBroker(Protocol):
         '''  # noqa: W605
         ...
 
+    @abstractmethod
     async def bind(self, name: str) -> None:
         '''
             Start reading queue.
@@ -162,12 +136,14 @@ class AbstractQueueBroker(Protocol):
 
         self.log.debug('Bind %s to queue "%s"', consumer, consumer.queue.name)
 
-    def prepared_data(self, consumer: Consumer, raw_data: str | bytes) -> dict:
+    @staticmethod
+    def prepared_data(consumer: Consumer, raw_data: str | bytes) -> dict:
         data = consumer.queue.deserialize(raw_data)
         if consumer.dto_class:
             data[consumer.dto_name or 'dto'] = consumer.dto_class(**data)
         return data
 
+    @abstractmethod
     async def queue_length(self, name: str, **options: Any) -> int:
         '''
             Get the current queue length.
@@ -176,3 +152,15 @@ class AbstractQueueBroker(Protocol):
             :param \*\*options: specific parameters for each broker implementation
         '''  # noqa: W605
         ...
+
+
+@dataclass(slots=True, frozen=True)
+class BoundQueue(QueueProtocol):
+    broker: 'AbstractQueueBroker'
+    queue: Queue
+
+    async def send(self, message: dict, **options: Any) -> None:
+        await self.broker.send(self.queue.name, self.queue.serialize(message), **options)
+
+    async def length(self) -> int:
+        return await self.broker.queue_length(self.queue.name)

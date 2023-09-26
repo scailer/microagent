@@ -1,10 +1,14 @@
 # mypy: ignore-errors
-import pytest
 import logging
+
 from dataclasses import dataclass
-from unittest.mock import MagicMock, AsyncMock
-from microagent.broker import AbstractQueueBroker, Queue, Consumer
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from microagent.broker import AbstractQueueBroker, Consumer, Queue
 from microagent.queue import QueueNotFound, SerializingError
+
 
 DSN = 'redis://localhost'
 
@@ -112,7 +116,7 @@ async def test_Broker_init_ok(broker):
     await broker.queue_length('channel')
 
     logger = logging.getLogger('name')
-    broker = Broker(dsn=DSN, logger=logger)
+    broker = Broker(dsn=DSN, log=logger)
     assert broker.log is logger
 
     with pytest.raises(TypeError):

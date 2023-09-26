@@ -35,10 +35,10 @@ Repository = 'https://github.com/scailer/microagent.git'
 Changelog = 'https://github.com/scailer/microagent/blob/master/CHANGELOG.rst'
 
 [project.optional-dependencies]
-aioredis = ['redis[hiredis]==5.0.0']
-redis = ['redis[hiredis]==5.0.0']
+aioredis = ['redis[hiredis]==5.*']
+redis = ['redis[hiredis]==5.*']
 amqp = ['aiormq==6.7.7']
-kafka = ['aiokafka==0.7']
+kafka = ['aiokafka==0.8.1']
 dev = [
     'pytest',
     'pytest-runner',
@@ -47,9 +47,9 @@ dev = [
     'coverage',
     'mypy',
     'ruff',
-    'redis==5.0.0',
-    'aiormq==6.7.7',
-    'aiokafka==0.7',
+    'redis==5.*',
+    'aiormq==6.7.*',
+    'aiokafka==0.8.*',
 ]
 
 [project.entry-points.'console_scripts']
@@ -79,6 +79,7 @@ exclude_lines = [
 [tool.ruff]
 line-length = 100
 target-version = 'py310'
+preview = true
 select = ['E', 'F', 'W', 'B', 'I', 'A', 'PL', 'C90', 'T20', 'BLE',
     'E221', 'E222', 'E223', 'E224', 'E225', 'E226', 'E227', 'E228']
 

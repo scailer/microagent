@@ -1,12 +1,16 @@
 # mypy: ignore-errors
-import uuid
-import json
 import asyncio
-import pytest
+import json
 import logging
-from unittest.mock import MagicMock, AsyncMock
+import uuid
+
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from microagent.bus import AbstractSignalBus
-from microagent.signal import SignalException, SerializingError, Signal, Receiver  # , LookupKey
+from microagent.signal import Receiver, SerializingError, Signal, SignalException  # , LookupKey
+
 
 DSN = 'redis://localhost'
 
@@ -130,7 +134,7 @@ async def test_Bus_init_ok():
     assert bus.prefix == 'PUBSUB'
 
     logger = logging.getLogger('name')
-    bus = Bus(dsn=DSN, logger=logger)
+    bus = Bus(dsn=DSN, log=logger)
     assert bus.log is logger
 
     with pytest.raises(TypeError):
@@ -225,8 +229,8 @@ async def test_Bus_waiter_fail_timeout(bus, test_signal):
     asyncio.get_running_loop().call_later(0.1, finish)
 
     async with bus.test_signal.waiter(sender='name', a=1, timeout=.05) as queue:
-        async for x in queue:
-            assert False
+        async for _x in queue:
+            raise AssertionError()
         assert True
 
 
@@ -317,7 +321,7 @@ async def test_Bus_broadcast_ok_none(bus, test_signal):
 
 
 async def test_Bus_broadcast_ok_sync(bus, test_signal):
-    handler = MagicMock(return_value=1, **{'__qualname__': 'qname'})
+    handler = AsyncMock(return_value=1, **{'__qualname__': 'qname'})
     receiver = Receiver(agent=None, handler=handler, signal=test_signal, timeout=60)
     assert await bus.broadcast(receiver, test_signal, 'test', {'uuid': 1}) == 1
 

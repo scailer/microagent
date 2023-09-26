@@ -1,6 +1,6 @@
 {
     "version": 2,
-    "jsonlib": "ujson",
+    "jsonlib": "json",
     "signals": [
         {"name": "test_signal", "providing_args": ["uuid"]},
         {"name": "else_signal", "providing_args": ["uuid"]},

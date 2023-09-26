@@ -46,29 +46,22 @@ Using with MicroAgent
 '''
 import asyncio
 import contextlib
-import inspect
 import logging
 import uuid
 
+from abc import abstractmethod
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, AsyncGenerator
 
+from .abc import BusProtocol, SignalProtocol
 from .signal import Receiver, SerializingError, Signal
 from .utils import IterQueue, raise_timeout
 
 
-def check_types(signal: Signal, data: dict, log: logging.Logger) -> None:
-    if signal.type_map:
-        for key, value in data.items():
-            if key not in signal.type_map:
-                log.warning('Receiver get unknown arg "%s" %s', key, value)
-            elif not isinstance(value, signal.type_map[key]):
-                log.warning('Receiver get wrong type for "%s" %s', key, value)
-
-
-@runtime_checkable
-class AbstractSignalBus(Protocol):
+@dataclass(slots=True)
+class AbstractSignalBus(BusProtocol):
     '''
         Signal bus is an abstract interface with two basic methods - send and bind.
 
@@ -112,35 +105,16 @@ class AbstractSignalBus(Protocol):
     '''
 
     dsn: str
-    prefix: str
-    log: logging.Logger
+    uid: str = field(default_factory=lambda: uuid.uuid4().hex)
+    prefix: str = 'PUBSUB'
+    log: logging.Logger = logging.getLogger('microagent.bus')
 
-    uid: str
-    receivers: dict[str, list[Receiver]]
-    _responses: dict[str, IterQueue]
+    receivers: dict[str, list[Receiver]] = field(default_factory=lambda: defaultdict(list))
+    _responses: dict[str, IterQueue] = field(default_factory=dict)
 
-    def __new__(cls, dsn: str, **kwargs: Any) -> 'AbstractSignalBus':
-        bus = super(AbstractSignalBus, cls).__new__(cls)
-
-        bus.uid = uuid.uuid4().hex
-        bus.log = logging.getLogger('microagent.bus')
-        bus.receivers = defaultdict(list)
-
-        return bus
-
-    def __init__(self, dsn: str, prefix: str = 'PUBSUB',
-            logger: logging.Logger | None = None) -> None:
-
-        self.dsn = dsn
-        self.prefix = prefix
-        self._responses = {}
-
-        if logger:
-            self.log = logger
-
+    def __post_init__(self) -> None:
         response_signal = Signal(name='response', providing_args=[])
         asyncio.create_task(self.bind(response_signal.make_channel_name(self.prefix)))
-
         self.log.debug('%s initialized', self)
 
     def __repr__(self) -> str:
@@ -150,6 +124,7 @@ class AbstractSignalBus(Protocol):
         signal = Signal.get(name)
         return BoundSignal(self, signal)
 
+    @abstractmethod
     async def send(self, channel: str, message: str) -> None:
         '''
             Send raw message to channel.
@@ -160,6 +135,7 @@ class AbstractSignalBus(Protocol):
         '''
         ...
 
+    @abstractmethod
     async def bind(self, signal: str) -> None:
         '''
             Subscribe to channel.
@@ -178,7 +154,8 @@ class AbstractSignalBus(Protocol):
         self.receivers[receiver.signal.name].append(receiver)
 
     @contextlib.asynccontextmanager
-    async def call(self, channel: str, message: str, timeout: int) -> Any:
+    async def call(self, channel: str, message: str, timeout: int
+            ) -> AsyncGenerator[IterQueue, None]:
         '''
             RPC over pub/sub. Pair of signals - sending and responsing. Response-signal
             is an internal construction enabled by default. When we call `call` we send
@@ -285,36 +262,31 @@ class AbstractSignalBus(Protocol):
         self.log.debug('Calling %s by %s:%s with %s', receiver.handler,
             signal.name, sender, str(message).encode('utf-8'))
 
+        timer = datetime.now().timestamp()  # type: float
+
         try:
-            response = receiver.handler(signal=signal, sender=sender, **message)
+            response = await asyncio.wait_for(
+                receiver.handler(signal=signal, sender=sender, **message),
+                receiver.timeout
+            )
+            if isinstance(response, (int, str)):
+                return response
+
         except TypeError:
             self.log.exception('Call %s failed', signal.name)
-            return None
 
-        if inspect.isawaitable(response):
-            timer = datetime.now().timestamp()  # type: float
-
-            try:
-                response = await asyncio.wait_for(response, receiver.timeout)
-
-            except asyncio.TimeoutError:
-                self.log.error(
-                    'TimeoutError: %s %.2f', receiver.handler,
-                    datetime.now().timestamp() - timer)
-                return None
-
-        if isinstance(response, (int, str)):
-            return response
+        except asyncio.TimeoutError:
+            self.log.error(
+                'TimeoutError: %s %.2f', receiver.handler,
+                datetime.now().timestamp() - timer)
 
         return None
 
 
-class BoundSignal:
-    __slots__ = ('bus', 'signal')
-
-    def __init__(self, bus: AbstractSignalBus, signal: Signal):
-        self.bus = bus
-        self.signal = signal
+@dataclass(slots=True, frozen=True)
+class BoundSignal(SignalProtocol):
+    bus: AbstractSignalBus
+    signal: Signal
 
     async def send(self, sender: str, **kwargs: Any) -> None:
         if self.signal.type_map:
@@ -324,7 +296,9 @@ class BoundSignal:
             self.signal.make_channel_name(self.bus.prefix, sender),
             self.signal.serialize(kwargs))
 
-    async def call(self, sender: str, timeout: int = 60, **kwargs: Any) -> int | str | None:
+    async def call(self, sender: str, timeout: int = 60, **kwargs: Any  # type: ignore[return]
+            ) -> int | str | None:
+
         if self.signal.type_map:
             check_types(self.signal, kwargs, self.bus.log)
 
@@ -338,8 +312,6 @@ class BoundSignal:
             async for value in queue:
                 return value
 
-        return None
-
     def waiter(self, sender: str, timeout: int = 60, **kwargs: Any) -> Any:
         '''
             async with bus.iter(sender='name', a=1, timeout=10) as queue:
@@ -352,3 +324,12 @@ class BoundSignal:
             self.signal.serialize(kwargs),
             timeout=timeout
         )
+
+
+def check_types(signal: Signal, data: dict, log: logging.Logger) -> None:
+    if signal.type_map:
+        for key, value in data.items():
+            if key not in signal.type_map:
+                log.warning('Receiver get unknown arg "%s" %s', key, value)
+            elif not isinstance(value, signal.type_map[key]):
+                log.warning('Receiver get wrong type for "%s" %s', key, value)

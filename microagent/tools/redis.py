@@ -2,9 +2,9 @@
 :ref:`Signal Bus <bus>` and :ref:`Queue Broker <broker>` based on :redis:`redis <>`.
 '''
 import asyncio
-import logging
 
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -14,6 +14,7 @@ from ..broker import AbstractQueueBroker
 from ..bus import AbstractSignalBus
 
 
+@dataclass
 class AIORedisSignalBus(AbstractSignalBus):
     '''
         Bus is based on redis publish and subscribe features.
@@ -25,19 +26,17 @@ class AIORedisSignalBus(AbstractSignalBus):
 
             from microagent.tools.redis import AIORedisSignalBus
 
-            bus = AIORedisSignalBus('redis://localhost/7', prefix='MYAPP', logger=custom_logger)
+            bus = AIORedisSignalBus('redis://localhost/7', prefix='MYAPP', log=custom_logger)
 
             await bus.user_created.send('user_agent', user_id=1)
 
 
     '''
-    connection: Redis
 
-    def __init__(self, dsn: str, prefix: str = 'PUBSUB',
-            logger: logging.Logger | None = None) -> None:
+    connection: Redis = field(init=False)
+    _pubsub_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
-        super().__init__(dsn, prefix, logger)
-        self._pubsub_lock = asyncio.Lock()
+    def __post_init__(self) -> None:
         self.connection = self.new_connection()
 
     def new_connection(self) -> Redis:
@@ -68,6 +67,7 @@ class AIORedisSignalBus(AbstractSignalBus):
                 await self.bind(channel)
 
 
+@dataclass
 class AIORedisBroker(AbstractQueueBroker):
     '''
         Broker is based on Redis lists and RPUSH and BLPOP commands.
@@ -80,7 +80,7 @@ class AIORedisBroker(AbstractQueueBroker):
 
             from microagent.tools.redis import AIORedisBroker
 
-            broker = AIORedisBroker('redis://localhost/7', logger=custom_logger)
+            broker = AIORedisBroker('redis://localhost/7', log=custom_logger)
 
             await broker.user_created.send({'user_id': 1})
 
@@ -96,15 +96,12 @@ class AIORedisBroker(AbstractQueueBroker):
     BIND_TIME: float = 1
     ROLLBACK_ATTEMPTS: int = 3
 
-    connection: Redis
-    log: logging.Logger
-    _bindings: dict
-    _rollbacks: dict
+    connection: Redis = field(init=False)
+    _bindings: dict = field(default_factory=dict)
+    _rollbacks: dict = field(default_factory=lambda: defaultdict(lambda: 0))
 
-    def __init__(self, dsn: str, logger: logging.Logger | None = None) -> None:
-        super().__init__(dsn, logger)  # type: ignore
+    def __post_init__(self) -> None:
         self.connection = self.new_connection()
-        self._rollbacks = defaultdict(lambda: 0)
 
     def new_connection(self) -> Redis:
         return Redis.from_url(self.dsn, decode_responses=True)
@@ -145,23 +142,13 @@ class AIORedisBroker(AbstractQueueBroker):
     async def _handler(self, name: str, data: str) -> None:
         consumer = self._bindings[name]
         _data = self.prepared_data(consumer, data)
+        timer = datetime.now().timestamp()
 
         try:
-            response = consumer.handler(**_data)
+            await asyncio.wait_for(consumer.handler(**_data), consumer.timeout)
         except Exception:
             self.log.exception('Call %s failed', consumer.queue.name)
             await self.rollback(consumer.queue.name, data)
-            return
-
-        if asyncio.iscoroutine(response):
-            timer = datetime.now().timestamp()
-
-            try:
-                response = await asyncio.wait_for(response, consumer.timeout)
-            except asyncio.TimeoutError:
-                self.log.error('TimeoutError: %s %.2f', consumer,
-                    datetime.now().timestamp() - timer)
-                await self.rollback(name, data)
-            except Exception:
-                self.log.exception('Call %s failed', consumer.queue.name)
-                await self.rollback(consumer.queue.name, data)
+        except asyncio.TimeoutError:
+            self.log.error('TimeoutError: %s %.2f', consumer, datetime.now().timestamp() - timer)
+            await self.rollback(name, data)

@@ -6,7 +6,7 @@ from typing import Any, Callable
 class IterQueue(asyncio.Queue):
     ''' Queue as async generator '''
 
-    def __aiter__(self) -> asyncio.Queue:
+    def __aiter__(self) -> 'IterQueue':
         return self
 
     async def __anext__(self) -> Any:
@@ -27,7 +27,7 @@ def raise_timeout(timeout: float) -> None:
     ''' Interupt current corutine by timer '''
 
     def _timeout(task: asyncio.Task) -> None:
-        if task._fut_waiter and not task._fut_waiter.cancelled():
+        if task._fut_waiter and not task._fut_waiter.cancelled():  # type: ignore[attr-defined]
             task.cancel()
 
     asyncio.get_event_loop().call_later(timeout, _timeout, asyncio.current_task())

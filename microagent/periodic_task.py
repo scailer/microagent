@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Callable, ClassVar, List, NamedTuple, TypedDict, Union
 
-from .types import BoundKey, PeriodicFunc
+from .abc import BoundKey, PeriodicFunc
 
 
 if TYPE_CHECKING:
@@ -195,7 +195,7 @@ def next_moment(cron: CRON, now: datetime) -> datetime:
             hour=now.hour, minute=now.minute)
 
     if now.month not in cron.months:
-        if now.month == 12:
+        if now.month == 12:  # noqa PLR2004
             now = datetime(year=now.year + 1, month=1, day=1)
         else:
             now = datetime(year=now.year, month=now.month + 1, day=1)

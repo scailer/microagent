@@ -48,7 +48,7 @@ Agent initiation.
     settings = {'secret': 'my_secret'}
 
     # Initialize MicroAgent, all arguments optional
-    agent = Agent(bus=bus, broker=broker, logger=logger, settings=settings)
+    agent = Agent(bus=bus, broker=broker, log=logger, settings=settings)
 
 
 Manual launching.
@@ -78,8 +78,9 @@ Using MicroAgent resources.
 import asyncio
 import logging
 
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Callable, Iterable, TypeVar
+from typing import Callable, Iterable, TypeVar
 
 from .broker import AbstractQueueBroker
 from .bus import AbstractSignalBus
@@ -92,6 +93,11 @@ from .signal import Receiver
 HandlerTypes = TypeVar('HandlerTypes', Receiver, Consumer, PeriodicTask, CRONTask, Hook)
 
 
+class MissConfig(Exception):
+    pass
+
+
+@dataclass
 class MicroAgent:
     '''
         MicroAgent is a **container** for **signal receivers**,
@@ -110,7 +116,7 @@ class MicroAgent:
             required for receive or send the signals
         :param broker:  queue broker, object of subclass :class:`AbstractQueueBroker`,
             required for consume or send the messages
-        :param logger: prepared :class:`logging.Logger`,
+        :param log: prepared :class:`logging.Logger`,
             or use default logger if not provided
         :param settings: dict of user settings storing in object
 
@@ -137,56 +143,29 @@ class MicroAgent:
             Dict, user settings, provided on initializing, or empty.
     '''
 
-    log: logging.Logger
-    bus: AbstractSignalBus | None
-    broker: AbstractQueueBroker | None
-    settings: dict
+    bus: AbstractSignalBus | None = None
+    broker: AbstractQueueBroker | None = None
+    log: logging.Logger = field(default_factory=lambda: logging.getLogger('microagent'))
+    settings: dict = field(default_factory=dict)
 
-    periodic_tasks: Iterable[PeriodicTask]
-    cron_tasks: Iterable[CRONTask]
-    receivers: Iterable[Receiver]
-    consumers: Iterable[Consumer]
-    hook: Hooks
+    periodic_tasks: Iterable[PeriodicTask] = field(init=False)
+    cron_tasks: Iterable[CRONTask] = field(init=False)
+    receivers: Iterable[Receiver] = field(init=False)
+    consumers: Iterable[Consumer] = field(init=False)
+    hook: Hooks = field(init=False)
 
-    def __new__(cls, **kwargs: Any) -> 'MicroAgent':
+    def __post_init__(self) -> None:
+        self.periodic_tasks = self._bound_handler(PeriodicTask)
+        self.cron_tasks = self._bound_handler(CRONTask)
+        self.receivers = self._bound_handler(Receiver)
+        self.consumers = self._bound_handler(Consumer)
+        self.hook = Hooks(self._bound_handler(Hook))
 
-        agent = super(MicroAgent, cls).__new__(cls)
+        if self.receivers and not isinstance(self.bus, AbstractSignalBus):
+            raise MissConfig(f'Bus must be AbstractSignalBus instance {self.bus}')
 
-        agent.periodic_tasks = agent._bound_handler(PeriodicTask)
-        agent.cron_tasks = agent._bound_handler(CRONTask)
-        agent.receivers = agent._bound_handler(Receiver)
-        agent.consumers = agent._bound_handler(Consumer)
-        agent.hook = Hooks(agent._bound_handler(Hook))
-        agent.log = logging.getLogger('microagent')
-        agent.settings = {}
-
-        if agent.receivers:
-            bus = kwargs.get('bus')
-            assert bus, 'Bus required'
-            assert isinstance(bus, AbstractSignalBus), \
-                f'Bus must be AbstractSignalBus instance or None instead {bus}'
-
-        if agent.consumers:
-            broker = kwargs.get('broker')
-            assert broker, 'Broker required'
-            assert isinstance(broker, AbstractQueueBroker), \
-                f'Broker must be AbstractQueueBroker instance or None instead {broker}'
-
-        return agent
-
-    def __init__(self,
-                bus: AbstractSignalBus | None = None,
-                broker: AbstractQueueBroker | None = None,
-                logger: logging.Logger | None = None,
-                settings: dict | None = None
-            ) -> None:
-
-        self.bus = bus
-        self.broker = broker
-        self.settings = settings or {}
-
-        if logger:
-            self.log = logger
+        if self.consumers and not isinstance(self.broker, AbstractQueueBroker):
+            raise MissConfig(f'Broker must be AbstractQueueBroker instance {self.broker}')
 
         self.log.debug('%s initialized', self)
 
@@ -228,7 +207,8 @@ class MicroAgent:
     async def stop(self) -> None:
         await self.hook.pre_stop()
 
-    async def run_servers(self, servers: Iterable[Callable]) -> None:
+    @staticmethod
+    async def run_servers(servers: Iterable[Callable]) -> None:
         await asyncio.gather(*[server() for server in servers])
 
     def run_periodic_tasks(self, periodic_tasks: Iterable[PeriodicTask],
@@ -237,7 +217,7 @@ class MicroAgent:
         for task in [*periodic_tasks, *cron_tasks]:
             start_after: float = getattr(task, 'start_after', None) or 0.0
 
-            if start_after > 100:
+            if start_after > 100:  # noqa PLR2004
                 start_at = datetime.now() + timedelta(seconds=start_after)  # type: datetime
                 self.log.debug('Set %s at %s', task, f'{start_at:%H:%M:%S}')
             else:
@@ -300,7 +280,9 @@ class MicroAgent:
 
         for _cls in self.__class__.__mro__:
             if _cls.__module__ != 'builtins' and _cls.__name__ != 'MicroAgent':
-                classes.append((_cls.__module__, *_cls.__qualname__.split('.')))
+                classes.append(
+                    (_cls.__module__, *_cls.__qualname__.split('.'))  # type: ignore[has-type]
+                )
 
         for lookup_key, args in handler_type._register.items():
             if tuple(lookup_key[:-1]) in classes:

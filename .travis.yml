@@ -7,6 +7,8 @@ python:
 install:
   - pip install codecov
 script:
-  - python setup.py test
+  - ruff microagent
+  - mypy microagent
+  - pytest tests
 after_success:
   - codecov

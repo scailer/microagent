@@ -169,7 +169,7 @@ class AgentsManager:
         and wait when it finished or failed, then send SIGTERM for all other working processes.
     '''
 
-    mp_ctx: multiprocessing.context.BaseContext
+    mp_ctx: multiprocessing.context.DefaultContext
     processes: dict[int, multiprocessing.process.BaseProcess]
     cfg: list[tuple[str, CFG_T]]
     running: bool

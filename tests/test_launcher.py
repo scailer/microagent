@@ -1,7 +1,9 @@
 # mypy: ignore-errors
 import importlib
-from unittest.mock import Mock, MagicMock
-from microagent.launcher import load_configuration, init_agent
+
+from unittest.mock import MagicMock, Mock
+
+from microagent.launcher import init_agent, load_configuration
 
 
 def test_load_configuration_ok(monkeypatch):

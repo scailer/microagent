@@ -32,8 +32,6 @@ Queue broker
 .. autoclass:: microagent.broker.Consumer
 
 
-.. autoclass:: microagent.agent.ConsumerHandler
-
 
 **Exceptions**
 

@@ -3,7 +3,7 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
 
-from .types import BoundKey, ConsumerFunc
+from .abc import BoundKey, ConsumerFunc
 
 
 if TYPE_CHECKING:
@@ -68,6 +68,9 @@ class Queue:
         if not isinstance(other, Queue):
             return NotImplemented
         return self.name == other.name
+
+    def __hash__(self) -> int:
+        return id(self)
 
     @classmethod
     def set_jsonlib(self, jsonlib: Any) -> None:
