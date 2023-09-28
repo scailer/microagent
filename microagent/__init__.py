@@ -11,16 +11,16 @@ from .abc import ConsumerFunc, HookFunc, PeriodicFunc, ReceiverFunc
 from .agent import MicroAgent
 from .hooks import Hook, HookArgs
 from .launcher import ServerInterrupt
-from .periodic_task import CRONArgs, CRONTask, PeriodicArgs, PeriodicTask, cron_parser
 from .queue import Consumer, ConsumerArgs, Queue
 from .signal import Receiver, ReceiverArgs, Signal
+from .timer import CRONArgs, CRONTask, PeriodicArgs, PeriodicTask, cron_parser
 from .utils import make_bound_key
 
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'ServerInterrupt', 'receiver', 'consumer',
            'periodic', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
 
-MIN_TIMEOUT = .001
+MIN_TIMEOUT_SEC = .001
 JSON_TYPES = {
     'string': str,
     'number': int,
@@ -156,8 +156,8 @@ def periodic(period: int | float, timeout: int | float = 1, start_after: int | f
                 log.info('Called handler 3')
     '''
 
-    assert period > MIN_TIMEOUT, 'period must be more than 0.001 s'
-    assert timeout > MIN_TIMEOUT, 'timeout must be more than 0.001 s'
+    assert period > MIN_TIMEOUT_SEC, 'period must be more than 0.001 s'
+    assert timeout > MIN_TIMEOUT_SEC, 'timeout must be more than 0.001 s'
     assert start_after >= 0, 'start_after must be a positive'
 
     def _decorator(func: PeriodicFunc) -> PeriodicFunc:
@@ -189,7 +189,7 @@ def cron(spec: str, timeout: int | float = 1) -> Callable[[PeriodicFunc], Period
                 log.info('Called handler 2')
     '''
 
-    assert timeout > MIN_TIMEOUT, 'timeout must be more than 0.001 s'
+    assert timeout > MIN_TIMEOUT_SEC, 'timeout must be more than 0.001 s'
 
     def _decorator(func: PeriodicFunc) -> PeriodicFunc:
         CRONTask._register[make_bound_key(func)] = CRONArgs(

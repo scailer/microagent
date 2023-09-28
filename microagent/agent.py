@@ -85,9 +85,9 @@ from typing import Callable, Iterable, TypeVar
 from .broker import AbstractQueueBroker
 from .bus import AbstractSignalBus
 from .hooks import Hook, Hooks
-from .periodic_task import CRONTask, PeriodicTask
 from .queue import Consumer
 from .signal import Receiver
+from .timer import CRONTask, PeriodicTask
 
 
 HandlerTypes = TypeVar('HandlerTypes', Receiver, Consumer, PeriodicTask, CRONTask, Hook)
