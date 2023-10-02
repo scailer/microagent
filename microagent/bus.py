@@ -18,11 +18,11 @@ Using SignalBus separately (sending only)
 .. code-block:: python
 
     from microagent import load_signals
-    from microagent.tools.redis import AIORedisSignalBus
+    from microagent.tools.redis import RedisSignalBus
 
     signals = load_signals('file://signals.json')
 
-    bus = AIORedisSignalBus('redis://localhost/7')
+    bus = RedisSignalBus('redis://localhost/7')
     await bus.user_created.send('user_agent', user_id=1)
 
 
@@ -31,7 +31,7 @@ Using with MicroAgent
 .. code-block:: python
 
     from microagent import MicroAgent, load_signals
-    from microagent.tools.redis import AIORedisSignalBus
+    from microagent.tools.redis import RedisSignalBus
 
     signals = load_signals('file://signals.json')
 
@@ -40,7 +40,7 @@ Using with MicroAgent
         async def example(self, user_id, **kwargs):
             await self.bus.user_created.send('some_signal', user_id=1)
 
-    bus = AIORedisSignalBus('redis://localhost/7')
+    bus = RedisSignalBus('redis://localhost/7')
     user_agent = UserAgent(bus=bus)
     await user_agent.start()
 '''
@@ -78,7 +78,7 @@ class AbstractSignalBus(BusProtocol):
 
             Signal(name='user_created', providing_args=['user_id'])
 
-            bus = AIORedisSignalBus('redis://localhost/7')
+            bus = RedisSignalBus('redis://localhost/7')
             await bus.user_created.send('user_agent', user_id=1)
 
         .. attribute:: dsn

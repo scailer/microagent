@@ -83,8 +83,8 @@ See MicroAgent documentation_.
 
 
     async def main():
-        bus = AIORedisSignalBus('redis://localhost/7')
-        broker = AIORedisBroker('redis://localhost/7')
+        bus = RedisSignalBus('redis://localhost/7')
+        broker = RedisBroker('redis://localhost/7')
 
         # usage bus and broker separate from agent
         await bus.started.send('user_agent')

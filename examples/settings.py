@@ -9,7 +9,7 @@ logging.basicConfig(format=(
 
 BUS = {
     'redis': {
-        'backend': 'microagent.tools.redis.AIORedisSignalBus',
+        'backend': 'microagent.tools.redis.RedisSignalBus',
         'dsn': 'redis://localhost/7',
         'prefix': 'PREF',
     },
@@ -17,7 +17,7 @@ BUS = {
 
 BROKER = {
     'redis': {
-        'backend': 'microagent.tools.redis.AIORedisBroker',
+        'backend': 'microagent.tools.redis.RedisBroker',
         'dsn': 'redis://localhost/7',
     },
 }

@@ -15,7 +15,7 @@ from ..bus import AbstractSignalBus
 
 
 @dataclass
-class AIORedisSignalBus(AbstractSignalBus):
+class RedisSignalBus(AbstractSignalBus):
     '''
         Bus is based on redis publish and subscribe features.
         Channel name is forming by rule ```{prefix}:{signal_name}:{sender_name}#{message_id}```
@@ -24,9 +24,9 @@ class AIORedisSignalBus(AbstractSignalBus):
 
         .. code-block:: python
 
-            from microagent.tools.redis import AIORedisSignalBus
+            from microagent.tools.redis import RedisSignalBus
 
-            bus = AIORedisSignalBus('redis://localhost/7', prefix='MYAPP', log=custom_logger)
+            bus = RedisSignalBus('redis://localhost/7', prefix='MYAPP', log=custom_logger)
 
             await bus.user_created.send('user_agent', user_id=1)
 
@@ -68,7 +68,7 @@ class AIORedisSignalBus(AbstractSignalBus):
 
 
 @dataclass
-class AIORedisBroker(AbstractQueueBroker):
+class RedisBroker(AbstractQueueBroker):
     '''
         Broker is based on Redis lists and RPUSH and BLPOP commands.
         Queue name using as a key. If hanling faild, message will be returned
@@ -78,9 +78,9 @@ class AIORedisBroker(AbstractQueueBroker):
 
         .. code-block:: python
 
-            from microagent.tools.redis import AIORedisBroker
+            from microagent.tools.redis import RedisBroker
 
-            broker = AIORedisBroker('redis://localhost/7', log=custom_logger)
+            broker = RedisBroker('redis://localhost/7', log=custom_logger)
 
             await broker.user_created.send({'user_id': 1})
 

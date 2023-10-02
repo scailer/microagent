@@ -39,11 +39,11 @@ Agent initiation.
 .. code-block:: python
 
     import logging
-    from microagent.tools.redis import AIORedisSignalBus, AIORedisBroker
+    from microagent.tools.redis import RedisSignalBus, RedisBroker
 
     # Initialize bus, broker and logger
-    bus = AIORedisSignalBus('redis://localhost/7')
-    broker = AIORedisBroker('redis://localhost/7')
+    bus = RedisSignalBus('redis://localhost/7')
+    broker = RedisBroker('redis://localhost/7')
     log = logging.getLogger('my_log')
     settings = {'secret': 'my_secret'}
 

@@ -8,7 +8,7 @@ import redis.asyncio as redis
 
 from microagent.queue import Consumer, Queue
 from microagent.signal import Signal
-from microagent.tools.redis import AIORedisBroker, AIORedisSignalBus
+from microagent.tools.redis import RedisBroker, RedisSignalBus
 
 
 @pytest.fixture()
@@ -34,7 +34,7 @@ async def test_bus_receive_ok(monkeypatch):
     conn = MagicMock(pubsub=lambda: PubSub())
     monkeypatch.setattr(redis.Redis, 'from_url', Mock(return_value=conn))
 
-    bus = AIORedisSignalBus('redis://localhost')
+    bus = RedisSignalBus('redis://localhost')
     bus.receiver = Mock()
 
     await bus.bind('pattern1')
@@ -48,7 +48,7 @@ async def test_bus_send_ok(monkeypatch):
     conn = MagicMock(publish=AsyncMock())
     monkeypatch.setattr(redis.Redis, 'from_url', Mock(return_value=conn))
 
-    bus = AIORedisSignalBus('redis://localhost')
+    bus = RedisSignalBus('redis://localhost')
 
     await bus.send('PUBSUB', '{}')
 
@@ -65,14 +65,14 @@ async def test_broker_consume_ok(monkeypatch):
     create_redis = MagicMock(blpop=AsyncMock(side_effect=[('ch', '{}'), None, Exception]))
     monkeypatch.setattr(redis, 'Redis', MagicMock(from_url=Mock(return_value=create_redis)))
 
-    broker = AIORedisBroker('redis://localhost')
+    broker = RedisBroker('redis://localhost')
     broker.BIND_TIME = .01
     await broker.bind_consumer(consumer)
     await asyncio.sleep(.02)
 
 
 async def test_broker_send_ok(monkeypatch):
-    broker = AIORedisBroker('redis://localhost')
+    broker = RedisBroker('redis://localhost')
     broker.connection = MagicMock(rpush=AsyncMock())
     await broker.send('test_queue', '{}')
 
@@ -84,7 +84,7 @@ async def test_broker_send_ok(monkeypatch):
 
 
 async def test_broker_queue_length_ok(monkeypatch):
-    broker = AIORedisBroker('redis://localhost')
+    broker = RedisBroker('redis://localhost')
     broker.connection = MagicMock(llen=AsyncMock())
     await broker.queue_length('test_queue')
 
@@ -98,7 +98,7 @@ async def test_broker_queue_length_ok(monkeypatch):
 async def test_broker_handling_async_ok():
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
-    broker = AIORedisBroker('redis://localhost')
+    broker = RedisBroker('redis://localhost')
     broker._bindings[queue.name] = consumer
     await broker._handler(queue.name, '{}')
     consumer.handler.assert_called_once_with()
@@ -108,7 +108,7 @@ async def test_broker_handling_async_rollback_ok():
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=AsyncMock(side_effect=Exception),
         queue=queue, timeout=1, options={})
-    broker = AIORedisBroker('redis://localhost')
+    broker = RedisBroker('redis://localhost')
     broker.send = AsyncMock()
     broker._bindings[queue.name] = consumer
     await broker._handler(queue.name, '{}')
@@ -121,7 +121,7 @@ async def test_broker_handling_async_rollback_timeout_ok():
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=AsyncMock(side_effect=asyncio.TimeoutError),
         queue=queue, timeout=1, options={})
-    broker = AIORedisBroker('redis://localhost')
+    broker = RedisBroker('redis://localhost')
     broker.send = AsyncMock()
     broker._bindings[queue.name] = consumer
     await broker._handler(queue.name, '{}')
@@ -132,7 +132,7 @@ async def test_broker_handling_async_rollback_timeout_ok():
 
 async def test_broker_rollback_many_attempts_ok():
     queue = Queue(name='test_queue')
-    broker = AIORedisBroker('redis://localhost')
+    broker = RedisBroker('redis://localhost')
     broker.send = AsyncMock()
     broker._rollbacks[str(hash(queue.name)) + str(hash('{}'))] = 4
     await broker.rollback(queue.name, '{}')
@@ -142,7 +142,7 @@ async def test_broker_rollback_many_attempts_ok():
 async def test_broker_handling_sync_ok():
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=Mock(), queue=queue, timeout=1, options={})
-    broker = AIORedisBroker('redis://localhost')
+    broker = RedisBroker('redis://localhost')
     broker._bindings[queue.name] = consumer
     await broker._handler(queue.name, '{}')
     consumer.handler.assert_called_once_with()
@@ -152,7 +152,7 @@ async def test_broker_handling_sync_rollback_ok():
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=Mock(side_effect=Exception),
         queue=queue, timeout=1, options={})
-    broker = AIORedisBroker('redis://localhost')
+    broker = RedisBroker('redis://localhost')
     broker.send = AsyncMock()
     broker._bindings[queue.name] = consumer
     await broker._handler(queue.name, '{}')

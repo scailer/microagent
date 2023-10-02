@@ -1,13 +1,16 @@
 # mypy: ignore-errors
 import asyncio
+import sys
 
 from unittest.mock import AsyncMock, MagicMock, Mock
 
-import aiokafka
 import pytest
 
 from microagent.queue import Consumer, Queue
-from microagent.tools.kafka import KafkaBroker
+
+if sys.version_info < (3, 12):
+    import aiokafka
+    from microagent.tools.kafka import KafkaBroker
 
 
 @pytest.fixture()
@@ -36,6 +39,7 @@ def kafka_consumer(monkeypatch):
     return consumer
 
 
+@pytest.mark.skipif(sys.version_info > (3, 11), reason='py3.12 not support')
 async def test_broker_consume_ok(kafka_consumer):
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
@@ -50,6 +54,7 @@ async def test_broker_consume_ok(kafka_consumer):
     assert consumer.handler.call_args.kwargs['kafka']
 
 
+@pytest.mark.skipif(sys.version_info > (3, 11), reason='py3.12 not support')
 async def test_broker_handler_fail_error(kafka_consumer):
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=1, queue=queue, timeout=1, options={})
@@ -58,6 +63,7 @@ async def test_broker_handler_fail_error(kafka_consumer):
     await broker._handle(consumer, {'a': 1})
 
 
+@pytest.mark.skipif(sys.version_info > (3, 11), reason='py3.12 not support')
 async def test_broker_handler_fail_timeout(kafka_consumer):
     queue = Queue(name='test_queue')
     consumer = Consumer(agent=None, handler=AsyncMock(side_effect=asyncio.TimeoutError),
@@ -67,6 +73,7 @@ async def test_broker_handler_fail_timeout(kafka_consumer):
     await broker._handle(consumer, {'a': 1})
 
 
+@pytest.mark.skipif(sys.version_info > (3, 11), reason='py3.12 not support')
 async def test_broker_send_ok(kafka_producer):
     queue = Queue(name='test_queue')
     broker = KafkaBroker('kafka://localhost')

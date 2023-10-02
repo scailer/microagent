@@ -19,11 +19,11 @@ Using QueueBroker separately (sending only)
 .. code-block:: python
 
     from microagent import load_queues
-    from microagent.tools.redis import AIORedisBroker
+    from microagent.tools.redis import RedisBroker
 
     queues = load_queues('file://queues.json')
 
-    broker = AIORedisBroker('redis://localhost/7')
+    broker = RedisBroker('redis://localhost/7')
     await broker.user_created.send({'user_id': 1})
 
 
@@ -32,7 +32,7 @@ Using with MicroAgent
 .. code-block:: python
 
     from microagent import MicroAgent, load_queues
-    from microagent.tools.redis import AIORedisSignalBus
+    from microagent.tools.redis import RedisSignalBus
 
     queues = load_queues('file://queues.json')
 
@@ -41,7 +41,7 @@ Using with MicroAgent
         async def example_read_queue(self, **kwargs):
             await self.broker.email_sended.send({'user_id': 1})
 
-    broker = AIORedisBroker('redis://localhost/7')
+    broker = RedisBroker('redis://localhost/7')
     email_agent = EmailAgent(broker=broker)
     await email_agent.start()
 '''
@@ -72,7 +72,7 @@ class AbstractQueueBroker(BrokerProtocol):
 
             Queue(name='user_created')
 
-            broker = AIORedisBroker('redis://localhost/7')
+            broker = RedisBroker('redis://localhost/7')
             await broker.user_created.send({'user_id': 1})
 
         .. attribute:: dsn
