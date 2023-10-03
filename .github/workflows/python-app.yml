@@ -31,4 +31,4 @@ jobs:
         run: mypy microagent
 
       - name: Testing
-        run: pytest tests 
+        run: pytest tests

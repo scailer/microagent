@@ -35,10 +35,9 @@ Repository = 'https://github.com/scailer/microagent.git'
 Changelog = 'https://github.com/scailer/microagent/blob/master/CHANGELOG.rst'
 
 [project.optional-dependencies]
-aioredis = ['redis[hiredis]==5.*']
 redis = ['redis[hiredis]==5.*']
-amqp = ['aiormq==6.7.7']
-kafka = ['aiokafka==0.8.1']
+amqp = ['aiormq==6.7.*']
+kafka = ['aiokafka==0.8.*']
 dev = [
     'pytest',
     'pytest-runner',
