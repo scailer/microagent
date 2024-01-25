@@ -1,4 +1,4 @@
-__version__ = '1.7.0.rc1'
+__version__ = '1.7.0.rc2'
 
 import importlib
 import json
@@ -45,7 +45,7 @@ def load_stuff(source: str) -> tuple[Any, Any]:
     data: dict[str, Iterable[dict[str, Any]]] = {}
 
     if source.startswith('file://'):
-        with open(source.replace('file://', ''), 'r') as f:
+        with open(source.replace('file://', ''), 'r', encoding='utf8') as f:
             data.update(json.loads(f.read().replace('\n', '')))
     else:
         with urllib.request.urlopen(source) as response:
@@ -309,7 +309,7 @@ def on(label: str) -> Callable[[HookFunc], HookFunc]:
                 await Server().start()  # run forever
                 raise ServerInterrupt('Exit')  # graceful exit
     '''
-    assert label in ('pre_start', 'post_start', 'pre_stop', 'server'), 'Bad label'
+    assert label in {'pre_start', 'post_start', 'pre_stop', 'server'}, 'Bad label'
 
     def _decorator(func: HookFunc) -> HookFunc:
         Hook._register[make_bound_key(func)] = HookArgs(label=label)

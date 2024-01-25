@@ -1,6 +1,5 @@
 # mypy: ignore-errors
 import asyncio
-
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 #from aiormq import Connection
@@ -9,7 +8,8 @@ import pytest
 
 from microagent.queue import Consumer, Queue
 from microagent.tools import amqp
-from microagent.tools.amqp import AMQPBroker, Connection, ManagedConnection, ReConnection
+from microagent.tools.amqp import (AMQPBroker, Connection, ManagedConnection,
+                                   ReConnection)
 
 
 @pytest.fixture()
@@ -18,6 +18,7 @@ def amqp_connection(monkeypatch):
         basic_consume=AsyncMock(),
         queue_declare=AsyncMock(),
         basic_publish=AsyncMock(),
+        basic_nack=AsyncMock(),
         basic_ack=AsyncMock(),
         close=AsyncMock()
     )
@@ -32,6 +33,7 @@ def channel(monkeypatch):
         basic_consume=AsyncMock(),
         queue_declare=AsyncMock(),
         basic_publish=AsyncMock(),
+        basic_nack=AsyncMock(),
         basic_ack=AsyncMock(),
         close=AsyncMock()
     )
@@ -109,6 +111,8 @@ async def test_broker_rebind_ok_many(monkeypatch, channel):
 
     assert not await conn.rebind()
     assert not await conn.rebind()
+
+    await asyncio.sleep(.1)
 
 
 async def test_broker_declare_queue_ok(monkeypatch, channel):

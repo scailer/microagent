@@ -36,8 +36,8 @@ Changelog = 'https://github.com/scailer/microagent/blob/master/CHANGELOG.rst'
 
 [project.optional-dependencies]
 redis = ['redis[hiredis]==5.*']
-amqp = ['aiormq==6.7.*']
-kafka = ['aiokafka==0.8.*']
+amqp = ['aiormq==6.8.*']
+kafka = ['aiokafka==0.10.*']
 dev = [
     'pytest',
     'pytest-runner',
@@ -47,8 +47,8 @@ dev = [
     'mypy',
     'ruff',
     'redis==5.*',
-    'aiormq==6.7.*',
-    'aiokafka==0.8.*',
+    'aiormq==6.8.*',
+    'aiokafka==0.10.*',
 ]
 
 [project.entry-points.'console_scripts']
@@ -81,6 +81,9 @@ target-version = 'py310'
 preview = true
 select = ['E', 'F', 'W', 'B', 'I', 'A', 'PL', 'C90', 'T20', 'BLE',
     'E221', 'E222', 'E223', 'E224', 'E225', 'E226', 'E227', 'E228']
+
+[tool.ruff.per-file-ignores]
+'microagent/tools/mocks.py' = ['PLC2701']
 
 [tool.ruff.mccabe]
 max-complexity = 10

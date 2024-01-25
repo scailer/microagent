@@ -212,7 +212,7 @@ class AbstractSignalBus(BusProtocol):
         if '#' in channel:
             channel, signal_id = channel.split('#')
 
-        pref, name, sender = channel.split(':')
+        _, name, sender = channel.split(':')  # prefix:name:sender
         signal = Signal.get(name)
 
         try:

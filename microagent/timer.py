@@ -128,7 +128,7 @@ class CRONTask(PeriodicMixin):
             *period* property of **CRONTask** object is a next value of
             generator behind facade. Be carefully with manual manipulation with it.
         '''
-        self.agent.log.debug('Run %s', self.__repr__())
+        self.agent.log.debug('Run %r', self)
         return self.cron.next().timestamp() - time.time()  # next step delay
 
 
@@ -166,7 +166,7 @@ def cron_parser(spec: str) -> CRON:
         if match:  # 0-23/5 -> [0, 5, 10, 15, 20]
             _min, _max, _step = map(int, match.groups())
 
-            if i in (2, 3) and _min == 1:
+            if i in {2, 3} and _min == 1:
                 values.append([x for x in range(_min - 1, _max + 1) if x and not x % _step])
             else:
                 values.append([x for x in range(_min, _max + 1) if not x % _step])

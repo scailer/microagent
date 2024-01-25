@@ -1,19 +1,10 @@
 # mypy: ignore-errors
 from pathlib import Path
 
-from microagent import (  # noqa
-    MicroAgent,
-    Queue,
-    Signal,
-    __version__,
-    consumer,
-    cron,
-    load_queues,
-    load_signals,
-    load_stuff,
-    periodic,  # noqa
-    receiver,
-)
+from microagent import periodic  # noqa
+from microagent import (MicroAgent, Queue, Signal, __version__,  # noqa
+                        consumer, cron, load_queues, load_signals, load_stuff,
+                        receiver)
 from microagent.tools import mocks
 
 

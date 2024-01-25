@@ -2,6 +2,7 @@
 :ref:`Signal Bus <bus>` and :ref:`Queue Broker <broker>` based on :redis:`redis <>`.
 '''
 import asyncio
+import inspect
 
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -107,10 +108,18 @@ class RedisBroker(AbstractQueueBroker):
         return Redis.from_url(self.dsn, decode_responses=True)
 
     async def send(self, name: str, message: str, **kwargs: Any) -> None:
-        await self.connection.rpush(name, message)  # type: ignore
+        ret = self.connection.rpush(name, message)
+
+        if inspect.isawaitable(ret):
+            await ret
 
     async def queue_length(self, name: str, **options: Any) -> int:
-        return int(await self.connection.llen(name))  # type: ignore
+        ret = self.connection.llen(name)
+
+        if inspect.isawaitable(ret):
+            return await ret
+        else:
+            return ret  # type: ignore[return-value]
 
     async def bind(self, name: str) -> None:
         _loop = asyncio.get_running_loop()
@@ -119,10 +128,9 @@ class RedisBroker(AbstractQueueBroker):
     async def _wait(self, name: str) -> None:
         conn = await self.new_connection()
         while True:
-            data = await conn.blpop(name, self.WAIT_TIME)
-            if data:
+            if data := await conn.blpop(name, self.WAIT_TIME):
                 _, data = data
-                asyncio.create_task(self._handler(name, data))
+                asyncio.create_task(self._handler(name, data))  # type: ignore[arg-type, unused-ignore]
 
     async def rollback(self, name: str, data: str) -> None:
         _hash = str(hash(name)) + str(hash(data))

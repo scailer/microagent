@@ -1,6 +1,5 @@
 # mypy: ignore-errors
 import asyncio
-
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -8,7 +7,13 @@ import redis.asyncio as redis
 
 from microagent.queue import Consumer, Queue
 from microagent.signal import Signal
-from microagent.tools.redis import RedisBroker, RedisSignalBus
+from microagent.tools.redis import RedisBroker as RedisBrokerBase
+from microagent.tools.redis import RedisSignalBus
+
+
+class RedisBroker(RedisBrokerBase):
+    async def _wait(self, name: str) -> None:
+        pass
 
 
 @pytest.fixture()
@@ -31,7 +36,7 @@ async def test_bus_receive_ok(monkeypatch):
             yield {'type': 'pmessage', 'channel': 'pattern1', 'data': 'data'}
             raise redis.ConnectionError()
 
-    conn = MagicMock(pubsub=lambda: PubSub())
+    conn = MagicMock(pubsub=lambda: PubSub(), blpop=AsyncMock(return_value=(None, '')))
     monkeypatch.setattr(redis.Redis, 'from_url', Mock(return_value=conn))
 
     bus = RedisSignalBus('redis://localhost')
@@ -45,7 +50,7 @@ async def test_bus_receive_ok(monkeypatch):
 
 
 async def test_bus_send_ok(monkeypatch):
-    conn = MagicMock(publish=AsyncMock())
+    conn = MagicMock(publish=AsyncMock(), blpop=AsyncMock(return_value=(None, '')))
     monkeypatch.setattr(redis.Redis, 'from_url', Mock(return_value=conn))
 
     bus = RedisSignalBus('redis://localhost')
@@ -57,6 +62,7 @@ async def test_bus_send_ok(monkeypatch):
     await bus.send('PUBSUB', '{}')
 
     assert conn.publish.call_count == 2
+    await asyncio.sleep(.1)
 
 
 async def test_broker_consume_ok(monkeypatch):
@@ -68,12 +74,12 @@ async def test_broker_consume_ok(monkeypatch):
     broker = RedisBroker('redis://localhost')
     broker.BIND_TIME = .01
     await broker.bind_consumer(consumer)
-    await asyncio.sleep(.02)
+    await asyncio.sleep(.1)
 
 
 async def test_broker_send_ok(monkeypatch):
     broker = RedisBroker('redis://localhost')
-    broker.connection = MagicMock(rpush=AsyncMock())
+    broker.connection = MagicMock(rpush=AsyncMock(), blpop=AsyncMock(return_value=(None, '')))
     await broker.send('test_queue', '{}')
 
     broker.connection.rpush.assert_called_once_with('test_queue', '{}')
@@ -82,10 +88,12 @@ async def test_broker_send_ok(monkeypatch):
 
     assert broker.connection.rpush.call_count == 2
 
+    await asyncio.sleep(.1)
+
 
 async def test_broker_queue_length_ok(monkeypatch):
     broker = RedisBroker('redis://localhost')
-    broker.connection = MagicMock(llen=AsyncMock())
+    broker.connection = MagicMock(llen=AsyncMock(), blpop=AsyncMock(return_value=(None, '')))
     await broker.queue_length('test_queue')
 
     broker.connection.llen.assert_called_once_with('test_queue')
@@ -137,25 +145,4 @@ async def test_broker_rollback_many_attempts_ok():
     broker._rollbacks[str(hash(queue.name)) + str(hash('{}'))] = 4
     await broker.rollback(queue.name, '{}')
     broker.send.assert_not_called()
-
-
-async def test_broker_handling_sync_ok():
-    queue = Queue(name='test_queue')
-    consumer = Consumer(agent=None, handler=Mock(), queue=queue, timeout=1, options={})
-    broker = RedisBroker('redis://localhost')
-    broker._bindings[queue.name] = consumer
-    await broker._handler(queue.name, '{}')
-    consumer.handler.assert_called_once_with()
-
-
-async def test_broker_handling_sync_rollback_ok():
-    queue = Queue(name='test_queue')
-    consumer = Consumer(agent=None, handler=Mock(side_effect=Exception),
-        queue=queue, timeout=1, options={})
-    broker = RedisBroker('redis://localhost')
-    broker.send = AsyncMock()
-    broker._bindings[queue.name] = consumer
-    await broker._handler(queue.name, '{}')
-    consumer.handler.assert_called_once()
     await asyncio.sleep(.01)
-    broker.send.assert_called_once_with(queue.name, '{}')

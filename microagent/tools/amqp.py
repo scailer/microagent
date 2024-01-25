@@ -117,8 +117,10 @@ class AMQPBroker(AbstractQueueBroker):
                 log.exception('Call %s failed', consumer)
 
             except asyncio.TimeoutError:
-                log.fatal('TimeoutError: %s %.2f', consumer,
-                    datetime.now().timestamp() - timer)
+                log.fatal('TimeoutError: %s %.2f', consumer, datetime.now().timestamp() - timer)
+
+                if message.delivery_tag:
+                    await message.channel.basic_nack(delivery_tag=message.delivery_tag)
 
         return _wrapper
 

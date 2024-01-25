@@ -3,14 +3,13 @@ import asyncio
 import json
 import logging
 import uuid
-
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from microagent.bus import AbstractSignalBus
-from microagent.signal import Receiver, SerializingError, Signal, SignalException  # , LookupKey
-
+from microagent.signal import (Receiver, SerializingError,  # , LookupKey
+                               Signal, SignalException)
 
 DSN = 'redis://localhost'
 
@@ -109,9 +108,8 @@ class Bus(AbstractSignalBus):
 
 
 @pytest.fixture
-async def bus(event_loop):
+async def bus():
     bus = Bus(dsn=DSN, prefix='TEST')
-    bus._loop = event_loop
     bus.bind = AsyncMock()
     bus.send = AsyncMock()
     bus.log = MagicMock()
