@@ -56,7 +56,7 @@ async def test_broker_send_ok(channel):
     await broker.send(queue.name, '{"a":1}')
 
     channel.basic_publish.assert_called_once_with(
-        b'{"a":1}', routing_key='test_queue', exchange='')
+        b'{"a":1}', routing_key='test_queue', exchange='', properties=None)
 
 
 async def test_broker_send_ok_fail(monkeypatch, channel):

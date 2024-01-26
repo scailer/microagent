@@ -11,6 +11,7 @@ from typing import Any, Awaitable, Callable
 from aiormq import Connection
 from aiormq.abc import AbstractChannel, AbstractConnection, DeliveredMessage, ExceptionType
 from aiormq.exceptions import AMQPError, ConnectionClosed
+from pamqp.commands import Basic
 
 from ..broker import AbstractQueueBroker, Consumer
 
@@ -76,18 +77,21 @@ class AMQPBroker(AbstractQueueBroker):
             self.connection = Connection(self.dsn)
             raise
 
-    async def send(self, name: str, message: str, exchange: str = '', **kwargs: Any) -> None:
+    async def send(self, name: str, message: str, exchange: str = '',
+            properties: dict | None = None, **kwargs: Any) -> None:
         '''
             Raw message sending.
 
             :param name: string, target queue name (routing_key)
             :param message: string, serialized message
             :param exchange: string, target exchange name
+            :param properties: dict, for Basic.Properties
             :param \*\*kwargs: dict, other basic_publish options
         '''  # noqa: W605
 
         channel = await self.get_channel()
-        await channel.basic_publish(message.encode(), routing_key=name, exchange=exchange, **kwargs)
+        await channel.basic_publish(message.encode(), routing_key=name, exchange=exchange,
+            properties=Basic.Properties(**properties) if properties else None, **kwargs)
 
     async def bind(self, name: str) -> None:
         await ManagedConnection(
