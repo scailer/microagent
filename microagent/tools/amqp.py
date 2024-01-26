@@ -9,9 +9,8 @@ from datetime import datetime
 from typing import Any, Awaitable, Callable
 
 from aiormq import Connection
-from aiormq.abc import AbstractChannel, AbstractConnection, DeliveredMessage, ExceptionType
+from aiormq.abc import AbstractChannel, AbstractConnection, Basic, DeliveredMessage, ExceptionType
 from aiormq.exceptions import AMQPError, ConnectionClosed
-from pamqp.commands import Basic
 
 from ..broker import AbstractQueueBroker, Consumer
 
