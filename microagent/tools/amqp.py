@@ -61,20 +61,21 @@ class AMQPBroker(AbstractQueueBroker):
     connection: AbstractConnection = field(init=False)
 
     def __post_init__(self) -> None:
-        self.connection = Connection(self.dsn)
+        self.connection = ReConnection(self.reconnect, self.dsn)
+
+    async def reconnect(self) -> None:
+        self.connection = ReConnection(self.reconnect, self.dsn)
+        await self.connection.connect()
+        log.info('Reconnect "%s"', self.connection)
 
     async def get_channel(self) -> AbstractChannel:
         '''
             Takes a channel from the pool or a new one, performs a lazy connection if required.
         '''
         if not self.connection.is_opened:
-            await self.connection.connect()
+            await self.reconnect()
 
-        try:
-            return await self.connection.channel()
-        except Exception:
-            self.connection = Connection(self.dsn)
-            raise
+        return await self.connection.channel()
 
     async def send(self, name: str, message: str, exchange: str = '',
             properties: dict | None = None, **kwargs: Any) -> None:
