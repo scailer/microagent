@@ -1,4 +1,4 @@
-__version__ = '1.7.0.rc2'
+__version__ = '1.7.0.rc3'
 
 import importlib
 import json
