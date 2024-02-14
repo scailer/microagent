@@ -1,15 +1,14 @@
 # mypy: ignore-errors
 import asyncio
+
 from unittest.mock import AsyncMock, MagicMock, Mock
 
-#from aiormq import Connection
 import aiormq
 import pytest
 
 from microagent.queue import Consumer, Queue
 from microagent.tools import amqp
-from microagent.tools.amqp import (AMQPBroker, Connection, ManagedConnection,
-                                   ReConnection)
+from microagent.tools.amqp import AMQPBroker, Connection, ManagedConnection, ReConnection
 
 
 @pytest.fixture()
@@ -66,7 +65,7 @@ async def test_broker_send_ok_fail(monkeypatch, channel):
     broker = AMQPBroker('amqp://localhost')
     conn_id = id(broker.connection)
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa B017
         await broker.send(queue.name, '{"a":1}')
 
     channel.basic_publish.assert_not_called()

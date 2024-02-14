@@ -4,9 +4,9 @@ clean:
 	find . -name '*.pyc' | xargs rm -rf
 
 test:
-	ruff microagent
-	mypy microagent
-	pytest tests
+	python -m ruff microagent tests
+	python -m mypy microagent
+	python -m pytest tests
 
 release: clean
 	python3 -m pip install --upgrade build twine

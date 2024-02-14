@@ -1,5 +1,6 @@
 # mypy: ignore-errors
 import importlib
+
 from unittest.mock import MagicMock, Mock
 
 from microagent.launcher import init_agent, load_configuration

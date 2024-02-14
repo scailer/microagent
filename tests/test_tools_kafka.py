@@ -1,6 +1,6 @@
 # mypy: ignore-errors
 import asyncio
-import sys
+
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiokafka

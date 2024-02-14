@@ -47,13 +47,13 @@ Using with MicroAgent
 import asyncio
 import contextlib
 import logging
+import time
 import uuid
 
 from abc import abstractmethod
-from collections import defaultdict
+from collections import abc, defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, AsyncGenerator
+from typing import Any
 
 from .abc import BusProtocol, SignalProtocol
 from .signal import Receiver, SerializingError, Signal
@@ -154,8 +154,7 @@ class AbstractSignalBus(BusProtocol):
         self.receivers[receiver.signal.name].append(receiver)
 
     @contextlib.asynccontextmanager
-    async def call(self, channel: str, message: str, timeout: int
-            ) -> AsyncGenerator[IterQueue, None]:
+    async def call(self, channel: str, message: str, timeout: int) -> abc.AsyncIterator[IterQueue]:
         '''
             RPC over pub/sub. Pair of signals - sending and responsing. Response-signal
             is an internal construction enabled by default. When we call `call` we send
@@ -219,7 +218,7 @@ class AbstractSignalBus(BusProtocol):
             data = signal.deserialize(message)  # type: dict
         except SerializingError:
             self.log.error('Invalid pubsub message: %s', message)
-            return
+            return None
 
         if name == 'response' and signal_id:
             return self.handle_response(signal_id, data)
@@ -233,6 +232,8 @@ class AbstractSignalBus(BusProtocol):
             self.log.warning('Pubsub mismatch arguments %s %s', channel, diff_args)
 
         asyncio.create_task(self.handle_signal(signal, sender, signal_id, data))
+
+        return None
 
     def handle_response(self, signal_id: str, message: dict[str, int | str | None]) -> None:
         if queue := self._responses.get(signal_id):
@@ -262,14 +263,14 @@ class AbstractSignalBus(BusProtocol):
         self.log.debug('Calling %s by %s:%s with %s', receiver.handler,
             signal.name, sender, str(message).encode('utf-8'))
 
-        timer = datetime.now().timestamp()  # type: float
+        timer = time.monotonic()  # type: float
 
         try:
             response = await asyncio.wait_for(
                 receiver.handler(signal=signal, sender=sender, **message),
                 receiver.timeout
             )
-            if isinstance(response, (int, str)):
+            if isinstance(response, int | str):
                 return response
 
         except TypeError:
@@ -277,8 +278,7 @@ class AbstractSignalBus(BusProtocol):
 
         except asyncio.TimeoutError:
             self.log.error(
-                'TimeoutError: %s %.2f', receiver.handler,
-                datetime.now().timestamp() - timer)
+                'TimeoutError: %s %.2f', receiver.handler, time.monotonic() - timer)
 
         return None
 
@@ -296,8 +296,8 @@ class BoundSignal(SignalProtocol):
             self.signal.make_channel_name(self.bus.prefix, sender),
             self.signal.serialize(kwargs))
 
-    async def call(self, sender: str, timeout: int = 60, **kwargs: Any  # type: ignore[return]
-            ) -> int | str | None:
+    async def call(self, sender: str, timeout: int = 60, **kwargs: Any
+            ) -> dict[str, int | str | None]:
 
         if self.signal.type_map:
             check_types(self.signal, kwargs, self.bus.log)
@@ -312,7 +312,10 @@ class BoundSignal(SignalProtocol):
             async for value in queue:
                 return value
 
-    def waiter(self, sender: str, timeout: int = 60, **kwargs: Any) -> Any:
+        return {}
+
+    def waiter(self, sender: str, timeout: int = 60, **kwargs: Any
+                ) -> contextlib.AbstractAsyncContextManager:
         '''
             async with bus.iter(sender='name', a=1, timeout=10) as queue:
                 async for x in queue:

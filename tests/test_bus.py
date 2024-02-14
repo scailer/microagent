@@ -3,19 +3,20 @@ import asyncio
 import json
 import logging
 import uuid
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from microagent.bus import AbstractSignalBus
-from microagent.signal import (Receiver, SerializingError,  # , LookupKey
-                               Signal, SignalException)
+from microagent.signal import Receiver, SerializingError, Signal, SignalException  # , LookupKey
+
 
 DSN = 'redis://localhost'
 
 
 class Handler(AsyncMock):
-    def __name__(self):
+    def __name__(self) -> str:  # noqa PLW3201
         return 'Handler'
 
 
@@ -100,10 +101,10 @@ async def test_Receiver_ok(test_signal):
 class Bus(AbstractSignalBus):
     RESPONSE_TIMEOUT = 0.5
 
-    async def send(self, channel: str, message: str):
+    async def send(self, channel: str, message: str) -> None:
         pass
 
-    async def bind(self, channel: str):
+    async def bind(self, channel: str) -> None:
         pass
 
 
@@ -237,7 +238,7 @@ async def test_Bus_receiver_ok(bus, test_signal):
     bus.receiver('TEST:test_signal:test', '{"uuid": 1}')
     await asyncio.sleep(.001)
     bus.handle_signal.assert_called()
-    bus.handle_signal.assert_called_with(test_signal, 'test', None, {"uuid": 1})
+    bus.handle_signal.assert_called_with(test_signal, 'test', None, {'uuid': 1})
 
 
 async def test_Bus_receiver_ok_typed(bus, typed_signal):
@@ -245,7 +246,7 @@ async def test_Bus_receiver_ok_typed(bus, typed_signal):
     bus.receiver('TEST:typed_signal:test', '{"uuid": 1}')
     await asyncio.sleep(.001)
     bus.handle_signal.assert_called()
-    bus.handle_signal.assert_called_with(typed_signal, 'test', None, {"uuid": 1})
+    bus.handle_signal.assert_called_with(typed_signal, 'test', None, {'uuid': 1})
 
 
 async def test_Bus_receiver_fail_bad_msg(bus, test_signal):

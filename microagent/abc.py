@@ -1,6 +1,7 @@
 import logging
 
-from typing import Any, Awaitable, Callable, Literal, Protocol
+from collections.abc import Awaitable, Callable
+from typing import Any, Literal, Protocol
 
 
 HookLabel = Literal['server', 'pre_start', 'post_start', 'pre_stop']
@@ -15,7 +16,8 @@ class SignalProtocol(Protocol):
     async def send(self, sender: str, **kwargs: Any) -> None:
         ...
 
-    async def call(self, sender: str, *, timeout: int = 60, **kwargs: Any) -> int | str | None:
+    async def call(self, sender: str, *, timeout: int = 60,
+            **kwargs: Any) -> dict[str, int | str | None]:
         ...
 
 

@@ -1,11 +1,11 @@
-__version__ = '1.7.0.rc4'
+__version__ = '1.7.0.rc5'
 
 import importlib
 import json
 import urllib.request
 
-from collections import namedtuple
-from typing import Any, Callable, Iterable
+from collections import abc
+from typing import Any, NamedTuple
 
 from .abc import ConsumerFunc, HookFunc, PeriodicFunc, ReceiverFunc
 from .agent import MicroAgent
@@ -42,10 +42,10 @@ def load_stuff(source: str) -> tuple[Any, Any]:
         Init signals from json-file loaded from disk or http request
     '''
 
-    data: dict[str, Iterable[dict[str, Any]]] = {}
+    data: dict[str, abc.Iterable[dict[str, Any]]] = {}
 
     if source.startswith('file://'):
-        with open(source.replace('file://', ''), 'r', encoding='utf8') as f:
+        with open(source.replace('file://', ''), encoding='utf8') as f:
             data.update(json.loads(f.read().replace('\n', '')))
     else:
         with urllib.request.urlopen(source) as response:
@@ -68,13 +68,17 @@ def load_stuff(source: str) -> tuple[Any, Any]:
         Signal.set_jsonlib(jsonlib)
         Queue.set_jsonlib(jsonlib)
 
+    # mypy: https://github.com/python/mypy/issues/848
+    SignalList = NamedTuple('signals', [(name, Signal) for name in Signal.get_all().keys()])  # type: ignore
+    QueueList = NamedTuple('queues', [(name, Queue) for name in Queue.get_all().keys()])  # type: ignore
+
     return (
-        namedtuple('signals', Signal.get_all().keys())(*Signal.get_all().values()),  # type: ignore
-        namedtuple('queues', Queue.get_all().keys())(*Queue.get_all().values())  # type: ignore
+        SignalList(*Signal.get_all().values()),
+        QueueList(*Queue.get_all().values())
     )
 
 
-def load_signals(source: str) -> Any:
+def load_signals(source: str) -> NamedTuple:
     '''
         Load Signal-entities from file or by web.
 
@@ -106,7 +110,7 @@ def load_signals(source: str) -> Any:
     return load_stuff(source)[0]
 
 
-def load_queues(source: str) -> Any:
+def load_queues(source: str) -> NamedTuple:
     '''
         Load Queue-entities from file or by web.
 
@@ -133,7 +137,7 @@ def load_queues(source: str) -> Any:
 
 
 def periodic(period: int | float, timeout: int | float = 1, start_after: int | float = 0
-        ) -> Callable[[PeriodicFunc], PeriodicFunc]:
+        ) -> abc.Callable[[PeriodicFunc], PeriodicFunc]:
     '''
         Run decorated handler periodically.
 
@@ -171,7 +175,7 @@ def periodic(period: int | float, timeout: int | float = 1, start_after: int | f
     return _decorator
 
 
-def cron(spec: str, timeout: int | float = 1) -> Callable[[PeriodicFunc], PeriodicFunc]:
+def cron(spec: str, timeout: int | float = 1) -> abc.Callable[[PeriodicFunc], PeriodicFunc]:
     '''
         Run decorated function by schedule (cron)
 
@@ -201,7 +205,7 @@ def cron(spec: str, timeout: int | float = 1) -> Callable[[PeriodicFunc], Period
     return _decorator
 
 
-def receiver(*signals: Signal, timeout: int = 60) -> Callable[[ReceiverFunc], ReceiverFunc]:
+def receiver(*signals: Signal, timeout: int = 60) -> abc.Callable[[ReceiverFunc], ReceiverFunc]:
     '''
         Binding for signals receiving.
 
@@ -238,7 +242,7 @@ def receiver(*signals: Signal, timeout: int = 60) -> Callable[[ReceiverFunc], Re
 
 
 def consumer(queue: Queue, timeout: int = 60, dto_class: type | None = None,
-         dto_name: str | None = None, **options: Any) -> Callable[[ConsumerFunc], ConsumerFunc]:
+         dto_name: str | None = None, **options: Any) -> abc.Callable[[ConsumerFunc], ConsumerFunc]:
     '''
         Binding for consuming messages from queue.
 
@@ -281,7 +285,7 @@ def consumer(queue: Queue, timeout: int = 60, dto_class: type | None = None,
     return _decorator
 
 
-def on(label: str) -> Callable[[HookFunc], HookFunc]:
+def on(label: str) -> abc.Callable[[HookFunc], HookFunc]:
     '''
         Hooks for internal events *(pre_start, post_start, pre_stop)*
         or running forever servers *(server)*.

@@ -24,9 +24,10 @@ import inspect
 import re
 import time
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Callable, ClassVar, List, NamedTuple, TypedDict, Union
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, ClassVar, NamedTuple, TypedDict
 
 from .abc import BoundKey, PeriodicFunc
 
@@ -42,14 +43,14 @@ MAX_DIFF = 2 * 356 * 24 * 60 * 60
 
 class CRON(NamedTuple):
     spec: str
-    minutes: List[int]  # 0-59
-    hours: List[int]  # 0-23
-    days: List[int]  # 1-31
-    months: List[int]  # 1-12
-    weekdays: List[int]  # 0-7
+    minutes: list[int]  # 0-59
+    hours: list[int]  # 0-23
+    days: list[int]  # 1-31
+    months: list[int]  # 1-12
+    weekdays: list[int]  # 0-7
 
     def next(self) -> datetime:  # noqa A003
-        return next_moment(self, datetime.now())
+        return next_moment(self, datetime.now(tz=timezone.utc))
 
     def __str__(self) -> str:
         return f'[{self.spec}]'
@@ -132,7 +133,7 @@ class CRONTask(PeriodicMixin):
         return self.cron.next().timestamp() - time.time()  # next step delay
 
 
-def _periodic(task: Union[PeriodicTask, CRONTask]) -> asyncio.Task:
+def _periodic(task: PeriodicTask | CRONTask) -> asyncio.Task:
     asyncio.get_running_loop().call_later(task.period, _periodic, task)
     return asyncio.create_task(task.call())
 
@@ -185,35 +186,37 @@ def cron_parser(spec: str) -> CRON:
 
 
 def next_moment(cron: CRON, now: datetime) -> datetime:
-    if abs((datetime.now() - now).total_seconds()) > MAX_DIFF:
+    if abs((datetime.now(tz=timezone.utc) - now).total_seconds()) > MAX_DIFF:
         raise ValueError
 
     if now.second or now.microsecond:
         # if moment passed several seconds ago, go to next minute
         now += timedelta(minutes=1)
         now = datetime(year=now.year, month=now.month, day=now.day,
-            hour=now.hour, minute=now.minute)
+            hour=now.hour, minute=now.minute, tzinfo=timezone.utc)
 
     if now.month not in cron.months:
         if now.month == 12:  # noqa PLR2004
-            now = datetime(year=now.year + 1, month=1, day=1)
+            now = datetime(year=now.year + 1, month=1, day=1, tzinfo=timezone.utc)
         else:
-            now = datetime(year=now.year, month=now.month + 1, day=1)
+            now = datetime(year=now.year, month=now.month + 1, day=1, tzinfo=timezone.utc)
 
         return next_moment(cron, now)
 
     if now.day not in cron.days or now.weekday() not in cron.weekdays:
         now += timedelta(days=1)
-        now = datetime(year=now.year, month=now.month, day=now.day)
+        now = datetime(year=now.year, month=now.month, day=now.day, tzinfo=timezone.utc)
         return next_moment(cron, now)
 
     if now.hour not in cron.hours:
         now += timedelta(hours=1)
-        now = datetime(year=now.year, month=now.month, day=now.day, hour=now.hour)
+        now = datetime(year=now.year, month=now.month, day=now.day, hour=now.hour,
+            tzinfo=timezone.utc)
         return next_moment(cron, now)
 
     if now.minute not in cron.minutes:
         now += timedelta(minutes=1)
         return next_moment(cron, now)
 
-    return datetime(year=now.year, month=now.month, day=now.day, hour=now.hour, minute=now.minute)
+    return datetime(year=now.year, month=now.month, day=now.day,
+        hour=now.hour, minute=now.minute, tzinfo=timezone.utc)

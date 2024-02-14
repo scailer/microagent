@@ -24,9 +24,10 @@ import os
 import signal
 import time
 
+from collections.abc import Iterator
 from functools import partial
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 
 if TYPE_CHECKING:
@@ -104,7 +105,7 @@ def init_agent(backend: str, cfg: dict[str, Any]) -> 'MicroAgent':
     return _import(backend)(bus=bus, broker=broker, **cfg)
 
 
-def _import(path: str) -> Any:
+def _import(path: str) -> type:
     mod = importlib.import_module('.'.join(path.split('.')[:-1]))
     return getattr(mod, path.split('.')[-1])
 
@@ -267,4 +268,4 @@ def run() -> None:
     try:
         AgentsManager(cfg).start()
     finally:
-        parser.exit(message="Exit\n")
+        parser.exit(message='Exit\n')

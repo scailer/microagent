@@ -3,10 +3,10 @@
 '''
 import asyncio
 import inspect
+import time
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 from redis.asyncio import ConnectionError, Redis, client
@@ -118,8 +118,8 @@ class RedisBroker(AbstractQueueBroker):
 
         if inspect.isawaitable(ret):
             return await ret
-        else:
-            return ret  # type: ignore[return-value]
+
+        return ret  # type: ignore[return-value]
 
     async def bind(self, name: str) -> None:
         _loop = asyncio.get_running_loop()
@@ -150,7 +150,7 @@ class RedisBroker(AbstractQueueBroker):
     async def _handler(self, name: str, data: str) -> None:
         consumer = self._bindings[name]
         _data = self.prepared_data(consumer, data)
-        timer = datetime.now().timestamp()
+        timer = time.monotonic()
 
         try:
             await asyncio.wait_for(consumer.handler(**_data), consumer.timeout)
@@ -158,5 +158,5 @@ class RedisBroker(AbstractQueueBroker):
             self.log.exception('Call %s failed', consumer.queue.name)
             await self.rollback(consumer.queue.name, data)
         except asyncio.TimeoutError:
-            self.log.error('TimeoutError: %s %.2f', consumer, datetime.now().timestamp() - timer)
+            self.log.error('TimeoutError: %s %.2f', consumer, time.monotonic() - timer)
             await self.rollback(name, data)

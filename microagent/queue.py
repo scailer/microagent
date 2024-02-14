@@ -1,7 +1,8 @@
 import json
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar, TypedDict
+from types import ModuleType
+from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from .abc import BoundKey, ConsumerFunc
 
@@ -56,7 +57,7 @@ class Queue:
     name: str
 
     _queues: ClassVar[dict[str, 'Queue']] = {}
-    _jsonlib = json
+    _jsonlib: ClassVar[ModuleType] = json
 
     def __post_init__(self) -> None:
         self._queues[self.name] = self
@@ -73,8 +74,8 @@ class Queue:
         return id(self)
 
     @classmethod
-    def set_jsonlib(self, jsonlib: Any) -> None:
-        self._jsonlib = jsonlib
+    def set_jsonlib(cls, jsonlib: ModuleType) -> None:
+        cls._jsonlib = jsonlib
 
     @classmethod
     def get(cls, name: str) -> 'Queue':

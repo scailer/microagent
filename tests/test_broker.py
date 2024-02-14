@@ -1,5 +1,6 @@
 # mypy: ignore-errors
 import logging
+
 from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock
 
@@ -7,6 +8,7 @@ import pytest
 
 from microagent.broker import AbstractQueueBroker, Consumer, Queue
 from microagent.queue import QueueNotFound, SerializingError
+
 
 DSN = 'redis://localhost'
 
@@ -18,7 +20,7 @@ class DTOTest:
 
 
 class Handler(AsyncMock):
-    def __name__(self):
+    def __name__(self):  # noqa PLW3201
         return 'Handler'
 
 
@@ -85,13 +87,13 @@ class Broker(AbstractQueueBroker):
     dsn: str
     uid: str
 
-    async def send(self, channel: str, message: str):
+    async def send(self, channel: str, message: str) -> None:
         pass
 
-    async def bind(self, channel: str):
+    async def bind(self, channel: str) -> None:
         pass
 
-    async def queue_length(self, name):
+    async def queue_length(self, name: str) -> None:
         pass
 
 

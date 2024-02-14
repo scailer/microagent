@@ -3,10 +3,11 @@
 '''
 import asyncio
 import logging
+import time
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from aiormq import Connection
 from aiormq.abc import AbstractChannel, AbstractConnection, Basic, DeliveredMessage, ExceptionType
@@ -108,7 +109,7 @@ class AMQPBroker(AbstractQueueBroker):
 
             log.debug('Calling %s by %s with %s', consumer,
                 consumer.queue.name, str(data).encode('utf-8'))
-            timer = datetime.now().timestamp()
+            timer = time.monotonic()
 
             try:
                 data['amqp'] = message
@@ -121,7 +122,7 @@ class AMQPBroker(AbstractQueueBroker):
                 log.exception('Call %s failed', consumer)
 
             except asyncio.TimeoutError:
-                log.fatal('TimeoutError: %s %.2f', consumer, datetime.now().timestamp() - timer)
+                log.fatal('TimeoutError: %s %.2f', consumer, time.monotonic() - timer)
 
                 if message.delivery_tag:
                     await message.channel.basic_nack(delivery_tag=message.delivery_tag)
@@ -152,10 +153,10 @@ class AMQPBroker(AbstractQueueBroker):
         channel = await self.get_channel()
         info = await channel.queue_declare(name)
 
-        if isinstance(info['message_count'], (int, str, bytes)):
+        if isinstance(info['message_count'], int | str | bytes):
             return int(info['message_count'])
-        else:
-            return 0
+
+        return 0
 
     @staticmethod
     async def putout(amqp: DeliveredMessage) -> None:

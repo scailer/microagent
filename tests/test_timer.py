@@ -1,18 +1,19 @@
 # mypy: ignore-errors
 import asyncio
-from datetime import datetime, timedelta
+
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from microagent.timer import (DAYS, CRONTask, PeriodicTask, cron_parser,
-                              next_moment)
+from microagent.timer import DAYS, CRONTask, PeriodicTask, cron_parser, next_moment
 
-YEAR = datetime.now().year
+
+YEAR = datetime.now(tz=timezone.utc).year
 
 
 class Handler(AsyncMock):
-    def __name__(self):
+    def __name__(self) -> str:  # noqa PLW3201
         return 'Handler'
 
 
@@ -88,106 +89,106 @@ async def test_cron_parser_ok():
 
 
 async def test_next_moment_ok_list():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, second=1)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, second=1, tzinfo=timezone.utc)
     assert next_moment(cron_parser('10,20 * * * *'), now) == datetime(
-        year=now.year, month=now.month, day=now.day, hour=now.hour, minute=20)
+        year=now.year, month=now.month, day=now.day, hour=now.hour, minute=20, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_range():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, second=1)
-    assert next_moment(cron_parser('5-20 * * * *'), now) == datetime(
-        year=now.year, month=now.month, day=now.day, hour=now.hour, minute=now.minute + 1)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, second=1, tzinfo=timezone.utc)
+    assert next_moment(cron_parser('5-20 * * * *'), now) == datetime(year=now.year,
+        month=now.month, day=now.day, hour=now.hour, minute=now.minute + 1, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_range_with_steps():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, second=1)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, second=1, tzinfo=timezone.utc)
     assert next_moment(cron_parser('5-20/5 * * * *'), now) == datetime(
-        year=now.year, month=now.month, day=now.day, hour=now.hour, minute=20)
+        year=now.year, month=now.month, day=now.day, hour=now.hour, minute=20, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_second():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, second=1)
-    assert next_moment(cron_parser('* * * * *'), now) == datetime(
-        year=now.year, month=now.month, day=now.day, hour=now.hour, minute=now.minute + 1)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, second=1, tzinfo=timezone.utc)
+    assert next_moment(cron_parser('* * * * *'), now) == datetime(year=now.year, month=now.month,
+        day=now.day, hour=now.hour, minute=now.minute + 1, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_minute():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17)
-    assert next_moment(cron_parser('* * * * *'), now) == datetime(
-        year=now.year, month=now.month, day=now.day, hour=now.hour, minute=now.minute)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, tzinfo=timezone.utc)
+    assert next_moment(cron_parser('* * * * *'), now) == datetime(year=now.year, month=now.month,
+        day=now.day, hour=now.hour, minute=now.minute, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_minute_last():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=59, second=1)
-    assert next_moment(cron_parser('* * * * *'), now) == datetime(
-        year=now.year, month=now.month, day=now.day, hour=now.hour + 1, minute=0)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=59, second=1, tzinfo=timezone.utc)
+    assert next_moment(cron_parser('* * * * *'), now) == datetime(year=now.year, month=now.month,
+        day=now.day, hour=now.hour + 1, minute=0, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_hour():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17)
-    assert next_moment(cron_parser(f'{now.minute - 1} * * * *'), now) == datetime(
-        year=now.year, month=now.month, day=now.day, hour=now.hour + 1, minute=now.minute - 1)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, tzinfo=timezone.utc)
+    assert next_moment(cron_parser(f'{now.minute - 1} * * * *'), now) == datetime(year=now.year,
+        month=now.month, day=now.day, hour=now.hour + 1, minute=now.minute - 1, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_hour_last():
-    now = datetime(year=YEAR, month=5, day=15, hour=23, minute=17)
+    now = datetime(year=YEAR, month=5, day=15, hour=23, minute=17, tzinfo=timezone.utc)
     assert next_moment(cron_parser('0 * * * *'), now) == datetime(
-        year=now.year, month=now.month, day=now.day + 1, hour=0, minute=0)
+        year=now.year, month=now.month, day=now.day + 1, hour=0, minute=0, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_day():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17)
-    assert next_moment(cron_parser(f'0 {now.hour - 1} * * *'), now) == datetime(
-        year=now.year, month=now.month, day=now.day + 1, hour=now.hour - 1, minute=0)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, tzinfo=timezone.utc)
+    assert next_moment(cron_parser(f'0 {now.hour - 1} * * *'), now) == datetime(year=now.year,
+        month=now.month, day=now.day + 1, hour=now.hour - 1, minute=0, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_day_last():
-    now = datetime(year=YEAR, month=5, day=31, hour=16, minute=17)
+    now = datetime(year=YEAR, month=5, day=31, hour=16, minute=17, tzinfo=timezone.utc)
     assert next_moment(cron_parser('0 0 * * *'), now) == datetime(
-        year=now.year, month=now.month + 1, day=1, hour=0, minute=0)
+        year=now.year, month=now.month + 1, day=1, hour=0, minute=0, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_week():
-    n = datetime(year=YEAR, month=5, day=15, hour=16, minute=17)
+    n = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, tzinfo=timezone.utc)
     assert next_moment(cron_parser(f'0 0 * * {n.weekday()}'), n - timedelta(days=1)) == datetime(
-        year=n.year, month=n.month, day=n.day, hour=0, minute=0)
+        year=n.year, month=n.month, day=n.day, hour=0, minute=0, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_month():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, tzinfo=timezone.utc)
     assert next_moment(cron_parser(f'0 0 {now.day - 1} * *'), now) == datetime(
-        year=now.year, month=now.month + 1, day=now.day - 1, hour=0, minute=0)
+        year=now.year, month=now.month + 1, day=now.day - 1, hour=0, minute=0, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_month_last():
-    now = datetime(year=YEAR, month=12, day=31, hour=16, minute=17)
+    now = datetime(year=YEAR, month=12, day=31, hour=16, minute=17, tzinfo=timezone.utc)
     assert next_moment(cron_parser('0 0 * * *'), now) == datetime(
-        year=now.year + 1, month=1, day=1, hour=0, minute=0)
+        year=now.year + 1, month=1, day=1, hour=0, minute=0, tzinfo=timezone.utc)
 
 
 async def test_next_moment_ok_year():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, tzinfo=timezone.utc)
     assert next_moment(cron_parser(f'0 0 1 {now.month - 1} *'), now) == datetime(
-        year=now.year + 1, month=now.month - 1, day=1, hour=0, minute=0)
+        year=now.year + 1, month=now.month - 1, day=1, hour=0, minute=0, tzinfo=timezone.utc)
 
 
 async def test_next_moment_fail():
     with pytest.raises(ValueError):
-        assert next_moment(cron_parser('0 0 2 31 *'), datetime.now())
+        assert next_moment(cron_parser('0 0 2 31 *'), datetime.now(tz=timezone.utc))
 
 
 async def test_next_moment_ok_latest_day():
     for m, d in enumerate(DAYS[:11], 1):
-        assert next_moment(cron_parser('0 0 1 * *'), datetime(year=YEAR, month=m, day=d)
-            ) == datetime(year=YEAR, month=m + 1, day=1)
+        assert next_moment(cron_parser('0 0 1 * *'), datetime(year=YEAR, month=m, day=d,
+            tzinfo=timezone.utc)) == datetime(year=YEAR, month=m + 1, day=1, tzinfo=timezone.utc)
 
-    assert next_moment(cron_parser('0 0 1 * *'), datetime(year=YEAR, month=12, day=31)
-        ) == datetime(year=YEAR + 1, month=1, day=1)
+    assert next_moment(cron_parser('0 0 1 * *'), datetime(year=YEAR, month=12, day=31,
+        tzinfo=timezone.utc)) == datetime(year=YEAR + 1, month=1, day=1, tzinfo=timezone.utc)
 
 
 @pytest.mark.skipif(True, reason='Long test: 2-3 min')
 async def test_next_moment_ok_every_minute():
-    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, second=18)
+    now = datetime(year=YEAR, month=5, day=15, hour=16, minute=17, second=18, tzinfo=timezone.utc)
 
     with pytest.raises(ValueError):
         while True:

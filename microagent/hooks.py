@@ -25,9 +25,9 @@ allow provide endpoints for microagent, such as http, websocket, smtp or other.
 
 import inspect
 
-from collections import defaultdict
+from collections import abc, defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Awaitable, Callable, ClassVar, Iterable, TypedDict
+from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from .abc import BoundKey, HookFunc
 
@@ -56,23 +56,23 @@ class Hooks:
 
     binds: dict[str, list[Hook]]
 
-    def __init__(self, hooks: Iterable[Hook]):
+    def __init__(self, hooks: abc.Iterable[Hook]) -> None:
         self.binds = defaultdict(list)
 
         for hook in hooks:
             self.binds[hook.label].append(hook)
 
     @property
-    def servers(self) -> Iterable[Callable]:
+    def servers(self) -> abc.Iterable[abc.Callable]:
         return (hook.handler for hook in self.binds['server'])
 
-    def pre_start(self) -> Awaitable:
+    def pre_start(self) -> abc.Awaitable:
         return self.call('pre_start')
 
-    def post_start(self) -> Awaitable:
+    def post_start(self) -> abc.Awaitable:
         return self.call('post_start')
 
-    def pre_stop(self) -> Awaitable:
+    def pre_stop(self) -> abc.Awaitable:
         return self.call('pre_stop')
 
     async def call(self, label: str) -> None:

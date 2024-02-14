@@ -2,9 +2,9 @@
 :ref:`Queue Broker <broker>` based on :kafka:`kafka <>`.
 '''
 import asyncio
+import time
 
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 from urllib import parse
 
@@ -81,15 +81,14 @@ class KafkaBroker(AbstractQueueBroker):
 
     async def _handle(self, consumer: Consumer, data: dict) -> None:
         self.log.debug('Calling %s by %s with %s', consumer, consumer.queue.name, data)
-        timer = datetime.now().timestamp()
+        timer = time.monotonic()
 
         try:
             await asyncio.wait_for(consumer.handler(**data), consumer.timeout)
         except TypeError:
             self.log.exception('Call %s failed', consumer)
         except asyncio.TimeoutError:
-            self.log.error('TimeoutError: %s %.2f', consumer,
-                datetime.now().timestamp() - timer)
+            self.log.error('TimeoutError: %s %.2f', consumer, time.monotonic() - timer)
 
     async def queue_length(self, name: str, **options: Any) -> int:  # noqa
         return 0

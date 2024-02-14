@@ -78,9 +78,10 @@ Using MicroAgent resources.
 import asyncio
 import logging
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Callable, Iterable, TypeVar
+from datetime import datetime, timedelta, timezone
+from typing import TypeVar
 
 from .broker import AbstractQueueBroker
 from .bus import AbstractSignalBus
@@ -218,7 +219,7 @@ class MicroAgent:
             start_after: float = getattr(task, 'start_after', None) or 0.0
 
             if start_after > 100:  # noqa PLR2004
-                start_at = datetime.now() + timedelta(seconds=start_after)  # type: datetime
+                start_at = datetime.now(tz=timezone.utc) + timedelta(seconds=start_after)
                 self.log.debug('Set %s at %s', task, f'{start_at:%H:%M:%S}')
             else:
                 self.log.debug('Set %s after %d sec', task, start_after)

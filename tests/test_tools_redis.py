@@ -1,5 +1,6 @@
 # mypy: ignore-errors
 import asyncio
+
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -7,8 +8,7 @@ import redis.asyncio as redis
 
 from microagent.queue import Consumer, Queue
 from microagent.signal import Signal
-from microagent.tools.redis import RedisBroker as RedisBrokerBase
-from microagent.tools.redis import RedisSignalBus
+from microagent.tools.redis import RedisBroker as RedisBrokerBase, RedisSignalBus
 
 
 class RedisBroker(RedisBrokerBase):
@@ -23,20 +23,20 @@ def test_signal():
 
 async def test_bus_receive_ok(monkeypatch):
     class PubSub:
-        PUBLISH_MESSAGE_TYPES = ("message", "pmessage")
+        PUBLISH_MESSAGE_TYPES = ('message', 'pmessage')
         psubscribe = AsyncMock()
 
         async def __aenter__(self):
-            return MagicMock(PUBLISH_MESSAGE_TYPES=("message", "pmessage"), listen=self.listen)
+            return MagicMock(PUBLISH_MESSAGE_TYPES=('message', 'pmessage'), listen=self.listen)
 
-        async def __aexit__(self, exc_type, exc, traceback) -> None:
+        async def __aexit__(self, exc_type, exc, traceback) -> None:  # noqa ANN001
             pass
 
         async def listen(self):
             yield {'type': 'pmessage', 'channel': 'pattern1', 'data': 'data'}
             raise redis.ConnectionError()
 
-    conn = MagicMock(pubsub=lambda: PubSub(), blpop=AsyncMock(return_value=(None, '')))
+    conn = MagicMock(pubsub=PubSub, blpop=AsyncMock(return_value=(None, '')))
     monkeypatch.setattr(redis.Redis, 'from_url', Mock(return_value=conn))
 
     bus = RedisSignalBus('redis://localhost')

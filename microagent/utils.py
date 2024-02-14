@@ -1,6 +1,6 @@
 import asyncio
 
-from typing import Any, Callable
+from collections.abc import Callable
 
 
 class IterQueue(asyncio.Queue):
@@ -9,7 +9,7 @@ class IterQueue(asyncio.Queue):
     def __aiter__(self) -> 'IterQueue':
         return self
 
-    async def __anext__(self) -> Any:
+    async def __anext__(self) -> dict[str, int | str | None]:
         try:
             value = await self.get()
             self.task_done()
