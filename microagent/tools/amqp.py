@@ -60,6 +60,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     '''
     connection: AbstractConnection = field(init=False)
+    sending_channel: AbstractChannel | None = None
 
     def __post_init__(self) -> None:
         self.connection = ReConnection(self.reconnect, self.dsn)
@@ -76,7 +77,10 @@ class AMQPBroker(AbstractQueueBroker):
         if not self.connection.is_opened:
             await self.reconnect()
 
-        return await self.connection.channel()
+        if not self.sending_channel or self.sending_channel.is_closed:
+            self.sending_channel = await self.connection.channel()
+
+        return self.sending_channel
 
     async def send(self, name: str, message: str, exchange: str = '',
             properties: dict | None = None, **kwargs: Any) -> None:
