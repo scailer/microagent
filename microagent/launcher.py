@@ -254,7 +254,6 @@ class AgentsManager:
         return '\n'.join(result)
 
 
-
 def run() -> None:
     ''' Parse input and run '''
 

@@ -133,7 +133,6 @@ class AMQPBroker(AbstractQueueBroker):
 
         return _wrapper
 
-
     async def declare_queue(self, name: str, **options: Any) -> None:
         '''
             Declare queue with queue_declare method.
