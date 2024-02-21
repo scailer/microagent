@@ -5,8 +5,8 @@ from typing import Any, Literal, Protocol
 
 
 HookLabel = Literal['server', 'pre_start', 'post_start', 'pre_stop']
-HookFunc = Callable[[], None | Awaitable[None]]
-PeriodicFunc = Callable[[], Awaitable[None]]
+HookFunc = Callable[[Any], Awaitable[None]]
+PeriodicFunc = Callable[[Any], Awaitable[None]]
 ReceiverFunc = Callable[..., Awaitable[None | int | str]]
 ConsumerFunc = Callable[..., Awaitable[None]]
 BoundKey = tuple[str, ...]

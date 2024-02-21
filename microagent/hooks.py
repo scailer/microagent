@@ -77,6 +77,6 @@ class Hooks:
 
     async def call(self, label: str) -> None:
         for hook in self.binds[label]:
-            response = hook.handler()
+            response = hook.handler(hook.agent)
             if inspect.isawaitable(response):
                 await response
