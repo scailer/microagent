@@ -1,10 +1,14 @@
 # mypy: ignore-errors
-import pytest
 import logging
+
 from dataclasses import dataclass
-from unittest.mock import MagicMock, AsyncMock
-from microagent.broker import AbstractQueueBroker, Queue, Consumer
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from microagent.broker import AbstractQueueBroker, Consumer, Queue
 from microagent.queue import QueueNotFound, SerializingError
+
 
 DSN = 'redis://localhost'
 
@@ -16,7 +20,7 @@ class DTOTest:
 
 
 class Handler(AsyncMock):
-    def __name__(self):
+    def __name__(self):  # noqa PLW3201
         return 'Handler'
 
 
@@ -53,7 +57,7 @@ async def test_Queue_get_fail_not_found():
 
 
 async def test_Queue_serialize_ok(test_queue):
-    assert test_queue.serialize({'a': 1}) == '{"a":1}'
+    assert test_queue.serialize({'a': 1}) == '{"a": 1}'
 
 
 async def test_Queue_serialize_fail(test_queue):
@@ -80,13 +84,16 @@ async def test_Consumer_ok(test_queue):
 
 
 class Broker(AbstractQueueBroker):
-    async def send(self, channel: str, message: str):
+    dsn: str
+    uid: str
+
+    async def send(self, channel: str, message: str) -> None:
         pass
 
-    async def bind(self, channel: str):
+    async def bind(self, channel: str) -> None:
         pass
 
-    async def queue_length(self, name):
+    async def queue_length(self, name: str) -> None:
         pass
 
 
@@ -109,7 +116,7 @@ async def test_Broker_init_ok(broker):
     await broker.queue_length('channel')
 
     logger = logging.getLogger('name')
-    broker = Broker(dsn=DSN, logger=logger)
+    broker = Broker(dsn=DSN, log=logger)
     assert broker.log is logger
 
     with pytest.raises(TypeError):
@@ -132,7 +139,7 @@ async def test_Broker_bind_fail(broker, test_queue):
 
 async def test_Broker_send_ok(broker, test_queue):
     await broker.test_queue.send({'uid': 1})
-    broker.send.assert_called_once_with('test_queue', '{"uid":1}')
+    broker.send.assert_called_once_with('test_queue', '{"uid": 1}')
 
 
 async def test_Broker_prepared_data_ok(broker, test_queue):

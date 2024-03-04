@@ -1,14 +1,16 @@
 # mypy: ignore-errors
 import importlib
-from unittest.mock import Mock, MagicMock
-from microagent.launcher import load_configuration, init_agent
+
+from unittest.mock import MagicMock, Mock
+
+from microagent.launcher import init_agent, load_configuration
 
 
 def test_load_configuration_ok(monkeypatch):
     cfg = MagicMock(
         BUS={
             'default': {
-                'backend': 'microagent.tools.aioredis.AIORedisSignalBus',
+                'backend': 'microagent.tools.redis.RedisSignalBus',
                 'dsn': 'redis://localhost',
                 'prefix': 'APP',
             },
@@ -22,7 +24,7 @@ def test_load_configuration_ok(monkeypatch):
                 'dsn': 'amqp://guest:guest@localhost:5671/myhost',
             },
             'bro': {
-                'backend': 'microagent.tools.aioredis.AIORedisSignalBus',
+                'backend': 'microagent.tools.redis.RedisSignalBus',
                 'dsn': 'redis://localhost',
             },
             'failed': {
@@ -53,7 +55,7 @@ def test_load_configuration_ok(monkeypatch):
     )
 
     _BUS = (
-        'microagent.tools.aioredis.AIORedisSignalBus',
+        'microagent.tools.redis.RedisSignalBus',
         {'dsn': 'redis://localhost', 'prefix': 'APP'}
     )
 
@@ -63,7 +65,7 @@ def test_load_configuration_ok(monkeypatch):
     )
 
     _BROKER2 = (
-        'microagent.tools.aioredis.AIORedisSignalBus',
+        'microagent.tools.redis.RedisSignalBus',
         {'dsn': 'redis://localhost'}
     )
 
@@ -80,7 +82,7 @@ def test_load_configuration_ok(monkeypatch):
 
 def test_init_agent_ok(monkeypatch):
     _BUS = (
-        'microagent.tools.aioredis.AIORedisSignalBus',
+        'microagent.tools.redis.RedisSignalBus',
         {'dsn': 'redis://localhost', 'prefix': 'APP'}
     )
 

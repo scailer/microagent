@@ -9,7 +9,7 @@ The message has a free structure, fully defined in the user area.
 
 Implementations:
 
-* :ref:`aioredis <tools-aioredis>`
+* :ref:`redis <tools-redis>`
 * :ref:`aioamqp <tools-amqp>`
 * :ref:`kafka <tools-kafka>`
 
@@ -19,11 +19,11 @@ Using QueueBroker separately (sending only)
 .. code-block:: python
 
     from microagent import load_queues
-    from microagent.tools.aioredis import AIORedisBroker
+    from microagent.tools.redis import RedisBroker
 
     queues = load_queues('file://queues.json')
 
-    broker = AIORedisBroker('redis://localhost/7')
+    broker = RedisBroker('redis://localhost/7')
     await broker.user_created.send({'user_id': 1})
 
 
@@ -32,7 +32,7 @@ Using with MicroAgent
 .. code-block:: python
 
     from microagent import MicroAgent, load_queues
-    from microagent.tools.aioredis import AIORedisSignalBus
+    from microagent.tools.redis import RedisSignalBus
 
     queues = load_queues('file://queues.json')
 
@@ -41,36 +41,23 @@ Using with MicroAgent
         async def example_read_queue(self, **kwargs):
             await self.broker.email_sended.send({'user_id': 1})
 
-    broker = AIORedisBroker('redis://localhost/7')
+    broker = RedisBroker('redis://localhost/7')
     email_agent = EmailAgent(broker=broker)
     await email_agent.start()
 '''
-import abc
-import uuid
 import logging
+import uuid
 
-from typing import Dict, Optional
-from .queue import Queue, Consumer
+from abc import abstractmethod
+from dataclasses import dataclass, field
+from typing import Any
 
-
-class BoundQueue:
-    __slots__ = ('broker', 'queue')
-
-    broker: 'AbstractQueueBroker'
-    queue: Queue
-
-    def __init__(self, broker: 'AbstractQueueBroker', queue: Queue):
-        self.broker = broker
-        self.queue = queue
-
-    async def send(self, message: dict, **options) -> None:
-        await self.broker.send(self.queue.name, self.queue.serialize(message), **options)
-
-    async def length(self) -> int:
-        return await self.broker.queue_length(self.queue.name)
+from .abc import BrokerProtocol, QueueProtocol
+from .queue import Consumer, Queue
 
 
-class AbstractQueueBroker(abc.ABC):
+@dataclass(slots=True)
+class AbstractQueueBroker(BrokerProtocol):
     '''
         Broker is an abstract interface with two basic methods - send and bind.
 
@@ -85,7 +72,7 @@ class AbstractQueueBroker(abc.ABC):
 
             Queue(name='user_created')
 
-            broker = AIORedisBroker('redis://localhost/7')
+            broker = RedisBroker('redis://localhost/7')
             await broker.user_created.send({'user_id': 1})
 
         .. attribute:: dsn
@@ -106,31 +93,17 @@ class AbstractQueueBroker(abc.ABC):
             Dict of all bound consumers
     '''
 
-    uid: str
     dsn: str
-    log: logging.Logger
-    _bindings: Dict[str, Consumer]
+    uid: str = field(default_factory=lambda: uuid.uuid4().hex)
+    log: logging.Logger = logging.getLogger('microagent.broker')
 
-    def __new__(cls, dsn, **kwargs) -> 'AbstractQueueBroker':
-        broker = super(AbstractQueueBroker, cls).__new__(cls)
+    _bindings: dict[str, Consumer] = field(default_factory=dict)
 
-        broker.uid = uuid.uuid4().hex
-        broker.log = logging.getLogger('microagent.broker')
-        broker._bindings = {}
-
-        return broker
-
-    def __init__(self, dsn: str, logger: Optional[logging.Logger] = None):
-        self.dsn = dsn
-
-        if logger:
-            self.log = logger
-
-    def __getattr__(self, name: str) -> BoundQueue:
+    def __getattr__(self, name: str) -> 'BoundQueue':
         return BoundQueue(self, Queue.get(name))
 
-    @abc.abstractmethod
-    async def send(self, name: str, message: str, **kwargs) -> None:
+    @abstractmethod
+    async def send(self, name: str, message: str, **kwargs: Any) -> None:
         '''
             Write a raw message to queue.
 
@@ -138,16 +111,16 @@ class AbstractQueueBroker(abc.ABC):
             :param message: string, serialized object
             :param \*\*kwargs: specific parameters for each broker implementation
         '''  # noqa: W605
-        raise NotImplementedError  # pragma: no cover
+        ...
 
-    @abc.abstractmethod
+    @abstractmethod
     async def bind(self, name: str) -> None:
         '''
             Start reading queue.
 
             :param name: string, queue name
         '''
-        raise NotImplementedError  # pragma: no cover
+        ...
 
     async def bind_consumer(self, consumer: Consumer) -> None:
         '''
@@ -163,18 +136,31 @@ class AbstractQueueBroker(abc.ABC):
 
         self.log.debug('Bind %s to queue "%s"', consumer, consumer.queue.name)
 
-    def prepared_data(self, consumer: Consumer, raw_data: str) -> dict:
+    @staticmethod
+    def prepared_data(consumer: Consumer, raw_data: str | bytes) -> dict:
         data = consumer.queue.deserialize(raw_data)
         if consumer.dto_class:
             data[consumer.dto_name or 'dto'] = consumer.dto_class(**data)
         return data
 
-    @abc.abstractmethod
-    async def queue_length(self, name: str, **options) -> int:
+    @abstractmethod
+    async def queue_length(self, name: str, **options: Any) -> int:
         '''
             Get the current queue length.
 
             :param name: string, queue name
             :param \*\*options: specific parameters for each broker implementation
         '''  # noqa: W605
-        return NotImplemented  # pragma: no cover
+        ...
+
+
+@dataclass(slots=True, frozen=True)
+class BoundQueue(QueueProtocol):
+    broker: 'AbstractQueueBroker'
+    queue: Queue
+
+    async def send(self, message: dict, **options: Any) -> None:
+        await self.broker.send(self.queue.name, self.queue.serialize(message), **options)
+
+    async def length(self) -> int:
+        return await self.broker.queue_length(self.queue.name)

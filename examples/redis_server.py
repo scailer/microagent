@@ -2,7 +2,7 @@
 import sys
 import asyncio
 import logging
-from microagent.tools.aioredis import AIORedisSignalBus, AIORedisBroker
+from microagent.tools.redis import RedisSignalBus, RedisBroker
 
 from user_agent import UserAgent
 from comment_agent import CommentAgent
@@ -15,8 +15,8 @@ logging.basicConfig(format=(
 
 
 async def main():
-    bus = AIORedisSignalBus('redis://localhost/7')
-    broker = AIORedisBroker('redis://localhost/7')
+    bus = RedisSignalBus('redis://localhost/7')
+    broker = RedisBroker('redis://localhost/7')
     await bus.started.send('user_agent')
 
     user_agent = UserAgent(bus=bus, broker=broker)

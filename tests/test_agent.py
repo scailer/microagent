@@ -1,10 +1,14 @@
 # mypy: ignore-errors
-import pytest
 import asyncio
 import unittest
-from unittest.mock import Mock, AsyncMock, MagicMock
-from microagent import MicroAgent, Signal, Queue, receiver, consumer, periodic, cron, on
-from microagent.tools.mocks import BusMock, BrokerMock
+
+from unittest.mock import AsyncMock, MagicMock, Mock
+
+import pytest
+
+from microagent import MicroAgent, Queue, Signal, consumer, cron, on, periodic, receiver
+from microagent.agent import MissConfig
+from microagent.tools.mocks import BrokerMock, BusMock
 
 
 @pytest.fixture()
@@ -98,7 +102,7 @@ def test_init_empty_agent_ok():
 
 def test_init_logger_agent_ok():
     logger = unittest.mock.Mock()
-    ma = MicroAgent(logger=logger)
+    ma = MicroAgent(log=logger)
     assert ma.log is logger
 
 
@@ -146,10 +150,10 @@ async def test_init_receiver_agent_fail(test_signal):
         async def handler_one(self, uuid, **kw):
             pass
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(MissConfig):
         FailedReceiverMicroAgent()
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(MissConfig):
         FailedReceiverMicroAgent(bus=1)
 
 
@@ -176,10 +180,10 @@ async def test_init_consumer_agent_fail(test_queue):
         async def handler_one(self, uuid, **kw):
             pass
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(MissConfig):
         FailedConsumerMicroAgent()
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(MissConfig):
         FailedConsumerMicroAgent(broker=1)
 
 

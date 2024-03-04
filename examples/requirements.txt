@@ -1,1 +1,1 @@
-microagent[aioredis]
+microagent[redis]

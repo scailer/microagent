@@ -1,23 +1,25 @@
 '''
 :ref:`Queue Broker <broker>` based on :kafka:`kafka <>`.
 '''
-import urllib
 import asyncio
-import logging
+import time
 
-from datetime import datetime
+from dataclasses import dataclass, field
+from typing import Any
+from urllib import parse
 
-import aiokafka  # type: ignore
+import aiokafka
 
 from ..broker import AbstractQueueBroker, Consumer
 
 
+@dataclass
 class KafkaBroker(AbstractQueueBroker):
     '''
         Experimental broker based on the Apache Kafka distributed stream processing system.
 
         :param dsn: string, data source name for connection kafka://localhost:9092
-        :param logger: logging.Logger (optional)
+        :param log: logging.Logger (optional)
 
 
         Sending messages.
@@ -41,16 +43,14 @@ class KafkaBroker(AbstractQueueBroker):
                     # kafka: AIOKafkaConsumer
                     process(data)
     '''
-    addr: str
-    producer: aiokafka.AIOKafkaProducer
+    addr: str = field(init=False)
+    producer: aiokafka.AIOKafkaProducer = field(init=False)
 
-    def __init__(self, dsn: str, logger: logging.Logger = None) -> None:
-        super().__init__(dsn, logger)
-        _loop = asyncio.get_running_loop()
-        self.addr = urllib.parse.urlparse(dsn).netloc  # type: ignore
-        self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
+    def __post_init__(self) -> None:
+        self.addr = parse.urlparse(self.dsn).netloc
+        self.producer = aiokafka.AIOKafkaProducer(bootstrap_servers=self.addr)
 
-    async def send(self, name: str, message: str, **kwargs) -> None:
+    async def send(self, name: str, message: str, **kwargs: Any) -> None:
         await self.producer.start()
 
         try:
@@ -61,7 +61,7 @@ class KafkaBroker(AbstractQueueBroker):
             _loop = asyncio.get_running_loop()
             self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
 
-    async def bind(self, name: str):
+    async def bind(self, name: str) -> None:
         loop = asyncio.get_running_loop()
         kafka_consumer = aiokafka.AIOKafkaConsumer(name, loop=loop, bootstrap_servers=self.addr)
         asyncio.create_task(self._kafka_wrapper(kafka_consumer, name))
@@ -81,21 +81,14 @@ class KafkaBroker(AbstractQueueBroker):
 
     async def _handle(self, consumer: Consumer, data: dict) -> None:
         self.log.debug('Calling %s by %s with %s', consumer, consumer.queue.name, data)
+        timer = time.monotonic()
 
         try:
-            response = consumer.handler(**data)
+            await asyncio.wait_for(consumer.handler(**data), consumer.timeout)
         except TypeError:
             self.log.exception('Call %s failed', consumer)
-            return
+        except asyncio.TimeoutError:
+            self.log.error('TimeoutError: %s %.2f', consumer, time.monotonic() - timer)
 
-        if asyncio.iscoroutine(response):
-            timer = datetime.now().timestamp()
-
-            try:
-                await asyncio.wait_for(response, consumer.timeout)
-            except asyncio.TimeoutError:
-                self.log.error('TimeoutError: %s %.2f', consumer,
-                    datetime.now().timestamp() - timer)
-
-    async def queue_length(self, name: str, **options):
-        pass  # TODO: get queue length
+    async def queue_length(self, name: str, **options: Any) -> int:  # noqa
+        return 0

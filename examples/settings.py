@@ -8,16 +8,16 @@ logging.basicConfig(format=(
 
 
 BUS = {
-    'aioredis': {
-        'backend': 'microagent.tools.aioredis.AIORedisSignalBus',
+    'redis': {
+        'backend': 'microagent.tools.redis.RedisSignalBus',
         'dsn': 'redis://localhost/7',
         'prefix': 'PREF',
     },
 }
 
 BROKER = {
-    'aioredis': {
-        'backend': 'microagent.tools.aioredis.AIORedisBroker',
+    'redis': {
+        'backend': 'microagent.tools.redis.RedisBroker',
         'dsn': 'redis://localhost/7',
     },
 }
@@ -26,16 +26,16 @@ BROKER = {
 AGENT = {
     'user_agent': {
         'backend': 'examples.user_agent.UserAgent',
-        'bus': 'aioredis',
-        'broker': 'aioredis',
+        'bus': 'redis',
+        'broker': 'redis',
     },
     'comment_agent': {
         'backend': 'examples.comment_agent.CommentAgent',
-        'bus': 'aioredis',
-        'broker': 'aioredis',
+        'bus': 'redis',
+        'broker': 'redis',
     },
     'email_agent': {
         'backend': 'examples.email_agent.EmailAgent',
-        'broker': 'aioredis',
+        'broker': 'redis',
     },
 }

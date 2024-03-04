@@ -8,6 +8,3 @@ AMQP (RabbitMQ)
 
 .. autoclass:: microagent.tools.amqp.AMQPBroker
    :members:
-
-
-.. autoclass:: microagent.tools.amqp.MessageMeta

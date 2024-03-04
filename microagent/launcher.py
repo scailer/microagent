@@ -15,26 +15,28 @@ group and start/stop at the same time. If one of the agents stops, the launcher
 stops the entire group.
 '''
 
-import os
-import time
-import signal
-import asyncio
 import argparse
+import asyncio
 import importlib
 import logging
 import multiprocessing
+import os
+import signal
+import time
 
-from typing import Optional, Iterator, Tuple, Dict, List, Any, TYPE_CHECKING
-from itertools import chain
+from collections.abc import Iterator
 from functools import partial
+from itertools import chain
+from typing import TYPE_CHECKING, Any
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
-    from .bus import AbstractSignalBus
     from .broker import AbstractQueueBroker
+    from .bus import AbstractSignalBus
 
 
-CFG_T = Tuple[str, Dict[str, Any]]
+CFG_T = tuple[str, dict[str, Any]]
 
 __all__ = (
     'GroupInterrupt',
@@ -58,7 +60,7 @@ class ServerInterrupt(Exception):
     pass
 
 
-def load_configuration(config_path: str) -> Iterator[Tuple[str, CFG_T]]:
+def load_configuration(config_path: str) -> Iterator[tuple[str, CFG_T]]:
     '''
         Load configuration from module and prepare it for initializing agents.
         Returns list of unfolded configs for each agent.
@@ -76,23 +78,23 @@ def load_configuration(config_path: str) -> Iterator[Tuple[str, CFG_T]]:
         yield name, (backend, cfg)
 
 
-def _configuration(data: Dict[str, Dict[str, str]]) -> Iterator[Tuple[str, CFG_T]]:
+def _configuration(data: dict[str, dict[str, str]]) -> Iterator[tuple[str, CFG_T]]:
     for name, params in data.items():
         backend = params.pop('backend', None)
         if backend:
             yield name, (backend, params)
 
 
-def init_agent(backend: str, cfg: Dict[str, Any]) -> 'MicroAgent':
+def init_agent(backend: str, cfg: dict[str, Any]) -> 'MicroAgent':
     '''
         Import and load all using backends from config,
         initialize it and returns not started MicroAgent instance
     '''
 
-    bus: Optional['AbstractSignalBus'] = None
-    broker: Optional['AbstractQueueBroker'] = None
-    _bus: Optional[CFG_T] = cfg.pop('bus', None)
-    _broker: Optional[CFG_T] = cfg.pop('broker', None)
+    bus: 'AbstractSignalBus' | None = None
+    broker: 'AbstractQueueBroker' | None = None
+    _bus: CFG_T | None = cfg.pop('bus', None)
+    _broker: CFG_T | None = cfg.pop('broker', None)
 
     if _bus:
         bus = _import(_bus[0])(**_bus[1])
@@ -103,62 +105,75 @@ def init_agent(backend: str, cfg: Dict[str, Any]) -> 'MicroAgent':
     return _import(backend)(bus=bus, broker=broker, **cfg)
 
 
-def _import(path: str):
+def _import(path: str) -> type:
     mod = importlib.import_module('.'.join(path.split('.')[:-1]))
     return getattr(mod, path.split('.')[-1])
 
 
-def _run_agent(name: str, backend: str, cfg: Dict[str, Any], parent_pid: int) -> None:
+def run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
     '''
         Initialize MicroAgent instance from config and run it forever
         Contains handling for process control
     '''
-    logger.info('Run Agent %s pid#%s', name, os.getpid())
+    logger.info('AgentProc[%s]: run on pid#%s', name, os.getpid())
 
-    asyncio.run(run_agent(name, backend, cfg, parent_pid))
+    asyncio.run(_run_agent(name, backend, cfg))
 
-    logger.info('Stoped Agent %s pid#%s', name, os.getpid())
+    logger.info('AgentProc[%s]: stoped pid#%s', name, os.getpid())
 
 
-async def run_agent(name: str, backend: str, cfg: Dict[str, Any], parent_pid: int) -> None:
+async def _run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
     loop = asyncio.get_event_loop()
 
     # Interrupt process when master shutdown
-    loop.add_signal_handler(signal.SIGINT, partial(_interrupter, 'INT'))
-    loop.add_signal_handler(signal.SIGTERM, partial(_interrupter, 'TERM'))
+    loop.add_signal_handler(signal.SIGINT, partial(_interrupter, name, 'INT'))
+    loop.add_signal_handler(signal.SIGTERM, partial(_interrupter, name, 'TERM'))
 
     # Check master & force break
-    loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, parent_pid, loop)
-
-    agent = init_agent(backend, cfg)
+    loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, name)
 
     try:
+        agent = init_agent(backend, cfg)
         await agent.start()  # wait when servers used
 
         while True:  # wait when no servers in agent
-            logger.debug('Agent %s alive', name)
+            logger.debug('AgentProc[%s]: alive', name)
             await asyncio.sleep(3600)
 
     except (KeyboardInterrupt, GroupInterrupt, ServerInterrupt) as exc:
-        logger.warning('Catch interrupt %s', exc)
+        logger.warning('AgentProc[%s]: Catch interrupt %s', name, exc)
+
+        for t in asyncio.all_tasks(loop=loop):
+            t.cancel()
+
+        await asyncio.sleep(.1)
+        loop.stop()
 
     except Exception as exc:
-        logger.exception('Catch error %s', exc)
+        logger.exception('AgentProc[%s]: Catch error %s', name, exc)
         raise
 
+    finally:
+        raise SystemExit()
 
-def _interrupter(sig):
-    logger.warning('Catch %s signal', sig)
+
+def _interrupter(name: str, sig: str) -> None:
+    logger.warning('AgentProc[%s]: catch %s signal', name, sig)
     raise GroupInterrupt(sig)
 
 
-def _master_watcher(pid: int, loop: asyncio.BaseEventLoop):
-    loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, pid, loop)
+def _master_watcher(name: str) -> None:
+    asyncio.get_running_loop().call_later(MASTER_WATCHER_PERIOD, _master_watcher, name)
+
+    if not (pid := getattr(multiprocessing.parent_process(), 'pid', None)):
+        logger.warning('AgentProc[%s]: parent process not found, exiting...', name)
+        raise SystemExit()
+
     try:
         os.kill(pid, 0)  # check master process
-    except ProcessLookupError:
-        logger.warning('Parent process#%s closed, exiting...', pid)
-        os._exit(os.EX_OK)  # noqa: W0212 hard break better than deattached pocesses
+    except ProcessLookupError as exc:
+        logger.warning('AgentProc[%s]: parent process#%s closed, exiting...', name, pid)
+        raise SystemExit() from exc
 
 
 class AgentsManager:
@@ -168,51 +183,44 @@ class AgentsManager:
         and wait when it finished or failed, then send SIGTERM for all other working processes.
     '''
 
-    mp_ctx: multiprocessing.context.BaseContext
-    processes: Dict[int, multiprocessing.process.BaseProcess]
-    cfg: List[Tuple[str, CFG_T]]
+    mp_ctx: multiprocessing.context.DefaultContext
+    processes: dict[int, multiprocessing.process.BaseProcess]
+    cfg: list[tuple[str, CFG_T]]
     running: bool
-    intlock: bool
 
-    def __init__(self, cfg: List[Tuple[str, CFG_T]]) -> None:
+    def __init__(self, cfg: list[tuple[str, CFG_T]]) -> None:
         self.mp_ctx = multiprocessing.get_context()
         self.processes = {}
         self.cfg = cfg
         self.running = False
-        self.intlock = False
 
         signal.signal(signal.SIGTERM, self._signal_cb)
         signal.signal(signal.SIGINT, self._signal_cb)
 
-    def _signal_cb(self, signum: int, *args) -> None:
+    def _signal_cb(self, signum: int, *args: Any) -> None:
         signame = {2: 'INT', 15: 'TERM'}.get(signum, signum)
-        logger.warning('Catch %s %s', signame, list(self.processes))
+        logger.warning('AgentsManager: catch %s', signame)
         self.running = False
 
     def start(self) -> None:
         ''' Starting and keep running unix-processes with agents '''
 
         self.running = True
+        logger.info('AgentsManager: starting...')
 
         for name, _cfg in self.cfg:
-            proc = self.mp_ctx.Process(
-                target=_run_agent,
-                name=name,
-                args=(name, *_cfg),
-                kwargs={'parent_pid': self.mp_ctx.current_process().pid},
-                daemon=True
-            )
-
+            proc = self.mp_ctx.Process(target=run_agent, name=name, args=(name, *_cfg), daemon=True)
             proc.start()
 
             if not proc.pid:
-                logger.error('Fail starting %s', name)
+                logger.error('AgentsManager: fail starting %s', name)
                 self.close()
                 return
 
             self.processes[proc.pid] = proc
+            logger.info('AgentsManager: %s started', name)
 
-        logger.info('Agents started')
+        logger.info('AgentsManager: started\n%s', self._get_state())
 
         while self.running:
             time.sleep(.01)
@@ -220,34 +228,38 @@ class AgentsManager:
             if any(not p.is_alive() for p in self.processes.values()):
                 self.running = False  # one finished - all finished
 
-        logger.info('Agents stoped')
+        logger.info('AgentsManager: interrupt detected')
         self.close()
 
-    def close(self):
+    def close(self) -> None:
         ''' Terminating dependent processes '''
 
-        if self.intlock:  # Prevent duble kill
-            logger.warning('Force kill locked')
-            return
-
-        self.intlock = True
-        logger.warning('Force kill processes %s', list(self.processes))
+        logger.warning('AgentsManager: force kill processes\n%s', self._get_state())
 
         for process in self.processes.values():
+            logger.info('AgentsManager: terminate %s [%s]', process.name, process.pid)
             process.terminate()
 
-        time.sleep(.1)
-        logger.info('Forked processes killed')
+        time.sleep(.5)
+        logger.info('AgentsManager: forked processes killed\n%s', self._get_state())
+
+    def _get_state(self) -> str:
+        result = []
+
+        for pid, proc in self.processes.items():
+            _color = 32 if proc.is_alive() else 31
+            _state = 'running...' if proc.is_alive() else f'exit={proc.exitcode}'
+            result.append(f'  {pid}: {proc.name} \x1b[{_color}m[{_state}]\x1b[0m')
+
+        return '\n'.join(result)
 
 
-def run():
+def run() -> None:
     ''' Parse input and run '''
 
     parser = argparse.ArgumentParser(description='Run microagents')
     parser.add_argument('modules', metavar='MODULE_PATH', type=str, nargs='+',
         help='configuration modeles path')
-    # parser.add_argument('--bind', metavar='HOST:POST', type=str, dest='bind',
-    #     help='Bind duty interface')
 
     call_args = parser.parse_args()
     cfg = list(chain(*[load_configuration(module) for module in call_args.modules]))
@@ -255,4 +267,4 @@ def run():
     try:
         AgentsManager(cfg).start()
     finally:
-        parser.exit(message="Exit\n")
+        parser.exit(message='Exit\n')

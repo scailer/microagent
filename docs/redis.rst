@@ -1,9 +1,9 @@
-.. _tools-aioredis:
+.. _tools-redis:
 
 Redis
 ======================================
 
 
-.. automodule:: microagent.tools.aioredis
+.. automodule:: microagent.tools.redis
     :members:
     :member-order: bysource

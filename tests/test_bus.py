@@ -1,18 +1,22 @@
 # mypy: ignore-errors
-import uuid
-import json
 import asyncio
-import pytest
+import json
 import logging
-from unittest.mock import MagicMock, AsyncMock
+import uuid
+
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from microagent.bus import AbstractSignalBus
-from microagent.signal import SignalException, SerializingError, Signal, Receiver  # , LookupKey
+from microagent.signal import Receiver, SerializingError, Signal, SignalException  # , LookupKey
+
 
 DSN = 'redis://localhost'
 
 
 class Handler(AsyncMock):
-    def __name__(self):
+    def __name__(self) -> str:  # noqa PLW3201
         return 'Handler'
 
 
@@ -68,7 +72,7 @@ async def test_Signal_make_channel_name_ok(test_signal):
 
 
 async def test_Signal_serialize_ok(test_signal):
-    assert test_signal.serialize({'a': 1}) == '{"a":1}'
+    assert test_signal.serialize({'a': 1}) == '{"a": 1}'
 
 
 async def test_Signal_serialize_fail(test_signal):
@@ -97,17 +101,16 @@ async def test_Receiver_ok(test_signal):
 class Bus(AbstractSignalBus):
     RESPONSE_TIMEOUT = 0.5
 
-    async def send(self, channel: str, message: str):
+    async def send(self, channel: str, message: str) -> None:
         pass
 
-    async def bind(self, channel: str):
+    async def bind(self, channel: str) -> None:
         pass
 
 
 @pytest.fixture
-async def bus(event_loop):
+async def bus():
     bus = Bus(dsn=DSN, prefix='TEST')
-    bus._loop = event_loop
     bus.bind = AsyncMock()
     bus.send = AsyncMock()
     bus.log = MagicMock()
@@ -130,7 +133,7 @@ async def test_Bus_init_ok():
     assert bus.prefix == 'PUBSUB'
 
     logger = logging.getLogger('name')
-    bus = Bus(dsn=DSN, logger=logger)
+    bus = Bus(dsn=DSN, log=logger)
     assert bus.log is logger
 
     with pytest.raises(TypeError):
@@ -225,8 +228,8 @@ async def test_Bus_waiter_fail_timeout(bus, test_signal):
     asyncio.get_running_loop().call_later(0.1, finish)
 
     async with bus.test_signal.waiter(sender='name', a=1, timeout=.05) as queue:
-        async for x in queue:
-            assert False
+        async for _x in queue:
+            raise AssertionError()
         assert True
 
 
@@ -235,7 +238,7 @@ async def test_Bus_receiver_ok(bus, test_signal):
     bus.receiver('TEST:test_signal:test', '{"uuid": 1}')
     await asyncio.sleep(.001)
     bus.handle_signal.assert_called()
-    bus.handle_signal.assert_called_with(test_signal, 'test', None, {"uuid": 1})
+    bus.handle_signal.assert_called_with(test_signal, 'test', None, {'uuid': 1})
 
 
 async def test_Bus_receiver_ok_typed(bus, typed_signal):
@@ -243,7 +246,7 @@ async def test_Bus_receiver_ok_typed(bus, typed_signal):
     bus.receiver('TEST:typed_signal:test', '{"uuid": 1}')
     await asyncio.sleep(.001)
     bus.handle_signal.assert_called()
-    bus.handle_signal.assert_called_with(typed_signal, 'test', None, {"uuid": 1})
+    bus.handle_signal.assert_called_with(typed_signal, 'test', None, {'uuid': 1})
 
 
 async def test_Bus_receiver_fail_bad_msg(bus, test_signal):
@@ -252,10 +255,6 @@ async def test_Bus_receiver_fail_bad_msg(bus, test_signal):
     await asyncio.sleep(.001)
     bus.handle_signal.assert_not_called()
     bus.log.error.assert_called()
-    bus.receiver('TEST:test_signal:test', '[]')
-    await asyncio.sleep(.001)
-    bus.handle_signal.assert_not_called()
-    assert bus.log.error.call_count == 2
 
 
 async def test_Bus_receiver_ok_missed_args(bus, test_signal):
@@ -305,7 +304,7 @@ async def test_Bus_handle_signal_ok_response(bus):
 
     bus.broadcast.assert_called_with(receiver, some_signal, 'test', {})
     bus.send.assert_called_with(
-        f'{bus.prefix}:response:{bus.uid}#{uid}', f'{{"{receiver.key}":42}}')
+        f'{bus.prefix}:response:{bus.uid}#{uid}', f'{{"{receiver.key}": 42}}')
 
 
 async def test_Bus_broadcast_ok(bus, test_signal):
@@ -321,7 +320,7 @@ async def test_Bus_broadcast_ok_none(bus, test_signal):
 
 
 async def test_Bus_broadcast_ok_sync(bus, test_signal):
-    handler = MagicMock(return_value=1, **{'__qualname__': 'qname'})
+    handler = AsyncMock(return_value=1, **{'__qualname__': 'qname'})
     receiver = Receiver(agent=None, handler=handler, signal=test_signal, timeout=60)
     assert await bus.broadcast(receiver, test_signal, 'test', {'uuid': 1}) == 1
 

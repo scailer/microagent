@@ -1,12 +1,14 @@
 language: python
 dist: focal
 python:
-  - "3.8"
-  - "3.9"
   - "3.10"
+  - "3.11"
+  - "3.12"
 install:
   - pip install codecov
 script:
-  - python setup.py test
+  - ruff microagent
+  - mypy microagent
+  - pytest tests
 after_success:
   - codecov

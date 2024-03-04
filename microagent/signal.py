@@ -1,6 +1,11 @@
-from typing import List, Dict, Callable, Union, Optional, Tuple, TYPE_CHECKING
-from dataclasses import dataclass
 import json
+
+from dataclasses import dataclass
+from types import ModuleType
+from typing import TYPE_CHECKING, ClassVar, TypedDict
+
+from .abc import BoundKey, ReceiverFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -19,7 +24,7 @@ class SerializingError(SignalException):
     pass
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class Signal:
     '''
         Dataclass (declaration) for a signal entity with a unique name.
@@ -38,10 +43,6 @@ class Signal:
             for input data in runtime. Type checking works in `bus.send`,
             `bus.call` and on receiving signals. Supported only json-types:
             string, number, boolean, array, object, null.
-
-        .. attribute:: content_type
-
-            String, content format, `json` by default
 
 
         Declaration with config-file (signals.json).
@@ -72,11 +73,11 @@ class Signal:
     '''
 
     name: str
-    providing_args: List[str]
-    type_map: Optional[Dict[str, Tuple[type, ...]]] = None
-    content_type: str = 'json'
-    _signals = {}  # type: Dict[str, Signal]
-    _jsonlib = json
+    providing_args: list[str]
+    type_map: dict[str, tuple[type, ...]] | None = None
+
+    _signals: ClassVar[dict[str, 'Signal']] = {}
+    _jsonlib: ClassVar[ModuleType] = json
 
     def __post_init__(self) -> None:
         self._signals[self.name] = self
@@ -89,20 +90,23 @@ class Signal:
             return NotImplemented
         return self.name == other.name
 
+    def __hash__(self) -> int:
+        return id(self)
+
     @classmethod
-    def set_jsonlib(self, jsonlib) -> None:
-        self._jsonlib = jsonlib
+    def set_jsonlib(cls, jsonlib: ModuleType) -> None:
+        cls._jsonlib = jsonlib
 
     @classmethod
     def get(cls, name: str) -> 'Signal':
         ''' Get the signal instance by name '''
         try:
             return cls._signals[name]
-        except KeyError:
-            raise SignalNotFound(f'No such signal {name}')
+        except KeyError as exc:
+            raise SignalNotFound(f'No such signal {name}') from exc
 
     @classmethod
-    def get_all(cls) -> Dict[str, 'Signal']:
+    def get_all(cls) -> dict[str, 'Signal']:
         ''' All registered signals '''
         return cls._signals
 
@@ -124,7 +128,7 @@ class Signal:
         try:
             return self._jsonlib.dumps(data)
         except (ValueError, TypeError, OverflowError) as exc:
-            raise SerializingError(exc)
+            raise SerializingError(exc) from exc
 
     def deserialize(self, data: str) -> dict:
         '''
@@ -133,17 +137,24 @@ class Signal:
             :param data: serialized transfered data
         '''
         try:
-            return self._jsonlib.loads(data)
+            return dict(self._jsonlib.loads(data))
         except (ValueError, TypeError, OverflowError) as exc:
-            raise SerializingError(exc)
+            raise SerializingError(exc) from exc
 
 
-@dataclass(frozen=True)
+class ReceiverArgs(TypedDict):
+    signal: Signal
+    timeout: float
+
+
+@dataclass(slots=True, frozen=True)
 class Receiver:
     agent: 'MicroAgent'
-    handler: Callable
+    handler: ReceiverFunc
     signal: Signal
-    timeout: Union[int, float]
+    timeout: float
+
+    _register: ClassVar[dict[BoundKey, ReceiverArgs]] = {}
 
     @property
     def key(self) -> str:

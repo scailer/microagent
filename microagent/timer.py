@@ -19,13 +19,18 @@ Exceptions are written to the logger in the associated Microagent.
         async def cron_handler(self):
             pass  # code here
 '''
-import re
-import time
 import asyncio
 import inspect
-from datetime import datetime, timedelta
+import re
+import time
+
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import List, Union, Callable, NamedTuple, TYPE_CHECKING
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, ClassVar, NamedTuple, TypedDict
+
+from .abc import BoundKey, PeriodicFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -38,16 +43,16 @@ MAX_DIFF = 2 * 356 * 24 * 60 * 60
 
 class CRON(NamedTuple):
     spec: str
-    minutes: List[int]  # 0-59
-    hours: List[int]  # 0-23
-    days: List[int]  # 1-31
-    months: List[int]  # 1-12
-    weekdays: List[int]  # 0-7
+    minutes: list[int]  # 0-59
+    hours: list[int]  # 0-23
+    days: list[int]  # 1-31
+    months: list[int]  # 1-12
+    weekdays: list[int]  # 0-7
 
-    def next(self):  # noqa A003
-        return next_moment(self, datetime.now())
+    def next(self) -> datetime:  # noqa A003
+        return next_moment(self, datetime.now(tz=timezone.utc))
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'[{self.spec}]'
 
 
@@ -73,24 +78,39 @@ class PeriodicMixin:
         asyncio.get_running_loop().call_later(start_after, _periodic, self)
 
 
-@dataclass(frozen=True)
-class PeriodicTask(PeriodicMixin):
-    agent: 'MicroAgent'
-    handler: Callable
+class PeriodicArgs(TypedDict):
     period: float
     timeout: float
     start_after: float
+
+
+@dataclass(frozen=True)
+class PeriodicTask(PeriodicMixin):
+    agent: 'MicroAgent'
+    handler: PeriodicFunc
+    period: float
+    timeout: float
+    start_after: float
+
+    _register: ClassVar[dict[BoundKey, PeriodicArgs]] = {}
 
     def __repr__(self) -> str:
         return f'<PeriodicTask {self.handler.__name__} of {self.agent} every {self.period} sec>'
 
 
+class CRONArgs(TypedDict):
+    cron: CRON
+    timeout: float
+
+
 @dataclass(frozen=True)
 class CRONTask(PeriodicMixin):
     agent: 'MicroAgent'
-    handler: Callable
+    handler: PeriodicFunc
     cron: CRON
     timeout: float
+
+    _register: ClassVar[dict[BoundKey, CRONArgs]] = {}
 
     def __repr__(self) -> str:
         return f'<CRONTask {self.handler.__name__} of {self.agent} every {self.cron}>'
@@ -109,11 +129,11 @@ class CRONTask(PeriodicMixin):
             *period* property of **CRONTask** object is a next value of
             generator behind facade. Be carefully with manual manipulation with it.
         '''
-        self.agent.log.debug('Run %s', self.__repr__())
+        self.agent.log.debug('Run %r', self)
         return self.cron.next().timestamp() - time.time()  # next step delay
 
 
-def _periodic(task: Union[PeriodicTask, CRONTask]) -> asyncio.Task:
+def _periodic(task: PeriodicTask | CRONTask) -> asyncio.Task:
     asyncio.get_running_loop().call_later(task.period, _periodic, task)
     return asyncio.create_task(task.call())
 
@@ -138,7 +158,7 @@ def cron_parser(spec: str) -> CRON:
                 )
             )
         )
-        for rng, val in zip(RANGES, spec.split())
+        for rng, val in zip(RANGES, spec.split(), strict=True)
     )
 
     for i, val in enumerate(norm_spec):
@@ -147,7 +167,7 @@ def cron_parser(spec: str) -> CRON:
         if match:  # 0-23/5 -> [0, 5, 10, 15, 20]
             _min, _max, _step = map(int, match.groups())
 
-            if i in (2, 3) and _min == 1:
+            if i in {2, 3} and _min == 1:
                 values.append([x for x in range(_min - 1, _max + 1) if x and not x % _step])
             else:
                 values.append([x for x in range(_min, _max + 1) if not x % _step])
@@ -166,35 +186,37 @@ def cron_parser(spec: str) -> CRON:
 
 
 def next_moment(cron: CRON, now: datetime) -> datetime:
-    if abs((datetime.now() - now).total_seconds()) > MAX_DIFF:
+    if abs((datetime.now(tz=timezone.utc) - now).total_seconds()) > MAX_DIFF:
         raise ValueError
 
     if now.second or now.microsecond:
         # if moment passed several seconds ago, go to next minute
         now += timedelta(minutes=1)
         now = datetime(year=now.year, month=now.month, day=now.day,
-            hour=now.hour, minute=now.minute)
+            hour=now.hour, minute=now.minute, tzinfo=timezone.utc)
 
     if now.month not in cron.months:
-        if now.month == 12:
-            now = datetime(year=now.year + 1, month=1, day=1)
+        if now.month == 12:  # noqa PLR2004
+            now = datetime(year=now.year + 1, month=1, day=1, tzinfo=timezone.utc)
         else:
-            now = datetime(year=now.year, month=now.month + 1, day=1)
+            now = datetime(year=now.year, month=now.month + 1, day=1, tzinfo=timezone.utc)
 
         return next_moment(cron, now)
 
     if now.day not in cron.days or now.weekday() not in cron.weekdays:
         now += timedelta(days=1)
-        now = datetime(year=now.year, month=now.month, day=now.day)
+        now = datetime(year=now.year, month=now.month, day=now.day, tzinfo=timezone.utc)
         return next_moment(cron, now)
 
     if now.hour not in cron.hours:
         now += timedelta(hours=1)
-        now = datetime(year=now.year, month=now.month, day=now.day, hour=now.hour)
+        now = datetime(year=now.year, month=now.month, day=now.day, hour=now.hour,
+            tzinfo=timezone.utc)
         return next_moment(cron, now)
 
     if now.minute not in cron.minutes:
         now += timedelta(minutes=1)
         return next_moment(cron, now)
 
-    return datetime(year=now.year, month=now.month, day=now.day, hour=now.hour, minute=now.minute)
+    return datetime(year=now.year, month=now.month, day=now.day,
+        hour=now.hour, minute=now.minute, tzinfo=timezone.utc)

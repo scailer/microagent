@@ -42,8 +42,8 @@ Tool is intended for developing:
 Tool provide features:
 
 * running a **periodical tasks** (interval or as CRON)
-* specification of signals (events), their sending and receiving via the bus (aioredis_)
-* description of queues, sending and receiving messages via the queue broker (aioamqp_, kafka_, aioredis_)
+* specification of signals (events), their sending and receiving via the bus (redis_)
+* description of queues, sending and receiving messages via the queue broker (aioamqp_, kafka_, redis_)
 * limited **RPC** via signal bus
 * launching sub-services (in the same process)
 * launching a group of microagents (each in a separate process)
@@ -83,8 +83,8 @@ See MicroAgent documentation_.
 
 
     async def main():
-        bus = AIORedisSignalBus('redis://localhost/7')
-        broker = AIORedisBroker('redis://localhost/7')
+        bus = RedisSignalBus('redis://localhost/7')
+        broker = RedisBroker('redis://localhost/7')
 
         # usage bus and broker separate from agent
         await bus.started.send('user_agent')
@@ -96,9 +96,9 @@ See MicroAgent documentation_.
 Installing
 ----------
 
-With aioredis_ backend provide signal bus and list-based queues::
+With redis_ backend provide signal bus and list-based queues::
 
-    pip install 'microagent[aioredis]'
+    pip install 'microagent[redis]'
 
 With aioamqp_ backend provide queues over AMQP (RabbitMQ)::
 
@@ -109,7 +109,7 @@ With kafka_ backend provide queues over Kafka (experemental)::
     pip install 'microagent[kafka]'
 
 
-.. _aioredis: https://pypi.org/project/aioredis/
+.. _redis: https://pypi.org/project/redis/
 .. _aioamqp: https://pypi.org/project/aioamqp/
 .. _kafka: https://pypi.org/project/aiokafka/
 .. _documentation: https://microagent.readthedocs.io/

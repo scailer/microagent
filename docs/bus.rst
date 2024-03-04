@@ -32,9 +32,6 @@ Signal bus
 .. autoclass:: microagent.bus.Receiver
 
 
-.. autoclass:: microagent.agent.ReceiverHandler
-
-
 **Exceptions**
 
 .. autoclass:: microagent.signal.SignalException

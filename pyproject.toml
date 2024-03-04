@@ -1,0 +1,139 @@
+[build-system]
+requires = ['setuptools', 'setuptools-scm']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'microagent'
+authors = [
+    {name = 'Dmitriy Vlasov', email = 'scailer@yandex.ru'},
+]
+readme = 'README.md'
+requires-python = '>=3.10'
+license = {file = 'LICENSE.md'}
+description = 'Tool for agent ecosystem'
+keywords = ['async', 'pubsub', 'queue', 'agent', 'periodic', 'cron']
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Plugins',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: MIT License',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+    'Framework :: AsyncIO'
+]
+dependencies = []
+dynamic = ['version']
+
+[project.urls]
+Homepage = 'https://github.com/scailer/microagent'
+Documentation = 'https://microagent.readthedocs.io/en/stable/'
+Repository = 'https://github.com/scailer/microagent.git'
+Changelog = 'https://github.com/scailer/microagent/blob/master/CHANGELOG.rst'
+
+[project.optional-dependencies]
+redis = ['redis[hiredis]==5.*']
+amqp = ['aiormq==6.8.*']
+kafka = ['aiokafka==0.10.*']
+dev = [
+    'pytest',
+    'pytest-runner',
+    'pytest-asyncio',
+    'pytest-cov',
+    'coverage',
+    'mypy',
+    'ruff',
+    'redis==5.*',
+    'aiormq==6.8.*',
+    'aiokafka==0.10.*',
+]
+
+[project.entry-points.'console_scripts']
+marun = 'microagent.launcher:run'
+
+[tool.setuptools.dynamic]
+version = {attr = 'microagent.__version__'}
+
+[tool.setuptools]
+packages = ['microagent', 'microagent.tools']
+
+[tool.setuptools.package-data]
+microagent = ['py.typed']
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    '@abc.abstractmethod',
+    '@abstractmethod',
+    'return NotImplemented',
+    'from .agent import MicroAgent',
+    '    \.\.\.'
+]
+
+[tool.ruff]
+line-length = 100
+target-version = 'py310'
+
+[tool.ruff.lint]
+preview = true
+select = [
+    'E', 'W', 'PL', 'C90', 'N', 'UP', 'I',
+    # pep8-errors, pep8-warn, pylint, mccabe, pep8-naming, pyupgrade, isort
+    'F', 'B', 'A', 'T20', 'BLE', 'RET',
+    # flake8, flake8-bugbear, flake8-builtins, flake8-print, flake8-blind-except, flake8-return
+    'ANN', 'ASYNC', 'DTZ', 'ISC', 'Q',
+    # flake8-annotations, flake8-async, flake8-datetimez, flake8-implicit-str-concat, flake8-quotes
+]
+ignore = [
+    'PLR6301',  # no-self-use
+    'PLR0913',  # too-many-arguments
+    'PLR0917',  # too many positional arguments
+    'ANN101',  # missing-type-self
+    'ANN102',  # missing-type-cls
+    'N805',  # First argument of a method should be named self, pydantic validators
+    'N818',  # Checks for custom exception definitions that omit the Error suffix.
+]
+
+[tool.ruff.lint.per-file-ignores]
+'microagent/tools/mocks.py' = ['PLC2701']
+'tests/*' = ['PLR2004']
+'tests/test_launcher.py' = ['N806']  # Variable `A` in function should be lowercase
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.isort]
+case-sensitive = true
+combine-as-imports = true
+lines-after-imports = 2
+lines-between-types = 1
+split-on-trailing-comma = false
+
+[tool.ruff.lint.pep8-naming]
+extend-ignore-names = ['test_*']
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+ignore-fully-untyped = true  # temp, legacy code
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = 'single'
+docstring-quotes = 'single'
+multiline-quotes = 'single'
+avoid-escape = false
+
+[tool.mypy]
+warn_unused_ignores = true
+warn_unreachable = true
+warn_no_return = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = '--verbose --asyncio-mode=auto --cov=microagent --cov-report=html --ignore archive/'

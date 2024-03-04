@@ -4,11 +4,14 @@ clean:
 	find . -name '*.pyc' | xargs rm -rf
 
 test:
-	python3 setup.py test
+	python -m ruff microagent tests
+	python -m mypy microagent
+	python -m pytest tests
 
 release: clean
-	python setup.py sdist bdist_wheel
+	python3 -m pip install --upgrade build twine
+	python3 -m build
 	python3 -m twine upload dist/*
 
-run_aioredis_example: 
-	python3 examples/aioredis_server.py
+run_redis_example: 
+	python3 examples/redis_server.py

@@ -2,6 +2,17 @@
 Changelog
 =========
 
+1.7 (2023-10-01)
+================
+
+- Change AMQP driver to aiormq
+- Change Redis driver to redis (redis.asyncio)
+- Drop setup.(py|cfg), add pyproject.toml
+- Drop support python 3.8, add python 3.11, 3.12
+- Redesigned linking system
+- Typing fixes
+
+
 1.6.1 (2022-05-29)
 ================
 

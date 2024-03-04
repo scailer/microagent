@@ -1,9 +1,12 @@
 # mypy: ignore-errors
 import asyncio
-import pytest
+
+from unittest.mock import AsyncMock, MagicMock, Mock
+
 import aiokafka
-from unittest.mock import MagicMock, AsyncMock, Mock
-from microagent.queue import Queue, Consumer
+import pytest
+
+from microagent.queue import Consumer, Queue
 from microagent.tools.kafka import KafkaBroker
 
 

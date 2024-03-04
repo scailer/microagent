@@ -1,18 +1,18 @@
 Periodic functions
 ======================================
 
-.. automodule:: microagent.periodic_task
+.. automodule:: microagent.timer
 
 
 .. automodule:: microagent
     :members: periodic, cron
 
 
-.. autoclass:: microagent.periodic_task.PeriodicTask
+.. autoclass:: microagent.timer.PeriodicTask
     :members:
     :member-order: bysource
 
 
-.. autoclass:: microagent.periodic_task.CRONTask
+.. autoclass:: microagent.timer.CRONTask
     :members:
     :member-order: bysource

@@ -30,7 +30,7 @@ except IndexError:
 # -- Project information -----------------------------------------------------
 
 project = 'MicroAgent'
-copyright = '2019-2020, Dmitrii Vlasov'
+copyright = '2019-2024, Dmitrii Vlasov'
 author = 'Dmitrii Vlasov'
 
 # The short X.Y version
@@ -228,7 +228,7 @@ intersphinx_mapping = {'https://docs.python.org/': None}
 todo_include_todos = True
 
 extlinks = {
-    'aioredis': ('https://aioredis.readthedocs.io/%s', ''),
+    'redis': ('https://redis.readthedocs.io/%s', ''),
     'aioamqp': ('https://aioamqp.readthedocs.io/%s', ''),
     'kafka': ('https://aiokafka.readthedocs.io/%s', ''),
 }

@@ -24,19 +24,29 @@ allow provide endpoints for microagent, such as http, websocket, smtp or other.
 '''
 
 import inspect
+
+from collections import abc, defaultdict
 from dataclasses import dataclass
-from collections import defaultdict
-from typing import Callable, Dict, List, Iterable, Awaitable, TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, TypedDict
+
+from .abc import BoundKey, HookFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
 
 
+class HookArgs(TypedDict):
+    label: str
+
+
 @dataclass(frozen=True)
 class Hook:
     agent: 'MicroAgent'
-    handler: Callable
+    handler: HookFunc
     label: str
+
+    _register: ClassVar[dict[BoundKey, 'HookArgs']] = {}
 
 
 class Hooks:
@@ -44,29 +54,29 @@ class Hooks:
         Internal hooks
     '''
 
-    binds: Dict[str, List[Hook]]
+    binds: dict[str, list[Hook]]
 
-    def __init__(self, hooks: Iterable[Hook]):
+    def __init__(self, hooks: abc.Iterable[Hook]) -> None:
         self.binds = defaultdict(list)
 
         for hook in hooks:
             self.binds[hook.label].append(hook)
 
     @property
-    def servers(self) -> Iterable[Callable]:
+    def servers(self) -> abc.Iterable[abc.Callable]:
         return (hook.handler for hook in self.binds['server'])
 
-    def pre_start(self) -> Awaitable:
+    def pre_start(self) -> abc.Awaitable:
         return self.call('pre_start')
 
-    def post_start(self) -> Awaitable:
+    def post_start(self) -> abc.Awaitable:
         return self.call('post_start')
 
-    def pre_stop(self) -> Awaitable:
+    def pre_stop(self) -> abc.Awaitable:
         return self.call('pre_stop')
 
     async def call(self, label: str) -> None:
         for hook in self.binds[label]:
-            response = hook.handler()
+            response = hook.handler(hook.agent)
             if inspect.isawaitable(response):
                 await response
