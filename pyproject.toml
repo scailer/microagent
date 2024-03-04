@@ -7,7 +7,7 @@ name = 'microagent'
 authors = [
     {name = 'Dmitriy Vlasov', email = 'scailer@yandex.ru'},
 ]
-readme = 'README.md'
+readme = 'README.rst'
 requires-python = '>=3.10'
 license = {file = 'LICENSE.md'}
 description = 'Tool for agent ecosystem'
