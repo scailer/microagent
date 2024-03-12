@@ -39,6 +39,7 @@ class RedisSignalBus(AbstractSignalBus):
 
     def __post_init__(self) -> None:
         self.connection = self.new_connection()
+        super().__post_init__()
 
     def new_connection(self) -> Redis:
         return Redis.from_url(self.dsn, decode_responses=True)
