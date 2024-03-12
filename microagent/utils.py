@@ -30,4 +30,4 @@ def raise_timeout(timeout: float) -> None:
         if task._fut_waiter and not task._fut_waiter.cancelled():  # type: ignore[attr-defined]
             task.cancel()
 
-    asyncio.get_event_loop().call_later(timeout, _timeout, asyncio.current_task())
+    asyncio.get_event_loop().call_later(timeout, _timeout, asyncio.current_task())  # type: ignore[arg-type]

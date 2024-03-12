@@ -75,7 +75,7 @@ class PeriodicMixin:
             self.agent.log.exception(f'Periodic Exception: {exc}')
 
     def start(self, start_after: float) -> None:
-        asyncio.get_running_loop().call_later(start_after, _periodic, self)
+        asyncio.get_running_loop().call_later(start_after, _periodic, self)  # type: ignore[arg-type]
 
 
 class PeriodicArgs(TypedDict):
