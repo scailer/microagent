@@ -19,8 +19,8 @@ MicroAgent
 .. image:: https://readthedocs.org/projects/microagent/badge/?version=latest&style=flat
   :target: https://microagent.readthedocs.io/
 
-.. image:: https://github.com/scailer/microagent/actions
-   :target: https://github.com/scailer/microagent/workflows/Tests/badge.svg
+.. image:: https://github.com/scailer/microagent/workflows/Tests/badge.svg
+   :target: https://github.com/scailer/microagent/actions
 
 
 The goal of this project is to facilitate the creation of **microservices**
