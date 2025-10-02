@@ -333,6 +333,6 @@ def check_types(signal: Signal, data: dict, log: logging.Logger) -> None:
     if signal.type_map:
         for key, value in data.items():
             if key not in signal.type_map:
-                log.warning('Receiver get unknown arg "%s" %s', key, value)
+                log.warning('Receiver "%s" get unknown arg "%s" %s', signal.name, key, value)
             elif not isinstance(value, signal.type_map[key]):
-                log.warning('Receiver get wrong type for "%s" %s', key, value)
+                log.warning('Receiver "%s" get wrong type for "%s" %s', signal.name, key, value)

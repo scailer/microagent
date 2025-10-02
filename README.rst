@@ -13,17 +13,14 @@ MicroAgent
 .. image:: https://img.shields.io/pypi/status/microagent.svg
   :target: https://pypi.python.org/pypi/microagent
 
-.. image:: https://img.shields.io/pypi/dd/microagent.svg
+.. image:: https://img.shields.io/pypi/dm/microagent.svg
   :target: https://pypi.python.org/pypi/microagent
-
-.. image:: https://codecov.io/gh/scailer/microagent/branch/master/graph/badge.svg
-  :target: https://codecov.io/gh/scailer/microagent
-
-.. image:: https://travis-ci.com/scailer/microagent.svg?branch=master
-  :target: https://travis-ci.con/scailer/microagent
 
 .. image:: https://readthedocs.org/projects/microagent/badge/?version=latest&style=flat
   :target: https://microagent.readthedocs.io/
+
+.. image:: https://github.com/scailer/microagent/actions
+   :target: https://github.com/scailer/microagent/workflows/Tests/badge.svg
 
 
 The goal of this project is to facilitate the creation of **microservices**

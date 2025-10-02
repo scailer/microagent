@@ -22,6 +22,8 @@ classifiers = [
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
     'Topic :: Software Development :: Libraries :: Python Modules',
     'Framework :: AsyncIO'
 ]
@@ -75,11 +77,9 @@ exclude_lines = [
     '    \.\.\.'
 ]
 
-[tool.ruff]
+[tool.lint.ruff]
 line-length = 100
 target-version = 'py310'
-
-[tool.ruff.lint]
 preview = true
 select = [
     'E', 'W', 'PL', 'C90', 'N', 'UP', 'I',
@@ -99,29 +99,29 @@ ignore = [
     'N818',  # Checks for custom exception definitions that omit the Error suffix.
 ]
 
-[tool.ruff.lint.per-file-ignores]
+[tool.lint.ruff.per-file-ignores]
 'microagent/tools/mocks.py' = ['PLC2701']
 'tests/*' = ['PLR2004']
 'tests/test_launcher.py' = ['N806']  # Variable `A` in function should be lowercase
 
-[tool.ruff.lint.mccabe]
+[tool.lint.ruff.mccabe]
 max-complexity = 10
 
-[tool.ruff.lint.isort]
+[tool.lint.ruff.isort]
 case-sensitive = true
 combine-as-imports = true
 lines-after-imports = 2
 lines-between-types = 1
 split-on-trailing-comma = false
 
-[tool.ruff.lint.pep8-naming]
+[tool.lint.ruff.pep8-naming]
 extend-ignore-names = ['test_*']
 
-[tool.ruff.lint.flake8-annotations]
+[tool.lint.ruff.flake8-annotations]
 allow-star-arg-any = true
 ignore-fully-untyped = true  # temp, legacy code
 
-[tool.ruff.lint.flake8-quotes]
+[tool.lint.ruff.flake8-quotes]
 inline-quotes = 'single'
 docstring-quotes = 'single'
 multiline-quotes = 'single'
