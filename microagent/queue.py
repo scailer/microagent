@@ -59,10 +59,13 @@ class Queue:
     exchange: str = ''
 
     _queues: ClassVar[dict[str, 'Queue']] = {}
+    _exchanges: ClassVar[dict[str, 'Queue']] = {}
     _jsonlib: ClassVar[ModuleType] = json
 
     def __post_init__(self) -> None:
         self._queues[self.name] = self
+        if self.exchange:
+            self._exchanges[self.exchange] = self
 
     def __repr__(self) -> str:
         return f'<Queue {self.name}>'
@@ -83,7 +86,7 @@ class Queue:
     def get(cls, name: str) -> 'Queue':
         ''' Get the queue instance by name '''
         try:
-            return cls._queues[name]
+            return cls._exchanges.get(name) or cls._queues[name]
         except KeyError as exc:
             raise QueueNotFound(f'No such queue {name}') from exc
 
