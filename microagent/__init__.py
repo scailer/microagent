@@ -61,7 +61,7 @@ def load_stuff(source: str) -> tuple[Any, Any]:
         Signal(name=_data['name'], providing_args=providing_args, type_map=type_map)
 
     for _data in data.get('queues', []):
-        Queue(name=_data['name'])
+        Queue(name=_data['name'], exchange=_data.get('exchange', ''))
 
     if data.get('jsonlib'):
         jsonlib = importlib.import_module(data['jsonlib'])  # type: ignore
@@ -129,7 +129,8 @@ def load_queues(source: str) -> NamedTuple:
             {
                 "queues": [
                     {"name": "mailer"},
-                    {"name": "pusher"},
+                    {"name": "pusher1", "exchange": "push"},
+                    {"name": "pusher2", "exchange": "push"},
                 ]
             }
     '''

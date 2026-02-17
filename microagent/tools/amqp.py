@@ -99,10 +99,11 @@ class AMQPBroker(AbstractQueueBroker):
             properties=Basic.Properties(**properties) if properties else None, **kwargs)
 
     async def bind(self, name: str) -> None:
+        consumer = self._bindings[name]
         await ManagedConnection(
             dsn=self.dsn,
-            queue_name=name,
-            handler=self._amqp_wrapper(self._bindings[name])
+            consumer=consumer,
+            handler=self._amqp_wrapper(consumer)
         ).bind()
 
     def _amqp_wrapper(self, consumer: Consumer) -> Callable[[DeliveredMessage], Awaitable[None]]:
@@ -132,19 +133,6 @@ class AMQPBroker(AbstractQueueBroker):
                     await message.channel.basic_nack(delivery_tag=message.delivery_tag)
 
         return _wrapper
-
-    async def declare_queue(self, name: str, **options: Any) -> None:
-        '''
-            Declare queue with queue_declare method.
-
-            :param name: string, queue name
-            :param \*\*options: other queue_declare options
-        '''  # noqa: W605
-
-        channel = await self.get_channel()
-        info = await channel.queue_declare(name, **options)
-        self.log.info('Declare/get queue "%(queue)s" with %(message_count)s '
-            'messages, %(consumer_count)s consumers', info)
 
     async def queue_length(self, name: str, **options: Any) -> int:
         '''
@@ -190,7 +178,7 @@ class ReConnection(Connection):
 class ManagedConnection:
     ''' Binded connection with rebind logic '''
     dsn: str
-    queue_name: str
+    consumer: Consumer
     handler: Callable
     bind_attempts: int = 0
     bind_running: bool = False
@@ -200,17 +188,25 @@ class ManagedConnection:
         connection = ReConnection(self.rebind, self.dsn)
         await connection.connect()
         channel = await connection.channel()
-        log.warning('Declare queue "%s"', self.queue_name)
-        await channel.queue_declare(self.queue_name)
-        await channel.basic_consume(self.queue_name, self.handler)
+        queue_name, exchange_name = self.consumer.queue.name, self.consumer.queue.exchange
+
+        log.warning('Declare queue "%s" with exchange_name "%s"', queue_name, exchange_name)
+
+        await channel.queue_declare(queue_name)
+
+        if exchange_name:
+            await channel.exchange_declare(exchange=exchange_name, exchange_type='fanout')
+            await channel.queue_bind(queue=queue_name, exchange=exchange_name)
+
+        await channel.basic_consume(queue_name, self.handler)
 
     async def rebind(self) -> bool:
         if self.bind_running:
-            log.exception('Already rebinding queue "%s"', self.queue_name)
+            log.exception('Already rebinding queue "%s"', self.consumer.queue.name)
             return False
 
         if self.bind_attempts > REBIND_ATTEMPTS:
-            log.exception('Failed all attempts to rebind queue "%s"', self.queue_name)
+            log.exception('Failed all attempts to rebind queue "%s"', self.consumer.queue.name)
             return False
 
         await asyncio.sleep((self.bind_attempts ** 2) * REBIND_BASE_DELAY)
@@ -218,12 +214,12 @@ class ManagedConnection:
 
         try:
             await self.bind()
-            log.info('Success rebind queue "%s"', self.queue_name)
+            log.info('Success rebind queue "%s"', self.consumer.queue.name)
             self.bind_attempts = 0
             return True
 
         except (AMQPError, OSError) as exc:
-            log.exception('Failed rebind queue "%s": %s', self.queue_name, exc)
+            log.exception('Failed rebind queue "%s": %s', self.consumer.queue.name, exc)
             asyncio.create_task(self.rebind())
             return False
 

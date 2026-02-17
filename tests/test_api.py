@@ -21,7 +21,7 @@ def test_load_from_file():
     source = 'file://' + str(Path(__file__).parent / 'stuff.json')
     signals, queues = load_stuff(source)
     assert len(signals) == 3
-    assert len(queues) == 1
+    assert len(queues) == 3
     assert signals.test_signal.name == 'test_signal'
     assert signals.else_signal.name == 'else_signal'
     assert signals.typed_signal.name == 'typed_signal'
@@ -47,8 +47,12 @@ def test_load_signals():
 def test_load_queues():
     source = 'file://' + str(Path(__file__).parent / 'stuff.json')
     queues = load_queues(source)
-    assert len(queues) == 1
+    assert len(queues) == 3
     assert queues.test_queue.name == 'test_queue'
+    assert queues.push1.name == 'push1'
+    assert queues.push1.exchange == 'ex'
+    assert queues.push2.name == 'push2'
+    assert queues.push2.exchange == 'ex'
 
 
 def test_load_from_url():

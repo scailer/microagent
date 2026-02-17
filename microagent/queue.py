@@ -42,7 +42,8 @@ class Queue:
             {
                 "queues": [
                     {"name": "mailer"},
-                    {"name": "pusher"},
+                    {"name": "pusher", "exchange": "events"},
+                    {"name": "logger", "exchange": "events"},
                 ]
             }
 
@@ -55,6 +56,7 @@ class Queue:
             )
     '''
     name: str
+    exchange: str = ''
 
     _queues: ClassVar[dict[str, 'Queue']] = {}
     _jsonlib: ClassVar[ModuleType] = json
