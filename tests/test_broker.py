@@ -144,7 +144,7 @@ async def test_Broker_send_ok(broker, test_queue):
 
 async def test_Broker_send_ok_to_exchange(broker, else_queue):
     await broker.ex.send({'uid': 1})
-    broker.send.assert_called_once_with('else_queue', '{"uid": 1}')
+    broker.send.assert_called_once_with('else_queue', '{"uid": 1}', exchange='ex')
 
 
 async def test_Broker_prepared_data_ok(broker, test_queue):

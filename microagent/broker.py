@@ -160,6 +160,8 @@ class BoundQueue(QueueProtocol):
     queue: Queue
 
     async def send(self, message: dict, **options: Any) -> None:
+        if 'exchange' not in options and self.queue.exchange:
+            options['exchange'] = self.queue.exchange
         await self.broker.send(self.queue.name, self.queue.serialize(message), **options)
 
     async def length(self) -> int:
