@@ -4,17 +4,16 @@
 import asyncio
 import logging
 import time
-
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from aiormq import Connection
-from aiormq.abc import AbstractChannel, AbstractConnection, Basic, DeliveredMessage, ExceptionType
+from aiormq.abc import (AbstractChannel, AbstractConnection, Basic,
+                        DeliveredMessage, ExceptionType)
 from aiormq.exceptions import AMQPError, ConnectionClosed
 
 from ..broker import AbstractQueueBroker, Consumer
-
 
 log = logging.getLogger('microagent.amqp')
 ConnectionClosedDefault = ConnectionClosed(0, 'normal closed')
@@ -82,7 +81,7 @@ class AMQPBroker(AbstractQueueBroker):
 
         return self.sending_channel
 
-    async def send(self, name: str, message: str, exchange: str = '',
+    async def send(self, name: str, message: str, exchange: str = '', topic: str | None = None,
             properties: dict | None = None, **kwargs: Any) -> None:
         '''
             Raw message sending.
@@ -95,6 +94,10 @@ class AMQPBroker(AbstractQueueBroker):
         '''  # noqa: W605
 
         channel = await self.get_channel()
+
+        if topic:
+            name = topic
+
         await channel.basic_publish(message.encode(), routing_key=name, exchange=exchange,
             properties=Basic.Properties(**properties) if properties else None, **kwargs)
 
@@ -188,13 +191,21 @@ class ManagedConnection:
         connection = ReConnection(self.rebind, self.dsn)
         await connection.connect()
         channel = await connection.channel()
-        queue_name, exchange_name = self.consumer.queue.name, self.consumer.queue.exchange
 
-        log.warning('Declare queue "%s" with exchange_name "%s"', queue_name, exchange_name)
+        queue_name = self.consumer.queue.name
+        exchange_name = self.consumer.queue.exchange
+        topics = self.consumer.queue.topics
+
+        log.warning('Declare queue "%s" with exchange_name "%s" topics "%s"',
+            queue_name, exchange_name, topics)
 
         await channel.queue_declare(queue_name)
 
-        if exchange_name:
+        if topics:  # topics
+            await channel.exchange_declare(exchange=exchange_name, exchange_type='topic')
+            for topic in topics:
+                await channel.queue_bind(queue=queue_name, exchange=exchange_name, routing_key=topic)
+        elif exchange_name:  # fanout
             await channel.exchange_declare(exchange=exchange_name, exchange_type='fanout')
             await channel.queue_bind(queue=queue_name, exchange=exchange_name)
 

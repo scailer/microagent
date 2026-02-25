@@ -3,7 +3,6 @@ __version__ = '1.7.3'
 import importlib
 import json
 import urllib.request
-
 from collections import abc
 from typing import Any, NamedTuple
 
@@ -15,7 +14,6 @@ from .queue import Consumer, ConsumerArgs, Queue
 from .signal import Receiver, ReceiverArgs, Signal
 from .timer import CRONArgs, CRONTask, PeriodicArgs, PeriodicTask, cron_parser
 from .utils import make_bound_key
-
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'ServerInterrupt', 'receiver', 'consumer',
            'periodic', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
@@ -58,10 +56,18 @@ def load_stuff(source: str) -> tuple[Any, Any]:
             type_map = {name: get_types(_type) for name, _type in providing_args.items()}
             providing_args = list(providing_args)
 
-        Signal(name=_data['name'], providing_args=providing_args, type_map=type_map)
+        Signal(
+            name=_data['name'],
+            providing_args=providing_args,
+            type_map=type_map
+        )
 
     for _data in data.get('queues', []):
-        Queue(name=_data['name'], exchange=_data.get('exchange', ''))
+        Queue(
+            name=_data['name'],
+            exchange=_data.get('exchange', ''),
+            topics=_data.get('topics', [])
+        )
 
     if data.get('jsonlib'):
         jsonlib = importlib.import_module(data['jsonlib'])  # type: ignore

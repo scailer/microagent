@@ -23,12 +23,10 @@ import multiprocessing
 import os
 import signal
 import time
-
 from collections.abc import Iterator
 from functools import partial
 from itertools import chain
 from typing import TYPE_CHECKING, Any
-
 
 if TYPE_CHECKING:
     from .agent import MicroAgent

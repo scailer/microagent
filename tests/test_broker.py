@@ -1,6 +1,5 @@
 # mypy: ignore-errors
 import logging
-
 from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock
 
@@ -8,7 +7,6 @@ import pytest
 
 from microagent.broker import AbstractQueueBroker, Consumer, Queue
 from microagent.queue import QueueNotFound, SerializingError
-
 
 DSN = 'redis://localhost'
 

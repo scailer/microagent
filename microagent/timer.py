@@ -23,14 +23,12 @@ import asyncio
 import inspect
 import re
 import time
-
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, ClassVar, NamedTuple, TypedDict
 
 from .abc import BoundKey, PeriodicFunc
-
 
 if TYPE_CHECKING:
     from .agent import MicroAgent

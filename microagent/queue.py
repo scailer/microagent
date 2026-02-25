@@ -1,11 +1,9 @@
 import json
-
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import ModuleType
 from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from .abc import BoundKey, ConsumerFunc
-
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -41,9 +39,10 @@ class Queue:
 
             {
                 "queues": [
-                    {"name": "mailer"},
-                    {"name": "pusher", "exchange": "events"},
+                    {"name": "mailer"},  # simple
+                    {"name": "pusher", "exchange": "events"},  # fanout
                     {"name": "logger", "exchange": "events"},
+                    {"name": "save", "exchange": "msg", "topics": "m.*"},  # topics
                 ]
             }
 
@@ -57,6 +56,7 @@ class Queue:
     '''
     name: str
     exchange: str = ''
+    topics: list[str] = field(default_factory=list)
 
     _queues: ClassVar[dict[str, 'Queue']] = {}
     _exchanges: ClassVar[dict[str, 'Queue']] = {}

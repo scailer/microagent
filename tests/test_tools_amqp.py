@@ -1,6 +1,5 @@
 # mypy: ignore-errors
 import asyncio
-
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiormq
@@ -8,7 +7,8 @@ import pytest
 
 from microagent.queue import Consumer, Queue
 from microagent.tools import amqp
-from microagent.tools.amqp import AMQPBroker, Connection, ManagedConnection, ReConnection
+from microagent.tools.amqp import (AMQPBroker, Connection, ManagedConnection,
+                                   ReConnection)
 
 
 @pytest.fixture()
@@ -62,6 +62,15 @@ async def test_broker_send_ok(channel):
         b'{"a":1}', routing_key='test_queue', exchange='', properties=None)
 
 
+async def test_broker_send_ok_topic(channel):
+    queue = Queue(name='test_queue', exchange='ex', topics=['*'])
+    broker = AMQPBroker('amqp://localhost')
+    await broker.ex.send({"a":1}, topic='a')
+
+    channel.basic_publish.assert_called_once_with(
+        b'{"a": 1}', routing_key='a', exchange='ex', properties=None)
+
+
 async def test_broker_send_ok_fail(monkeypatch, channel):
     monkeypatch.setattr(Connection, 'channel', AsyncMock(side_effect=Exception))
 
@@ -96,6 +105,19 @@ async def test_broker_bind_ok_with_exchange(channel):
     channel.basic_consume.assert_called()
     channel.queue_bind.assert_called_once_with(queue=queue.name, exchange='ex')
     channel.exchange_declare.assert_called_once_with(exchange='ex', exchange_type='fanout')
+
+
+async def test_broker_bind_ok_with_topics(channel):
+    queue = Queue(name='test_queue', exchange='ex', topics=['a.*', 'b.*'])
+    consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
+
+    broker = AMQPBroker('amqp://localhost')
+    await broker.bind_consumer(consumer)
+
+    channel.basic_consume.assert_called()
+    channel.queue_bind.assert_any_call(queue=queue.name, exchange='ex', routing_key='a.*')
+    channel.queue_bind.assert_any_call(queue=queue.name, exchange='ex', routing_key='b.*')
+    channel.exchange_declare.assert_called_once_with(exchange='ex', exchange_type='topic')
 
 
 async def test_broker_rebind_ok(monkeypatch, channel):
