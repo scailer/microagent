@@ -1,4 +1,4 @@
-__version__ = '1.7.3'
+__version__ = '1.8.0rc1'
 
 import importlib
 import json
@@ -137,6 +137,8 @@ def load_queues(source: str) -> NamedTuple:
                     {"name": "mailer"},
                     {"name": "pusher1", "exchange": "push"},
                     {"name": "pusher2", "exchange": "push"},
+                    {"name": "create_event", "exchange": "logs", "topics": ["*created"]},
+                    {"name": "update_event", "exchange": "logs", "topics": ["*updated"]},
                 ]
             }
     '''

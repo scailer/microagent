@@ -39,10 +39,10 @@ class Queue:
 
             {
                 "queues": [
-                    {"name": "mailer"},  # simple
-                    {"name": "pusher", "exchange": "events"},  # fanout
+                    {"name": "mailer"},  // simple
+                    {"name": "pusher", "exchange": "events"},  // fanout
                     {"name": "logger", "exchange": "events"},
-                    {"name": "save", "exchange": "msg", "topics": "m.*"},  # topics
+                    {"name": "save", "exchange": "msg", "topics": "m.*"},  // topics
                 ]
             }
 
@@ -52,6 +52,17 @@ class Queue:
 
             some_queue = Queue(
                 name='some_queue'
+            )
+
+            else_queue = Queue(
+                name='else_queue',
+                exchange='fanout_exchange'
+            )
+
+            topic_queue = Queue(
+                name='topic_queue',
+                exchange='topic_exchange',
+                topics=['message.*']
             )
     '''
     name: str

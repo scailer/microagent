@@ -1,5 +1,5 @@
 '''
-:ref:`Queue Broker <broker>` based on :aioamqp:`aioamqp <>`.
+:ref:`Queue Broker <broker>` based on :aiormq:`aiormq <>`.
 '''
 import asyncio
 import logging

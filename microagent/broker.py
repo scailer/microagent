@@ -7,10 +7,17 @@ The broker performs the functions of guaranteed and consistent transmission of m
 from the product to the consumer, many to one (or according to the broker's own logic).
 The message has a free structure, fully defined in the user area.
 
+The broker supports three types of architecture:
+
+-   **Simple:** messages are delivered to a single queue.
+-   **Branching:** a message is sent to an exchange, from which it is copied to multiple queues.
+-   **Topics:** a message is sent to an exchange and, based on the topic, \ 
+    is routed to queues subscribed to that topic.
+
 Implementations:
 
 * :ref:`redis <tools-redis>`
-* :ref:`aioamqp <tools-amqp>`
+* :ref:`aiormq <tools-amqp>`
 * :ref:`kafka <tools-kafka>`
 
 
@@ -22,9 +29,13 @@ Using QueueBroker separately (sending only)
     from microagent.tools.redis import RedisBroker
 
     queues = load_queues('file://queues.json')
-
     broker = RedisBroker('redis://localhost/7')
-    await broker.user_created.send({'user_id': 1})
+
+    await broker.user_created.send({'user_id': 1})  # send to queue
+
+    await broker.push.send({'user_id': 1, 'text': 'hi!'})  # send to exchange
+
+    await broker.logs.send({'text': 'success'}, topic='user.message')  # send with topic
 
 
 Using with MicroAgent
