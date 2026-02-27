@@ -37,9 +37,9 @@ Repository = 'https://github.com/scailer/microagent.git'
 Changelog = 'https://github.com/scailer/microagent/blob/master/CHANGELOG.rst'
 
 [project.optional-dependencies]
-redis = ['redis[hiredis]==6.*']
+redis = ['redis[hiredis]>5']
 amqp = ['aiormq==6.9.*']
-kafka = ['aiokafka==0.12.*']
+kafka = ['aiokafka==0.13.*']
 dev = [
     'pytest',
     'pytest-runner',
@@ -48,9 +48,9 @@ dev = [
     'coverage',
     'mypy',
     'ruff',
-    'redis==6.*',
+    'redis[hiredis]>5',
     'aiormq==6.9.*',
-    'aiokafka==0.12.*',
+    'aiokafka==0.13.*',
 ]
 
 [project.entry-points.'console_scripts']

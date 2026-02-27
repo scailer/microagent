@@ -12,6 +12,8 @@
         }}
     ],
     "queues": [
-        {"name": "test_queue"}
+        {"name": "test_queue"},
+        {"name": "push1", "exchange": "ex"},
+        {"name": "push2", "exchange": "ex"}
     ]
 }

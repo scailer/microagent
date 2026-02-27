@@ -24,13 +24,11 @@ allow provide endpoints for microagent, such as http, websocket, smtp or other.
 '''
 
 import inspect
-
 from collections import abc, defaultdict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from .abc import BoundKey, HookFunc
-
 
 if TYPE_CHECKING:
     from .agent import MicroAgent

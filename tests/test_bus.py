@@ -3,14 +3,13 @@ import asyncio
 import json
 import logging
 import uuid
-
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from microagent.bus import AbstractSignalBus
-from microagent.signal import Receiver, SerializingError, Signal, SignalException  # , LookupKey
-
+from microagent.signal import (Receiver, SerializingError,  # , LookupKey
+                               Signal, SignalException)
 
 DSN = 'redis://localhost'
 

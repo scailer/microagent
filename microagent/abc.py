@@ -1,8 +1,6 @@
 import logging
-
 from collections.abc import Awaitable, Callable
 from typing import Any, Literal, Protocol
-
 
 HookLabel = Literal['server', 'pre_start', 'post_start', 'pre_stop']
 HookFunc = Callable[[Any], Awaitable[None]]

@@ -1,11 +1,9 @@
 import json
-
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import ModuleType
 from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from .abc import BoundKey, ConsumerFunc
-
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -41,8 +39,10 @@ class Queue:
 
             {
                 "queues": [
-                    {"name": "mailer"},
-                    {"name": "pusher"},
+                    {"name": "mailer"},  // simple
+                    {"name": "pusher", "exchange": "events"},  // fanout
+                    {"name": "logger", "exchange": "events"},
+                    {"name": "save", "exchange": "msg", "topics": "m.*"},  // topics
                 ]
             }
 
@@ -53,14 +53,30 @@ class Queue:
             some_queue = Queue(
                 name='some_queue'
             )
+
+            else_queue = Queue(
+                name='else_queue',
+                exchange='fanout_exchange'
+            )
+
+            topic_queue = Queue(
+                name='topic_queue',
+                exchange='topic_exchange',
+                topics=['message.*']
+            )
     '''
     name: str
+    exchange: str = ''
+    topics: list[str] = field(default_factory=list)
 
     _queues: ClassVar[dict[str, 'Queue']] = {}
+    _exchanges: ClassVar[dict[str, 'Queue']] = {}
     _jsonlib: ClassVar[ModuleType] = json
 
     def __post_init__(self) -> None:
         self._queues[self.name] = self
+        if self.exchange:
+            self._exchanges[self.exchange] = self
 
     def __repr__(self) -> str:
         return f'<Queue {self.name}>'
@@ -81,7 +97,7 @@ class Queue:
     def get(cls, name: str) -> 'Queue':
         ''' Get the queue instance by name '''
         try:
-            return cls._queues[name]
+            return cls._exchanges.get(name) or cls._queues[name]
         except KeyError as exc:
             raise QueueNotFound(f'No such queue {name}') from exc
 

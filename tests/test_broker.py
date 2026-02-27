@@ -1,6 +1,5 @@
 # mypy: ignore-errors
 import logging
-
 from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock
 
@@ -8,7 +7,6 @@ import pytest
 
 from microagent.broker import AbstractQueueBroker, Consumer, Queue
 from microagent.queue import QueueNotFound, SerializingError
-
 
 DSN = 'redis://localhost'
 
@@ -31,7 +29,7 @@ def test_queue():
 
 @pytest.fixture()
 def else_queue():
-    return Queue(name='else_queue')
+    return Queue(name='else_queue', exchange='ex')
 
 
 async def test_Queue_register_ok(test_queue, else_queue):
@@ -140,6 +138,11 @@ async def test_Broker_bind_fail(broker, test_queue):
 async def test_Broker_send_ok(broker, test_queue):
     await broker.test_queue.send({'uid': 1})
     broker.send.assert_called_once_with('test_queue', '{"uid": 1}')
+
+
+async def test_Broker_send_ok_to_exchange(broker, else_queue):
+    await broker.ex.send({'uid': 1})
+    broker.send.assert_called_once_with('else_queue', '{"uid": 1}', exchange='ex')
 
 
 async def test_Broker_prepared_data_ok(broker, test_queue):
