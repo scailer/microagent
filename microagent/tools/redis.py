@@ -120,7 +120,7 @@ class RedisBroker(AbstractQueueBroker):
         if inspect.isawaitable(ret):
             return await ret
 
-        return ret  # type: ignore[return-value]
+        return ret
 
     async def bind(self, name: str) -> None:
         _loop = asyncio.get_running_loop()
