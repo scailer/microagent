@@ -4,7 +4,7 @@ clean:
 	find . -name '*.pyc' | xargs rm -rf
 
 test:
-	python -m ruff microagent tests
+	python -m ruff check microagent tests
 	python -m mypy microagent
 	python -m pytest tests
 

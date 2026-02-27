@@ -1,20 +1,19 @@
 '''
-:ref:`Queue Broker <broker>` based on :aioamqp:`aioamqp <>`.
+:ref:`Queue Broker <broker>` based on :aiormq:`aiormq <>`.
 '''
 import asyncio
 import logging
 import time
-
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from aiormq import Connection
-from aiormq.abc import AbstractChannel, AbstractConnection, Basic, DeliveredMessage, ExceptionType
+from aiormq.abc import (AbstractChannel, AbstractConnection, Basic,
+                        DeliveredMessage, ExceptionType)
 from aiormq.exceptions import AMQPError, ConnectionClosed
 
 from ..broker import AbstractQueueBroker, Consumer
-
 
 log = logging.getLogger('microagent.amqp')
 ConnectionClosedDefault = ConnectionClosed(0, 'normal closed')
@@ -82,7 +81,7 @@ class AMQPBroker(AbstractQueueBroker):
 
         return self.sending_channel
 
-    async def send(self, name: str, message: str, exchange: str = '',
+    async def send(self, name: str, message: str, exchange: str = '', topic: str | None = None,
             properties: dict | None = None, **kwargs: Any) -> None:
         '''
             Raw message sending.
@@ -95,14 +94,19 @@ class AMQPBroker(AbstractQueueBroker):
         '''  # noqa: W605
 
         channel = await self.get_channel()
+
+        if topic:
+            name = topic
+
         await channel.basic_publish(message.encode(), routing_key=name, exchange=exchange,
             properties=Basic.Properties(**properties) if properties else None, **kwargs)
 
     async def bind(self, name: str) -> None:
+        consumer = self._bindings[name]
         await ManagedConnection(
             dsn=self.dsn,
-            queue_name=name,
-            handler=self._amqp_wrapper(self._bindings[name])
+            consumer=consumer,
+            handler=self._amqp_wrapper(consumer)
         ).bind()
 
     def _amqp_wrapper(self, consumer: Consumer) -> Callable[[DeliveredMessage], Awaitable[None]]:
@@ -132,19 +136,6 @@ class AMQPBroker(AbstractQueueBroker):
                     await message.channel.basic_nack(delivery_tag=message.delivery_tag)
 
         return _wrapper
-
-    async def declare_queue(self, name: str, **options: Any) -> None:
-        '''
-            Declare queue with queue_declare method.
-
-            :param name: string, queue name
-            :param \*\*options: other queue_declare options
-        '''  # noqa: W605
-
-        channel = await self.get_channel()
-        info = await channel.queue_declare(name, **options)
-        self.log.info('Declare/get queue "%(queue)s" with %(message_count)s '
-            'messages, %(consumer_count)s consumers', info)
 
     async def queue_length(self, name: str, **options: Any) -> int:
         '''
@@ -190,7 +181,7 @@ class ReConnection(Connection):
 class ManagedConnection:
     ''' Binded connection with rebind logic '''
     dsn: str
-    queue_name: str
+    consumer: Consumer
     handler: Callable
     bind_attempts: int = 0
     bind_running: bool = False
@@ -200,17 +191,33 @@ class ManagedConnection:
         connection = ReConnection(self.rebind, self.dsn)
         await connection.connect()
         channel = await connection.channel()
-        log.warning('Declare queue "%s"', self.queue_name)
-        await channel.queue_declare(self.queue_name)
-        await channel.basic_consume(self.queue_name, self.handler)
+
+        queue_name = self.consumer.queue.name
+        exchange_name = self.consumer.queue.exchange
+        topics = self.consumer.queue.topics
+
+        log.warning('Declare queue "%s" with exchange_name "%s" topics "%s"',
+            queue_name, exchange_name, topics)
+
+        await channel.queue_declare(queue_name)
+
+        if topics:  # topics
+            await channel.exchange_declare(exchange=exchange_name, exchange_type='topic')
+            for topic in topics:
+                await channel.queue_bind(queue=queue_name, exchange=exchange_name, routing_key=topic)
+        elif exchange_name:  # fanout
+            await channel.exchange_declare(exchange=exchange_name, exchange_type='fanout')
+            await channel.queue_bind(queue=queue_name, exchange=exchange_name)
+
+        await channel.basic_consume(queue_name, self.handler)
 
     async def rebind(self) -> bool:
         if self.bind_running:
-            log.exception('Already rebinding queue "%s"', self.queue_name)
+            log.exception('Already rebinding queue "%s"', self.consumer.queue.name)
             return False
 
         if self.bind_attempts > REBIND_ATTEMPTS:
-            log.exception('Failed all attempts to rebind queue "%s"', self.queue_name)
+            log.exception('Failed all attempts to rebind queue "%s"', self.consumer.queue.name)
             return False
 
         await asyncio.sleep((self.bind_attempts ** 2) * REBIND_BASE_DELAY)
@@ -218,12 +225,12 @@ class ManagedConnection:
 
         try:
             await self.bind()
-            log.info('Success rebind queue "%s"', self.queue_name)
+            log.info('Success rebind queue "%s"', self.consumer.queue.name)
             self.bind_attempts = 0
             return True
 
         except (AMQPError, OSError) as exc:
-            log.exception('Failed rebind queue "%s": %s', self.queue_name, exc)
+            log.exception('Failed rebind queue "%s": %s', self.consumer.queue.name, exc)
             asyncio.create_task(self.rebind())
             return False
 

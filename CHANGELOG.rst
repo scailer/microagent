@@ -3,6 +3,13 @@ Changelog
 =========
 
 
+1.8.0 (2026-02-26)
+==================
+
+- The broker now supports the use of exchanges and topic-based routing
+- Drop support python 3.9, add python 3.13, 3.14
+
+
 1.7.3 (2024-03-12)
 ================
 
