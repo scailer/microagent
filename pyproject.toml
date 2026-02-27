@@ -40,6 +40,7 @@ Changelog = 'https://github.com/scailer/microagent/blob/master/CHANGELOG.rst'
 redis = ['redis[hiredis]>5']
 amqp = ['aiormq==6.9.*']
 kafka = ['aiokafka==0.13.*']
+
 dev = [
     'pytest',
     'pytest-runner',
