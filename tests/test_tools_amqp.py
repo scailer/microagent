@@ -63,7 +63,7 @@ async def test_broker_send_ok(channel):
 
 
 async def test_broker_send_ok_topic(channel):
-    queue = Queue(name='test_queue', exchange='ex', topics=['*'])
+    Queue(name='test_queue', exchange='ex', topics=['*'])
     broker = AMQPBroker('amqp://localhost')
     await broker.ex.send({"a":1}, topic='a')
 
