@@ -77,7 +77,6 @@ Using MicroAgent resources.
 
 import asyncio
 import logging
-
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -89,7 +88,6 @@ from .hooks import Hook, Hooks
 from .queue import Consumer
 from .signal import Receiver
 from .timer import CRONTask, PeriodicTask
-
 
 HandlerTypes = TypeVar('HandlerTypes', Receiver, Consumer, PeriodicTask, CRONTask, Hook)
 

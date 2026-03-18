@@ -1,6 +1,5 @@
 # mypy: ignore-errors
 import asyncio
-
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiormq
@@ -8,7 +7,8 @@ import pytest
 
 from microagent.queue import Consumer, Queue
 from microagent.tools import amqp
-from microagent.tools.amqp import AMQPBroker, Connection, ManagedConnection, ReConnection
+from microagent.tools.amqp import (AMQPBroker, Connection, ManagedConnection,
+                                   ReConnection)
 
 
 @pytest.fixture()
@@ -16,6 +16,8 @@ def amqp_connection(monkeypatch):
     channel = MagicMock(
         basic_consume=AsyncMock(),
         queue_declare=AsyncMock(),
+        queue_bind=AsyncMock(),
+        exchange_declare=AsyncMock(),
         basic_publish=AsyncMock(),
         basic_nack=AsyncMock(),
         basic_ack=AsyncMock(),
@@ -31,6 +33,8 @@ def channel(monkeypatch):
     channel = MagicMock(
         basic_consume=AsyncMock(),
         queue_declare=AsyncMock(),
+        queue_bind=AsyncMock(),
+        exchange_declare=AsyncMock(),
         basic_publish=AsyncMock(),
         basic_nack=AsyncMock(),
         basic_ack=AsyncMock(),
@@ -58,6 +62,15 @@ async def test_broker_send_ok(channel):
         b'{"a":1}', routing_key='test_queue', exchange='', properties=None)
 
 
+async def test_broker_send_ok_topic(channel):
+    Queue(name='test_queue', exchange='ex', topics=['*'])
+    broker = AMQPBroker('amqp://localhost')
+    await broker.ex.send({"a":1}, topic='a')
+
+    channel.basic_publish.assert_called_once_with(
+        b'{"a": 1}', routing_key='a', exchange='ex', properties=None)
+
+
 async def test_broker_send_ok_fail(monkeypatch, channel):
     monkeypatch.setattr(Connection, 'channel', AsyncMock(side_effect=Exception))
 
@@ -82,21 +95,52 @@ async def test_broker_bind_ok(channel):
     channel.basic_consume.assert_called()
 
 
+async def test_broker_bind_ok_with_exchange(channel):
+    queue = Queue(name='test_queue', exchange='ex')
+    consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
+
+    broker = AMQPBroker('amqp://localhost')
+    await broker.bind_consumer(consumer)
+
+    channel.basic_consume.assert_called()
+    channel.queue_bind.assert_called_once_with(queue=queue.name, exchange='ex')
+    channel.exchange_declare.assert_called_once_with(exchange='ex', exchange_type='fanout')
+
+
+async def test_broker_bind_ok_with_topics(channel):
+    queue = Queue(name='test_queue', exchange='ex', topics=['a.*', 'b.*'])
+    consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
+
+    broker = AMQPBroker('amqp://localhost')
+    await broker.bind_consumer(consumer)
+
+    channel.basic_consume.assert_called()
+    channel.queue_bind.assert_any_call(queue=queue.name, exchange='ex', routing_key='a.*')
+    channel.queue_bind.assert_any_call(queue=queue.name, exchange='ex', routing_key='b.*')
+    channel.exchange_declare.assert_called_once_with(exchange='ex', exchange_type='topic')
+
+
 async def test_broker_rebind_ok(monkeypatch, channel):
-    conn = ManagedConnection('amqp://localhost', queue_name='test_queue', handler=AsyncMock())
+    queue = Queue(name='test_queue')
+    consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
+    conn = ManagedConnection('amqp://localhost', consumer=consumer, handler=AsyncMock())
 
     assert await conn.rebind()
 
 
 async def test_broker_rebind_ok_already(monkeypatch, channel):
-    conn = ManagedConnection('amqp://localhost', queue_name='test_queue', handler=AsyncMock())
+    queue = Queue(name='test_queue')
+    consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
+    conn = ManagedConnection('amqp://localhost', consumer=consumer, handler=AsyncMock())
     conn.bind_running = True
 
     assert not await conn.rebind()
 
 
 async def test_broker_rebind_ok_attempts(monkeypatch, channel):
-    conn = ManagedConnection('amqp://localhost', queue_name='test_queue', handler=AsyncMock())
+    queue = Queue(name='test_queue')
+    consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
+    conn = ManagedConnection('amqp://localhost', consumer=consumer, handler=AsyncMock())
     conn.bind_attempts = 4
 
     assert not await conn.rebind()
@@ -104,7 +148,9 @@ async def test_broker_rebind_ok_attempts(monkeypatch, channel):
 
 async def test_broker_rebind_ok_many(monkeypatch, channel):
     channel.basic_consume = AsyncMock(side_effect=aiormq.exceptions.ConnectionChannelError)
-    conn = ManagedConnection('amqp://localhost', queue_name='test_queue', handler=AsyncMock())
+    queue = Queue(name='test_queue')
+    consumer = Consumer(agent=None, handler=AsyncMock(), queue=queue, timeout=1, options={})
+    conn = ManagedConnection('amqp://localhost', consumer=consumer, handler=AsyncMock())
     monkeypatch.setattr(amqp, 'REBIND_BASE_DELAY', 0)
     monkeypatch.setattr(amqp, 'REBIND_ATTEMPTS', 1)
 
@@ -112,17 +158,6 @@ async def test_broker_rebind_ok_many(monkeypatch, channel):
     assert not await conn.rebind()
 
     await asyncio.sleep(.1)
-
-
-async def test_broker_declare_queue_ok(monkeypatch, channel):
-    monkeypatch.setattr(Connection, 'connect', AsyncMock())
-    monkeypatch.setattr(Connection, 'channel', AsyncMock(return_value=channel))
-
-    queue = Queue(name='test_queue')
-    broker = AMQPBroker('amqp://localhost')
-    await broker.declare_queue(queue.name)
-
-    channel.queue_declare.assert_called_once_with('test_queue')
 
 
 async def test_broker_queue_length_ok(monkeypatch, channel):

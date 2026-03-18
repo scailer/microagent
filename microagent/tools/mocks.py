@@ -14,7 +14,8 @@ Prepared bus and broker mocks for testing based on unittest.mock.AsyncMock
     agent.broker.mailing.length.assert_called()
 '''
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, _safe_super  # type: ignore[attr-defined]
+from unittest.mock import (AsyncMock, MagicMock,  # type: ignore[attr-defined]
+                           _safe_super)
 
 from microagent.broker import AbstractQueueBroker
 from microagent.bus import AbstractSignalBus

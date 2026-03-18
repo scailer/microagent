@@ -220,7 +220,7 @@ epub_exclude_files = ['search.html']
 # -- Options for intersphinx extension ---------------------------------------
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+# intersphinx_mapping = {'https://docs.python.org/': None}
 
 # -- Options for todo extension ----------------------------------------------
 
@@ -229,6 +229,6 @@ todo_include_todos = True
 
 extlinks = {
     'redis': ('https://redis.readthedocs.io/%s', ''),
-    'aioamqp': ('https://aioamqp.readthedocs.io/%s', ''),
+    'aiormq': ('https://github.com/mosquito/aiormq/blob/master/README.rst%s', ''),
     'kafka': ('https://aiokafka.readthedocs.io/%s', ''),
 }

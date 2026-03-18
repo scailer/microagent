@@ -1,11 +1,9 @@
 import json
-
 from dataclasses import dataclass
 from types import ModuleType
 from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from .abc import BoundKey, ReceiverFunc
-
 
 if TYPE_CHECKING:
     from .agent import MicroAgent

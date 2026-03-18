@@ -1,6 +1,5 @@
 # mypy: ignore-errors
 import asyncio
-
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -8,7 +7,8 @@ import redis.asyncio as redis
 
 from microagent.queue import Consumer, Queue
 from microagent.signal import Signal
-from microagent.tools.redis import RedisBroker as RedisBrokerBase, RedisSignalBus
+from microagent.tools.redis import RedisBroker as RedisBrokerBase
+from microagent.tools.redis import RedisSignalBus
 
 
 class RedisBroker(RedisBrokerBase):

@@ -1,13 +1,12 @@
 # mypy: ignore-errors
 import asyncio
-
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from microagent.timer import DAYS, CRONTask, PeriodicTask, cron_parser, next_moment
-
+from microagent.timer import (DAYS, CRONTask, PeriodicTask, cron_parser,
+                              next_moment)
 
 YEAR = datetime.now(tz=timezone.utc).year
 

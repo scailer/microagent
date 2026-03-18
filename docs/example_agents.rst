@@ -4,6 +4,12 @@ Agent examples
 ======================================
 
 
+signals.json
+
+.. include:: ../examples/signals.json
+   :code: json
+
+
 user_agent.py
 
 .. include:: ../examples/user_agent.py
@@ -22,7 +28,7 @@ email_agent.py
    :code: python
 
 
-signals.json
+push_agent.py
 
-.. include:: ../examples/signals.json
-   :code: json
+.. include:: ../examples/push_agent.py
+   :code: python

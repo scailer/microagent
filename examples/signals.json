@@ -11,6 +11,10 @@
         }}
     ],
     "queues": [
-        {"name": "mailer"}
+        {"name": "mailer"},
+        {"name": "android", "exchange": "push3", "topics": ["*.android"]},
+        {"name": "ios", "exchange": "push3", "topics": ["*.ios"]},
+        {"name": "android_a", "exchange": "push"},
+        {"name": "ios_a", "exchange": "push"}
     ]
 }

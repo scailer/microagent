@@ -40,7 +40,7 @@ Tool provide features:
 
 * running a **periodical tasks** (interval or as CRON)
 * specification of signals (events), their sending and receiving via the bus (redis_)
-* description of queues, sending and receiving messages via the queue broker (aioamqp_, kafka_, redis_)
+* description of queues, sending and receiving messages via the queue broker (aiormq_, kafka_, redis_)
 * limited **RPC** via signal bus
 * launching sub-services (in the same process)
 * launching a group of microagents (each in a separate process)
@@ -97,7 +97,7 @@ With redis_ backend provide signal bus and list-based queues::
 
     pip install 'microagent[redis]'
 
-With aioamqp_ backend provide queues over AMQP (RabbitMQ)::
+With aiormq_ backend provide queues over AMQP (RabbitMQ)::
 
     pip install 'microagent[amqp]'
 
@@ -107,6 +107,6 @@ With kafka_ backend provide queues over Kafka (experemental)::
 
 
 .. _redis: https://pypi.org/project/redis/
-.. _aioamqp: https://pypi.org/project/aioamqp/
+.. _aiormq: https://pypi.org/project/aiormq/
 .. _kafka: https://pypi.org/project/aiokafka/
 .. _documentation: https://microagent.readthedocs.io/
