@@ -193,11 +193,11 @@ def cron(spec: str, timeout: int | float = 1) -> abc.Callable[[PeriodicFunc], Pe
 
         .. code-block:: python
 
-            @periodic('0 */4 * * *')
+            @cron('0 */4 * * *')
             async def handler_1(self):
                 log.info('Called handler 1')
 
-            @periodic('*/15 * * * *', timeout=10)
+            @cron('*/15 * * * *', timeout=10)
             async def handler_2(self):
                 log.info('Called handler 2')
     '''
