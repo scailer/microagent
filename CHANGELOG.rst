@@ -3,6 +3,12 @@ Changelog
 =========
 
 
+1.8.1 (2026-06-06)
+==================
+
+- Improves os process control, fix graceful exit
+
+
 1.8.0 (2026-02-26)
 ==================
 
