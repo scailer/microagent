@@ -78,9 +78,8 @@ def load_configuration(config_path: str) -> Iterator[tuple[str, CFG_T]]:
 
 def _configuration(data: dict[str, dict[str, str]]) -> Iterator[tuple[str, CFG_T]]:
     for name, params in data.items():
-        backend = params.pop('backend', None)
-        if backend:
-            yield name, (backend, params)
+        if backend := params.get('backend'):
+            yield name, (backend, {k: v for k, v in params.items() if k != 'backend'})
 
 
 def init_agent(backend: str, cfg: dict[str, Any]) -> 'MicroAgent':
@@ -121,14 +120,16 @@ def run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
 
 
 async def _run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     # Interrupt process when master shutdown
     loop.add_signal_handler(signal.SIGINT, partial(_interrupter, name, 'INT'))
     loop.add_signal_handler(signal.SIGTERM, partial(_interrupter, name, 'TERM'))
 
     # Check master & force break
-    loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, name)
+    watcher_handle = loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, name)
+
+    agent: MicroAgent | None = None
 
     try:
         agent = init_agent(backend, cfg)
@@ -141,17 +142,21 @@ async def _run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
     except (KeyboardInterrupt, GroupInterrupt, ServerInterrupt) as exc:
         logger.warning('AgentProc[%s]: Catch interrupt %s', name, exc)
 
-        for t in asyncio.all_tasks(loop=loop):
-            t.cancel()
+        current = asyncio.current_task()
+        for t in asyncio.all_tasks():
+            if t is not current:
+                t.cancel()
 
         await asyncio.sleep(.1)
-        loop.stop()
 
     except Exception as exc:
         logger.exception('AgentProc[%s]: Catch error %s', name, exc)
         raise
 
     finally:
+        watcher_handle.cancel()
+        if agent is not None:
+            await agent.stop()
         raise SystemExit()
 
 
@@ -210,18 +215,14 @@ class AgentsManager:
             proc = self.mp_ctx.Process(target=run_agent, name=name, args=(name, *_cfg), daemon=True)
             proc.start()
 
-            if not proc.pid:
-                logger.error('AgentsManager: fail starting %s', name)
-                self.close()
-                return
-
+            assert proc.pid is not None
             self.processes[proc.pid] = proc
             logger.info('AgentsManager: %s started', name)
 
         logger.info('AgentsManager: started\n%s', self._get_state())
 
         while self.running:
-            time.sleep(.01)
+            time.sleep(1)
 
             if any(not p.is_alive() for p in self.processes.values()):
                 self.running = False  # one finished - all finished
@@ -238,7 +239,13 @@ class AgentsManager:
             logger.info('AgentsManager: terminate %s [%s]', process.name, process.pid)
             process.terminate()
 
-        time.sleep(.5)
+        for process in self.processes.values():
+            process.join(timeout=1)
+            if process.is_alive():
+                logger.warning('AgentsManager: kill %s [%s]', process.name, process.pid)
+                process.kill()
+                process.join(timeout=1)
+
         logger.info('AgentsManager: forked processes killed\n%s', self._get_state())
 
     def _get_state(self) -> str:
