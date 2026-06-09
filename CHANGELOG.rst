@@ -7,6 +7,8 @@ Changelog
 ==================
 
 - Improves os process control, fix graceful exit
+- CRON tasks now has OR logic for calendar and week days
+- Periodic/cron graceful cancellation
 
 
 1.8.0 (2026-02-26)

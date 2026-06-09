@@ -204,6 +204,10 @@ class MicroAgent:
             await self.run_servers(self.hook.servers)
 
     async def stop(self) -> None:
+        for periodic_task in self.periodic_tasks:
+            periodic_task.cancel()
+        for cron_task in self.cron_tasks:
+            cron_task.cancel()
         await self.hook.pre_stop()
 
     @staticmethod
@@ -220,7 +224,7 @@ class MicroAgent:
                 start_at = datetime.now(tz=timezone.utc) + timedelta(seconds=start_after)
                 self.log.debug('Set %s at %s', task, f'{start_at:%H:%M:%S}')
             else:
-                self.log.debug('Set %s after %d sec', task, start_after)
+                self.log.debug('Set %s after %s sec', task, start_after)
 
             task.start(start_after)
 

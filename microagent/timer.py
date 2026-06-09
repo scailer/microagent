@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 RANGES = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
 DAYS = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
-MAX_DIFF = 2 * 356 * 24 * 60 * 60
+MAX_DIFF = 2 * 365 * 24 * 60 * 60
 
 
 class CRON(NamedTuple):
@@ -58,6 +58,8 @@ class PeriodicMixin:
     agent: 'MicroAgent'
     handler: Callable
     timeout: float
+    _timer_handle: asyncio.TimerHandle | None = None
+    _running_task: asyncio.Task | None = None
 
     async def call(self) -> None:
         try:
@@ -73,7 +75,13 @@ class PeriodicMixin:
             self.agent.log.exception(f'Periodic Exception: {exc}')
 
     def start(self, start_after: float) -> None:
-        asyncio.get_running_loop().call_later(start_after, _periodic, self)  # type: ignore[arg-type]
+        self._timer_handle = asyncio.get_running_loop().call_later(start_after, _periodic, self)  # type: ignore[arg-type]
+
+    def cancel(self) -> None:
+        if self._timer_handle is not None:
+            self._timer_handle.cancel()
+        if self._running_task is not None and not self._running_task.done():
+            self._running_task.cancel()
 
 
 class PeriodicArgs(TypedDict):
@@ -123,17 +131,14 @@ class CRONTask(PeriodicMixin):
 
     @property
     def period(self) -> float:
-        '''
-            *period* property of **CRONTask** object is a next value of
-            generator behind facade. Be carefully with manual manipulation with it.
-        '''
-        self.agent.log.debug('Run %r', self)
         return self.cron.next().timestamp() - time.time()  # next step delay
 
 
 def _periodic(task: PeriodicTask | CRONTask) -> asyncio.Task:
-    asyncio.get_running_loop().call_later(task.period, _periodic, task)
-    return asyncio.create_task(task.call())
+    task._timer_handle = asyncio.get_running_loop().call_later(task.period, _periodic, task)
+    running = asyncio.create_task(task.call())
+    task._running_task = running
+    return running
 
 
 def cron_parser(spec: str) -> CRON:
@@ -201,7 +206,23 @@ def next_moment(cron: CRON, now: datetime) -> datetime:
 
         return next_moment(cron, now)
 
-    if now.day not in cron.days or now.weekday() not in cron.weekdays:
+    # calculating whether a task needs to be started on that day
+    days_all = set(cron.days) == set(range(1, 32))  # run every calendar day
+    wdays_all = set(cron.weekdays) >= set(range(7))  # run every week day
+
+    day_ok = now.day in cron.days  # run today
+    wday_ok = now.weekday() in cron.weekdays  # run today
+
+    if not days_all and not wdays_all:
+        ok = day_ok or wday_ok  # POSIX: both restricted → OR
+    elif not days_all:
+        ok = day_ok
+    elif not wdays_all:
+        ok = wday_ok
+    else:  # if run every day
+        ok = True
+
+    if not ok:
         now += timedelta(days=1)
         now = datetime(year=now.year, month=now.month, day=now.day, tzinfo=timezone.utc)
         return next_moment(cron, now)
