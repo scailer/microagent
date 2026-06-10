@@ -1,8 +1,9 @@
 # mypy: ignore-errors
-import os
 import asyncio
+import os
 from collections import defaultdict
-from microagent import MicroAgent, on, receiver, load_stuff
+
+from microagent import MicroAgent, load_stuff, on, receiver
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 signals, queues = load_stuff('file://' + os.path.join(cur_dir, 'signals.json'))

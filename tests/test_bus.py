@@ -348,3 +348,108 @@ async def test_Bus_broadcast_fail_timeout(bus, test_signal):
 
     assert ret is None
     bus.log.error.assert_called()
+
+
+async def test_Bus_broadcast_fail_broad_exception(bus, test_signal):
+    handler = MagicMock(return_value=1, **{'__qualname__': 'qname'})
+    receiver = Receiver(agent=None, handler=handler, signal=test_signal, timeout=60)
+    receiver.handler.side_effect = ValueError('something went wrong')
+
+    ret = await bus.broadcast(receiver, test_signal, 'test', {'uuid': 1})
+
+    assert ret is None
+    bus.log.exception.assert_called()
+
+
+async def test_Bus_broadcast_fail_cancelled_propagates(bus, test_signal):
+    handler = MagicMock(return_value=1, **{'__qualname__': 'qname'})
+    receiver = Receiver(agent=None, handler=handler, signal=test_signal, timeout=60)
+
+    async def cancelled(*args, **kwargs):
+        raise asyncio.CancelledError()
+
+    receiver.handler.side_effect = cancelled
+
+    with pytest.raises(asyncio.CancelledError):
+        await bus.broadcast(receiver, test_signal, 'test', {'uuid': 1})
+
+
+async def test_Bus_broadcast_fail_runtime_error(bus, test_signal):
+    handler = MagicMock(return_value=1, **{'__qualname__': 'qname'})
+    receiver = Receiver(agent=None, handler=handler, signal=test_signal, timeout=60)
+
+    async def runtime_error(*args, **kwargs):
+        raise RuntimeError('unexpected')
+
+    receiver.handler.side_effect = runtime_error
+
+    ret = await bus.broadcast(receiver, test_signal, 'test', {'uuid': 1})
+
+    assert ret is None
+    bus.log.exception.assert_called()
+
+
+async def test_Bus_close_ok():
+    class SlowBindBus(AbstractSignalBus):
+        started = False
+
+        async def send(self, channel: str, message: str) -> None:
+            pass
+
+        async def bind(self, channel: str) -> None:
+            self.started = True
+            await asyncio.Event().wait()
+
+    bus = SlowBindBus(dsn=DSN)
+    await asyncio.sleep(0.01)
+    assert bus.started
+    assert bus._tasks
+
+    await bus.close()
+
+    assert not bus._tasks
+
+
+async def test_Bus_close_idempotent():
+    bus = Bus(dsn=DSN)
+    await bus.close()
+    await bus.close()
+
+
+async def test_Bus_close_ok_all_tasks_cancelled():
+    bus = Bus(dsn=DSN, prefix='TEST')
+    bus.bind = AsyncMock()
+    bus.send = AsyncMock()
+
+    async def slow_handler(*args, **kwargs):
+        await asyncio.sleep(10)
+
+    bus.handle_signal = slow_handler
+
+    signal = Signal(name='test_signal', providing_args=['a'])
+    bus.receiver('TEST:test_signal:sender', signal.serialize({'a': 1}))
+    await asyncio.sleep(0.01)
+
+    assert bus._tasks
+
+    await bus.close()
+
+    assert not bus._tasks
+
+
+async def test_Bus_close_cancels_receiver_task(bus, test_signal):
+    async def slow_handler(*args, **kwargs):
+        await asyncio.sleep(10)
+
+    receiver = Receiver(agent=None, handler=slow_handler, signal=test_signal, timeout=60)
+    await bus.bind_receiver(receiver)
+
+    bus.receiver('TEST:test_signal:test', test_signal.serialize({'uuid': 1}))
+    await asyncio.sleep(0.01)
+
+    task_count = len(bus._tasks)
+    assert task_count > 0
+
+    await bus.close()
+
+    assert not bus._tasks

@@ -1,4 +1,4 @@
-__version__ = '1.8.1'
+__version__ = '1.8.2'
 
 import importlib
 import json
@@ -44,7 +44,7 @@ def load_stuff(source: str) -> tuple[Any, Any]:
 
     if source.startswith('file://'):
         with open(source.replace('file://', ''), encoding='utf8') as f:
-            data.update(json.loads(f.read().replace('\n', '')))
+            data.update(json.load(f))
     else:
         with urllib.request.urlopen(source) as response:
             data.update(json.loads(response.read()))

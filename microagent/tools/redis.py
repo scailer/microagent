@@ -49,7 +49,9 @@ class RedisSignalBus(AbstractSignalBus):
     async def bind(self, channel: str) -> None:
         async with self._pubsub_lock:
             pubsub = self.connection.pubsub()
-            asyncio.create_task(self._receiver(pubsub, channel))
+            task = asyncio.create_task(self._receiver(pubsub, channel))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
 
     async def _receiver(self, pubsub: client.PubSub, channel: str) -> None:
         async with pubsub as psub:
