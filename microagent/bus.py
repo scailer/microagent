@@ -152,7 +152,7 @@ class AbstractSignalBus(BusProtocol):
         '''
             Bind bounded to agent receiver to current bus.
         '''
-        self.log.info('Bind %s to %s: %s', receiver.signal, self, receiver)
+        self.log.info('Bind %s to %r: %s', receiver.signal, self, receiver)
         if receiver.signal.name not in self.receivers:
             await self.bind(receiver.signal.make_channel_name(self.prefix))
         self.receivers[receiver.signal.name].append(receiver)
