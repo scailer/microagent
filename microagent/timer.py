@@ -24,7 +24,7 @@ import inspect
 import re
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, ClassVar, NamedTuple, TypedDict
 
@@ -54,12 +54,16 @@ class CRON(NamedTuple):
         return f'[{self.spec}]'
 
 
+class PeriodicState(TypedDict, total=False):
+    timer_handle: asyncio.TimerHandle
+    running_task: asyncio.Task
+
+
 class PeriodicMixin:
     agent: 'MicroAgent'
     handler: Callable
     timeout: float
-    _timer_handle: asyncio.TimerHandle | None = None
-    _running_task: asyncio.Task | None = None
+    _state: PeriodicState
 
     async def call(self) -> None:
         try:
@@ -75,13 +79,14 @@ class PeriodicMixin:
             self.agent.log.exception(f'Periodic Exception: {exc}')
 
     def start(self, start_after: float) -> None:
-        self._timer_handle = asyncio.get_running_loop().call_later(start_after, _periodic, self)  # type: ignore[arg-type]
+        self._state['timer_handle'] = asyncio.get_running_loop().call_later(
+            start_after, _periodic, self)  # type: ignore[arg-type]
 
     def cancel(self) -> None:
-        if self._timer_handle is not None:
-            self._timer_handle.cancel()
-        if self._running_task is not None and not self._running_task.done():
-            self._running_task.cancel()
+        if (timer_handle := self._state.get('timer_handle')) is not None:
+            timer_handle.cancel()
+        if (running_task := self._state.get('running_task')) is not None and not running_task.done():
+            running_task.cancel()
 
 
 class PeriodicArgs(TypedDict):
@@ -97,6 +102,7 @@ class PeriodicTask(PeriodicMixin):
     period: float
     timeout: float
     start_after: float
+    _state: PeriodicState = field(default_factory=PeriodicState)
 
     _register: ClassVar[dict[BoundKey, PeriodicArgs]] = {}
 
@@ -115,6 +121,7 @@ class CRONTask(PeriodicMixin):
     handler: PeriodicFunc
     cron: CRON
     timeout: float
+    _state: PeriodicState = field(default_factory=PeriodicState)
 
     _register: ClassVar[dict[BoundKey, CRONArgs]] = {}
 
@@ -135,9 +142,9 @@ class CRONTask(PeriodicMixin):
 
 
 def _periodic(task: PeriodicTask | CRONTask) -> asyncio.Task:
-    task._timer_handle = asyncio.get_running_loop().call_later(task.period, _periodic, task)
+    task._state['timer_handle'] = asyncio.get_running_loop().call_later(task.period, _periodic, task)
     running = asyncio.create_task(task.call())
-    task._running_task = running
+    task._state['running_task'] = running
     return running
 
 
