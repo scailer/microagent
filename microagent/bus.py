@@ -121,7 +121,7 @@ class AbstractSignalBus(BusProtocol):
         task.add_done_callback(self._tasks.discard)
         self.log.debug('%s initialized', self)
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return f'<Bus {self.__class__.__name__} {self.dsn} {self.prefix}#{self.uid}>'
 
     def __getattr__(self, name: str) -> 'BoundSignal':
@@ -152,7 +152,7 @@ class AbstractSignalBus(BusProtocol):
         '''
             Bind bounded to agent receiver to current bus.
         '''
-        self.log.info('Bind %s to %r: %s', receiver.signal, self, receiver)
+        self.log.info('Bind %s to %s: %s', receiver.signal, self, receiver)
         if receiver.signal.name not in self.receivers:
             await self.bind(receiver.signal.make_channel_name(self.prefix))
         self.receivers[receiver.signal.name].append(receiver)
