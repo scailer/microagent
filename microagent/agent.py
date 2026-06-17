@@ -208,6 +208,8 @@ class MicroAgent:
             periodic_task.cancel()
         for cron_task in self.cron_tasks:
             cron_task.cancel()
+        if self.bus:
+            await self.bus.close()
         await self.hook.pre_stop()
 
     @staticmethod

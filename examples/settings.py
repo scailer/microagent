@@ -1,5 +1,5 @@
-import sys
 import logging
+import sys
 
 logging.basicConfig(format=(
     '%(levelname)-8s [pid#%(process)d] %(asctime)s %(name)s '

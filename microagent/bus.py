@@ -110,13 +110,18 @@ class AbstractSignalBus(BusProtocol):
 
     receivers: dict[str, list[Receiver]] = field(default_factory=lambda: defaultdict(list))
     _responses: dict[str, IterQueue] = field(default_factory=dict)
+    _tasks: set[asyncio.Task] = field(default_factory=set)
 
     def __post_init__(self) -> None:
         response_signal = Signal(name='response', providing_args=[])
-        asyncio.create_task(self.bind(response_signal.make_channel_name(self.prefix)))
+        task = asyncio.create_task(
+            self.bind(response_signal.make_channel_name(self.prefix))
+        )
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
         self.log.debug('%s initialized', self)
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return f'<Bus {self.__class__.__name__} {self.dsn} {self.prefix}#{self.uid}>'
 
     def __getattr__(self, name: str) -> 'BoundSignal':
@@ -230,9 +235,19 @@ class AbstractSignalBus(BusProtocol):
         if diff_args:
             self.log.warning('Pubsub mismatch arguments %s %s', channel, diff_args)
 
-        asyncio.create_task(self.handle_signal(signal, sender, signal_id, data))
+        task = asyncio.create_task(
+            self.handle_signal(signal, sender, signal_id, data)
+        )
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
         return None
+
+    async def close(self) -> None:
+        for task in self._tasks:
+            task.cancel()
+        if self._tasks:
+            await asyncio.wait(self._tasks)
 
     def handle_response(self, signal_id: str, message: dict[str, int | str | None]) -> None:
         if queue := self._responses.get(signal_id):
@@ -272,12 +287,12 @@ class AbstractSignalBus(BusProtocol):
             if isinstance(response, int | str):
                 return response
 
-        except TypeError:
-            self.log.exception('Call %s failed', signal.name)
-
         except asyncio.TimeoutError:
             self.log.error(
                 'TimeoutError: %s %.2f', receiver.handler, time.monotonic() - timer)
+
+        except Exception:
+            self.log.exception('Call %s failed', signal.name)
 
         return None
 
@@ -295,7 +310,7 @@ class BoundSignal(SignalProtocol):
             self.signal.make_channel_name(self.bus.prefix, sender),
             self.signal.serialize(kwargs))
 
-    async def call(self, sender: str, timeout: int = 60, **kwargs: Any
+    async def call(self, sender: str, *, timeout: int = 60, **kwargs: Any
             ) -> dict[str, int | str | None]:
 
         if self.signal.type_map:
@@ -313,7 +328,7 @@ class BoundSignal(SignalProtocol):
 
         return {}
 
-    def waiter(self, sender: str, timeout: int = 60, **kwargs: Any
+    def waiter(self, sender: str, *, timeout: int = 60, **kwargs: Any
                 ) -> contextlib.AbstractAsyncContextManager:
         '''
             async with bus.iter(sender='name', a=1, timeout=10) as queue:

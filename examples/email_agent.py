@@ -1,6 +1,7 @@
 # mypy: ignore-errors
 import os
-from microagent import MicroAgent, on, consumer, load_stuff
+
+from microagent import MicroAgent, consumer, load_stuff, on
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 signals, queues = load_stuff('file://' + os.path.join(cur_dir, 'signals.json'))

@@ -3,6 +3,13 @@ Changelog
 =========
 
 
+1.8.2 (2026-06-11)
+==================
+
+- Receiver/bus graceful cancellation
+- Fix exception handling
+
+
 1.8.1 (2026-06-06)
 ==================
 

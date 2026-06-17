@@ -1,12 +1,13 @@
 # mypy: ignore-errors
-import sys
 import asyncio
 import logging
-from microagent.tools.redis import RedisSignalBus, RedisBroker
+import sys
 
-from user_agent import UserAgent
 from comment_agent import CommentAgent
 from email_agent import EmailAgent
+from user_agent import UserAgent
+
+from microagent.tools.redis import RedisBroker, RedisSignalBus
 
 logging.basicConfig(format=(
     '%(levelname)-8s [pid#%(process)d] %(asctime)s %(name)s '
