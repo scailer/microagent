@@ -61,8 +61,7 @@ class KafkaBroker(AbstractQueueBroker):
         await super().close()
 
     async def bind(self, name: str) -> None:
-        loop = asyncio.get_running_loop()
-        kafka_consumer = aiokafka.AIOKafkaConsumer(name, loop=loop, bootstrap_servers=self.addr)
+        kafka_consumer = aiokafka.AIOKafkaConsumer(name, bootstrap_servers=self.addr)
         task = asyncio.create_task(self._kafka_wrapper(kafka_consumer, name))
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)

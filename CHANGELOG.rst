@@ -3,6 +3,12 @@ Changelog
 =========
 
 
+1.8.3 (2026-06-18)
+==================
+
+- Broker graceful shutdown with task tracking
+- Broker fixes and updates
+
 1.8.2 (2026-06-11)
 ==================
 

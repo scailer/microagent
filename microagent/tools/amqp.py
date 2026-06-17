@@ -61,17 +61,22 @@ class AMQPBroker(AbstractQueueBroker):
     connection: AbstractConnection = field(init=False)
     sending_channel: AbstractChannel | None = None
     _managed_connections: list['ManagedConnection'] = field(default_factory=list, init=False)
+    _closing: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         self.connection = ReConnection(self.reconnect, self.dsn)
 
     async def reconnect(self) -> None:
+        if self._closing:
+            return
         self.connection = ReConnection(self.reconnect, self.dsn)
         await self.connection.connect()
         log.info('Reconnect "%s"', self.connection)
 
     async def close(self) -> None:
+        self._closing = True
         for mc in self._managed_connections:
+            mc.closed = True
             await mc.close()
         if self.sending_channel and not self.sending_channel.is_closed:
             await self.sending_channel.close()
@@ -123,9 +128,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     def _amqp_wrapper(self, consumer: Consumer) -> Callable[[DeliveredMessage], Awaitable[None]]:
         async def _wrapper(message: DeliveredMessage) -> None:
-            if not (data := self.prepared_data(consumer, message.body)):
-                log.debug('Calling %s by %s without data', consumer, consumer.queue.name)
-                return
+            data = self.prepared_data(consumer, message.body)
 
             log.debug('Calling %s by %s with %s', consumer,
                 consumer.queue.name, str(data).encode('utf-8'))
@@ -138,7 +141,7 @@ class AMQPBroker(AbstractQueueBroker):
                 if consumer.options.get('autoack', True) and message.delivery_tag:
                     await message.channel.basic_ack(delivery_tag=message.delivery_tag)
 
-            except TypeError:
+            except TypeError:  # when data mismatch handler args (stay data in queue)
                 log.exception('Call %s failed', consumer)
 
             except asyncio.TimeoutError:
@@ -197,6 +200,7 @@ class ManagedConnection:
     handler: Callable
     bind_attempts: int = 0
     bind_running: bool = False
+    closed: bool = False
     _connection: AbstractConnection | None = None
     _channel: AbstractChannel | None = None
 
@@ -232,13 +236,15 @@ class ManagedConnection:
             await self._connection.close()
 
     async def rebind(self) -> bool:
-        if self.bind_running:
-            log.exception('Already rebinding queue "%s"', self.consumer.queue.name)
+        if self.closed or self.bind_running:
+            log.warning('Already rebinding queue "%s"', self.consumer.queue.name)
             return False
 
         if self.bind_attempts > REBIND_ATTEMPTS:
-            log.exception('Failed all attempts to rebind queue "%s"', self.consumer.queue.name)
+            log.error('Failed all attempts to rebind queue "%s"', self.consumer.queue.name)
             return False
+
+        self.bind_running = True
 
         await asyncio.sleep((self.bind_attempts ** 2) * REBIND_BASE_DELAY)
         self.bind_attempts += 1

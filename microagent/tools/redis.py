@@ -2,7 +2,6 @@
 :ref:`Signal Bus <bus>` and :ref:`Queue Broker <broker>` based on :redis:`redis <>`.
 '''
 import asyncio
-import inspect
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -110,18 +109,10 @@ class RedisBroker(AbstractQueueBroker):
         return Redis.from_url(self.dsn, decode_responses=True)
 
     async def send(self, name: str, message: str, **kwargs: Any) -> None:
-        ret = self.connection.rpush(name, message)
-
-        if inspect.isawaitable(ret):
-            await ret
+        await self.connection.rpush(name, message)
 
     async def queue_length(self, name: str, **options: Any) -> int:
-        ret = self.connection.llen(name)
-
-        if inspect.isawaitable(ret):
-            return await ret
-
-        return ret
+        return await self.connection.llen(name)
 
     async def bind(self, name: str) -> None:
         task = asyncio.create_task(self._wait(name))
