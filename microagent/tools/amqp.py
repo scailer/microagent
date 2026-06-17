@@ -60,6 +60,7 @@ class AMQPBroker(AbstractQueueBroker):
     '''
     connection: AbstractConnection = field(init=False)
     sending_channel: AbstractChannel | None = None
+    _managed_connections: list['ManagedConnection'] = field(default_factory=list, init=False)
 
     def __post_init__(self) -> None:
         self.connection = ReConnection(self.reconnect, self.dsn)
@@ -68,6 +69,15 @@ class AMQPBroker(AbstractQueueBroker):
         self.connection = ReConnection(self.reconnect, self.dsn)
         await self.connection.connect()
         log.info('Reconnect "%s"', self.connection)
+
+    async def close(self) -> None:
+        for mc in self._managed_connections:
+            await mc.close()
+        if self.sending_channel and not self.sending_channel.is_closed:
+            await self.sending_channel.close()
+        if self.connection.is_opened:
+            await self.connection.close()
+        await super().close()
 
     async def get_channel(self) -> AbstractChannel:
         '''
@@ -103,11 +113,13 @@ class AMQPBroker(AbstractQueueBroker):
 
     async def bind(self, name: str) -> None:
         consumer = self._bindings[name]
-        await ManagedConnection(
+        mc = ManagedConnection(
             dsn=self.dsn,
             consumer=consumer,
             handler=self._amqp_wrapper(consumer)
-        ).bind()
+        )
+        self._managed_connections.append(mc)
+        await mc.bind()
 
     def _amqp_wrapper(self, consumer: Consumer) -> Callable[[DeliveredMessage], Awaitable[None]]:
         async def _wrapper(message: DeliveredMessage) -> None:
@@ -185,12 +197,14 @@ class ManagedConnection:
     handler: Callable
     bind_attempts: int = 0
     bind_running: bool = False
+    _connection: AbstractConnection | None = None
+    _channel: AbstractChannel | None = None
 
     async def bind(self) -> None:
         ''' Start connection and bind consumer '''
-        connection = ReConnection(self.rebind, self.dsn)
-        await connection.connect()
-        channel = await connection.channel()
+        self._connection = ReConnection(self.rebind, self.dsn)
+        await self._connection.connect()
+        self._channel = await self._connection.channel()
 
         queue_name = self.consumer.queue.name
         exchange_name = self.consumer.queue.exchange
@@ -199,17 +213,23 @@ class ManagedConnection:
         log.warning('Declare queue "%s" with exchange_name "%s" topics "%s"',
             queue_name, exchange_name, topics)
 
-        await channel.queue_declare(queue_name)
+        await self._channel.queue_declare(queue_name)
 
         if topics:  # topics
-            await channel.exchange_declare(exchange=exchange_name, exchange_type='topic')
+            await self._channel.exchange_declare(exchange=exchange_name, exchange_type='topic')
             for topic in topics:
-                await channel.queue_bind(queue=queue_name, exchange=exchange_name, routing_key=topic)
+                await self._channel.queue_bind(queue=queue_name, exchange=exchange_name, routing_key=topic)
         elif exchange_name:  # fanout
-            await channel.exchange_declare(exchange=exchange_name, exchange_type='fanout')
-            await channel.queue_bind(queue=queue_name, exchange=exchange_name)
+            await self._channel.exchange_declare(exchange=exchange_name, exchange_type='fanout')
+            await self._channel.queue_bind(queue=queue_name, exchange=exchange_name)
 
-        await channel.basic_consume(queue_name, self.handler)
+        await self._channel.basic_consume(queue_name, self.handler)
+
+    async def close(self) -> None:
+        if self._channel and not self._channel.is_closed:
+            await self._channel.close()
+        if self._connection and self._connection.is_opened:
+            await self._connection.close()
 
     async def rebind(self) -> bool:
         if self.bind_running:

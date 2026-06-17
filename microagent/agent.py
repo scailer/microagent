@@ -210,6 +210,8 @@ class MicroAgent:
             cron_task.cancel()
         if self.bus:
             await self.bus.close()
+        if self.broker:
+            await self.broker.close()
         await self.hook.pre_stop()
 
     @staticmethod

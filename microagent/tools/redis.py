@@ -124,19 +124,26 @@ class RedisBroker(AbstractQueueBroker):
         return ret
 
     async def bind(self, name: str) -> None:
-        _loop = asyncio.get_running_loop()
-        _loop.call_later(self.BIND_TIME, lambda: asyncio.create_task(self._wait(name)))
+        task = asyncio.create_task(self._wait(name))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     async def _wait(self, name: str) -> None:
-        conn = await self.new_connection()
-        while True:
-            if data := await conn.blpop(name, self.WAIT_TIME):
-                _, data = data
-                asyncio.create_task(self._handler(name, data))  # type: ignore[arg-type, unused-ignore]
+        await asyncio.sleep(self.BIND_TIME)
+        conn = self.new_connection()
+        try:
+            while True:
+                if data := await conn.blpop(name, self.WAIT_TIME):  # type: ignore[arg-type, misc]
+                    _, data = data
+                    htask = asyncio.create_task(self._handler(name, data))
+                    self._background_tasks.add(htask)
+                    htask.add_done_callback(self._background_tasks.discard)
+        finally:
+            await conn.aclose()
 
     async def rollback(self, name: str, data: str) -> None:
-        _hash = str(hash(name)) + str(hash(data))
-        attempt = self._rollbacks[_hash]
+        _key = (name, data)
+        attempt = self._rollbacks[_key]
 
         if attempt > self.ROLLBACK_ATTEMPTS:
             self.log.error('Rollback limit exceeded on queue "%s" with data: %s', name, data)
@@ -147,7 +154,7 @@ class RedisBroker(AbstractQueueBroker):
         _loop = asyncio.get_running_loop()
         _loop.call_later(attempt ** 2, lambda: asyncio.create_task(self.send(name, data)))
 
-        self._rollbacks[_hash] += 1
+        self._rollbacks[_key] += 1
 
     async def _handler(self, name: str, data: str) -> None:
         consumer = self._bindings[name]
@@ -156,9 +163,9 @@ class RedisBroker(AbstractQueueBroker):
 
         try:
             await asyncio.wait_for(consumer.handler(**_data), consumer.timeout)
-        except Exception:
-            self.log.exception('Call %s failed', consumer.queue.name)
-            await self.rollback(consumer.queue.name, data)
         except asyncio.TimeoutError:
             self.log.error('TimeoutError: %s %.2f', consumer, time.monotonic() - timer)
             await self.rollback(name, data)
+        except Exception:
+            self.log.exception('Call %s failed', consumer.queue.name)
+            await self.rollback(consumer.queue.name, data)

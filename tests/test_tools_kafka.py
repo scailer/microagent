@@ -71,10 +71,17 @@ async def test_broker_send_ok(kafka_producer):
     broker = KafkaBroker('kafka://localhost')
     await broker.send(queue.name, '{}')
 
-    broker.producer.start.assert_called()
+    broker.producer.start.assert_called_once()
     broker.producer.send_and_wait.assert_called_once_with(queue.name, b'{}')
-    broker.producer.stop.assert_called()
+    broker.producer.stop.assert_not_called()
 
-    broker.producer._closed = False
     await broker.send(queue.name, '{}')
-    broker.producer.start.assert_called()
+    assert broker.producer.send_and_wait.call_count == 2
+
+
+async def test_broker_close_stops_producer_ok(kafka_producer):
+    broker = KafkaBroker('kafka://localhost')
+    await broker.send('test_queue', '{}')
+
+    await broker.close()
+    broker.producer.stop.assert_called_once()

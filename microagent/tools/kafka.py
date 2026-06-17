@@ -44,26 +44,28 @@ class KafkaBroker(AbstractQueueBroker):
     '''
     addr: str = field(init=False)
     producer: aiokafka.AIOKafkaProducer = field(init=False)
+    _producer_started: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         self.addr = parse.urlparse(self.dsn).netloc
         self.producer = aiokafka.AIOKafkaProducer(bootstrap_servers=self.addr)
 
     async def send(self, name: str, message: str, **kwargs: Any) -> None:
-        await self.producer.start()
+        if not self._producer_started:
+            await self.producer.start()
+            self._producer_started = True
+        await self.producer.send_and_wait(name, bytes(message, 'utf8'), **kwargs)
 
-        try:
-            await self.producer.send_and_wait(name, bytes(message, 'utf8'), **kwargs)
-
-        finally:
-            await self.producer.stop()
-            _loop = asyncio.get_running_loop()
-            self.producer = aiokafka.AIOKafkaProducer(loop=_loop, bootstrap_servers=self.addr)
+    async def close(self) -> None:
+        await self.producer.stop()
+        await super().close()
 
     async def bind(self, name: str) -> None:
         loop = asyncio.get_running_loop()
         kafka_consumer = aiokafka.AIOKafkaConsumer(name, loop=loop, bootstrap_servers=self.addr)
-        asyncio.create_task(self._kafka_wrapper(kafka_consumer, name))
+        task = asyncio.create_task(self._kafka_wrapper(kafka_consumer, name))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     async def _kafka_wrapper(self, kafka_consumer: aiokafka.AIOKafkaConsumer, name: str) -> None:
         consumer = self._bindings[name]
@@ -73,7 +75,9 @@ class KafkaBroker(AbstractQueueBroker):
             async for msg in kafka_consumer:
                 data = self.prepared_data(consumer, msg.value)
                 data['kafka'] = msg
-                asyncio.create_task(self._handle(consumer, data))
+                htask = asyncio.create_task(self._handle(consumer, data))
+                self._background_tasks.add(htask)
+                htask.add_done_callback(self._background_tasks.discard)
 
         finally:
             await kafka_consumer.stop()

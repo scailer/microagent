@@ -39,5 +39,8 @@ class BrokerProtocol(Protocol):
     uid: str
     log: logging.Logger
 
+    async def close(self) -> None:
+        ...
+
     def __getattr__(self, name: str) -> QueueProtocol:
         ...

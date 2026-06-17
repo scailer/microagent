@@ -56,6 +56,7 @@ Using with MicroAgent
     email_agent = EmailAgent(broker=broker)
     await email_agent.start()
 '''
+import asyncio
 import logging
 import uuid
 from abc import abstractmethod
@@ -108,6 +109,17 @@ class AbstractQueueBroker(BrokerProtocol):
     log: logging.Logger = logging.getLogger('microagent.broker')
 
     _bindings: dict[str, Consumer] = field(default_factory=dict)
+    _background_tasks: set[asyncio.Task] = field(default_factory=set)
+
+    async def close(self) -> None:
+        '''
+            Graceful shutdown. Cancel all background tasks.
+        '''
+        tasks = list(self._background_tasks)
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.wait(tasks)
 
     def __getattr__(self, name: str) -> 'BoundQueue':
         return BoundQueue(self, Queue.get(name))
