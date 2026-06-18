@@ -124,7 +124,7 @@ class RedisBroker(AbstractQueueBroker):
         conn = self.new_connection()
         try:
             while True:
-                if data := await conn.blpop(name, self.WAIT_TIME):  # type: ignore[arg-type, misc]
+                if data := await conn.blpop(name, self.WAIT_TIME):
                     _, data = data
                     htask = asyncio.create_task(self._handler(name, data))
                     self._background_tasks.add(htask)

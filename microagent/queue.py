@@ -87,7 +87,7 @@ class Queue:
         return self.name == other.name
 
     def __hash__(self) -> int:
-        return id(self)
+        return id(self.name)
 
     @classmethod
     def set_jsonlib(cls, jsonlib: ModuleType) -> None:
