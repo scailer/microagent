@@ -1,10 +1,11 @@
 # mypy: ignore-errors
-import os
+from microagent import MicroAgent, Signal, cron, on, periodic, receiver
 
-from microagent import MicroAgent, cron, load_stuff, on, periodic, receiver
-
-cur_dir = os.path.dirname(os.path.realpath(__file__))
-signals, queues = load_stuff('file://' + os.path.join(cur_dir, 'signals.json'))
+# single-run
+# import os
+# from microagent import configure
+# cur_dir = os.path.dirname(os.path.realpath(__file__))
+# configure('file://' + os.path.join(cur_dir, 'signals.json'))
 
 
 class UserAgent(MicroAgent):
@@ -22,12 +23,12 @@ class UserAgent(MicroAgent):
         self.log.info('Run periodic task')
         await self.bus.user_comment.send('user_agent', user_id=1, text='informer text')
 
-    @receiver(signals.user_created)
+    @receiver(Signal.user_created)
     async def example_signal_receiver_send_message(self, signal, sender, **kwargs):
         self.log.info('Catch signal %s from %s with %s', signal, sender, kwargs)
         await self.broker.mailer.send({'text': 'Welcome text', 'email': 'user@lwr.pw'})
 
-    @receiver(signals.user_comment)
+    @receiver(Signal.user_comment)
     async def example_rpc_call(self, **kwargs):
         self.log.info('Catch signal %s', kwargs)
         value = await self.bus.rpc_comments_count.call('user_agent', user_id=1)

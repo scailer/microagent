@@ -4,7 +4,7 @@ import logging
 import os
 import sys
 
-from microagent import MicroAgent, consumer, load_stuff, on, periodic
+from microagent import MicroAgent, Queue, configure, consumer, on, periodic
 from microagent.tools import amqp, redis
 
 logging.basicConfig(format=(
@@ -13,7 +13,7 @@ logging.basicConfig(format=(
 ), stream=sys.stdout, level=logging.INFO)
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
-signals, queues = load_stuff('file://' + os.path.join(cur_dir, 'signals.json'))
+configure('file://' + os.path.join(cur_dir, 'signals.json'))
 
 
 class UserAgent(MicroAgent):
@@ -27,19 +27,19 @@ class UserAgent(MicroAgent):
         await self.broker.push3.send({'text': 'informer text'}, topic='msg.ios')
         await self.broker.push.send({'text': 'informer 1'})
 
-    @consumer(queues.android)
+    @consumer(Queue.android)
     async def example_read_queue_android(self, **kwargs):
         self.log.info('Catch android %s', kwargs)
 
-    @consumer(queues.ios)
+    @consumer(Queue.ios)
     async def example_read_queue_ios(self, **kwargs):
         self.log.info('Catch ios %s', kwargs)
 
-    @consumer(queues.android_a)
+    @consumer(Queue.android_a)
     async def example_read_queue_android_a(self, **kwargs):
         self.log.info('Catch android_a %s', kwargs)
 
-    @consumer(queues.ios_a)
+    @consumer(Queue.ios_a)
     async def example_read_queue_ios_a(self, **kwargs):
         self.log.info('Catch ios_a %s', kwargs)
 

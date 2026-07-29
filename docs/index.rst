@@ -32,6 +32,10 @@ Tool provide features:
 
 .. code-block:: python
 
+    from microagent import MicroAgent, Queue, Signal, configure
+
+    configure('file://signals.json')
+
     class Agent(MicroAgent):
 
         @on('pre_start')
@@ -47,13 +51,13 @@ Tool provide features:
             pass  # do something by schedule
 
         # subscribe to signals (events)
-        @receiver(signals.user_updated, signals.user_deleted)
+        @receiver(Signal.user_updated, Signal.user_deleted)
         async def send_notification(self, **kwargs):
             # send signal (event) to bus
             await self.bus.check_something.send(sender='agent', **kwargs)
 
         # message consumer from queue
-        @consumer(queues.mailer)
+        @consumer(Queue.mailer)
         async def send_emails(self, **kwargs):
             # send message to queue
             await self.broker.statistic_collector.send(kwargs)

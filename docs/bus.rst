@@ -7,6 +7,9 @@ Signal bus
 .. automodule:: microagent.bus
 
 
+.. autofunction:: microagent.configure
+
+
 .. autofunction:: microagent.load_signals
 
 
@@ -41,3 +44,6 @@ Signal bus
 
 
 .. autoclass:: microagent.signal.SerializingError
+
+
+.. autoclass:: microagent.DoubleLoadError

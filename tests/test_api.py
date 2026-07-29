@@ -1,9 +1,11 @@
 # mypy: ignore-errors
 from pathlib import Path
 
-from microagent import (MicroAgent, Queue, Signal, __version__,  # noqa
-                        consumer, cron, load_queues, load_signals, load_stuff,
-                        periodic, receiver)
+import pytest
+
+from microagent import (DoubleLoadError, MicroAgent, Queue, Signal, __version__,  # noqa
+                        configure, consumer, cron, load_queues, load_signals,
+                        load_stuff, periodic, receiver)
 from microagent.tools import mocks
 
 
@@ -43,6 +45,53 @@ def test_load_queues():
     assert queues.push1.exchange == 'ex'
     assert queues.push2.name == 'push2'
     assert queues.push2.exchange == 'ex'
+
+
+def test_double_load_raises():
+    source = 'file://' + str(Path(__file__).parent / 'stuff.json')
+    load_stuff(source)
+    with pytest.raises(DoubleLoadError, match='already loaded'):
+        load_stuff(source)
+
+
+def test_configure():
+    source = 'file://' + str(Path(__file__).parent / 'stuff.json')
+    assert configure(source) is None
+    assert Signal.test_signal.name == 'test_signal'
+    assert Queue.test_queue.name == 'test_queue'
+
+
+def test_double_configure_raises():
+    source = 'file://' + str(Path(__file__).parent / 'stuff.json')
+    configure(source)
+    with pytest.raises(DoubleLoadError, match='already loaded'):
+        configure(source)
+
+
+def test_signal_attribute_access():
+    source = 'file://' + str(Path(__file__).parent / 'stuff.json')
+    load_stuff(source)
+    assert Signal.test_signal.name == 'test_signal'
+    assert Signal.else_signal.name == 'else_signal'
+    assert Signal.typed_signal.name == 'typed_signal'
+
+
+def test_signal_attribute_access_nonexistent():
+    with pytest.raises(AttributeError, match='not registered'):
+        Signal.nonexistent_signal  # noqa
+
+
+def test_queue_attribute_access():
+    source = 'file://' + str(Path(__file__).parent / 'stuff.json')
+    load_stuff(source)
+    assert Queue.test_queue.name == 'test_queue'
+    assert Queue.push1.name == 'push1'
+    assert Queue.push2.name == 'push2'
+
+
+def test_queue_attribute_access_nonexistent():
+    with pytest.raises(AttributeError, match='not registered'):
+        Queue.nonexistent_queue  # noqa
 
 
 def test_load_from_url():

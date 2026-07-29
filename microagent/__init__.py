@@ -16,7 +16,8 @@ from .timer import CRONArgs, CRONTask, PeriodicArgs, PeriodicTask, cron_parser
 from .utils import make_bound_key
 
 __all__ = ['Signal', 'Queue', 'MicroAgent', 'ServerInterrupt', 'receiver', 'consumer',
-           'periodic', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
+           'periodic', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues',
+           'configure', 'DoubleLoadError']
 
 MIN_TIMEOUT_SEC = .001
 JSON_TYPES = {
@@ -35,10 +36,16 @@ def get_types(value: str | list[str]) -> tuple[type, ...]:
     return tuple(JSON_TYPES[x] for x in value)
 
 
-def load_stuff(source: str) -> tuple[Any, Any]:
-    '''
-        Init signals from json-file loaded from disk or http request
-    '''
+class DoubleLoadError(RuntimeError):
+    ''' Raised when :func:`configure` or :func:`load_stuff` called more than once '''
+
+
+def _load(source: str) -> None:
+    if Signal._signals or Queue._queues:
+        raise DoubleLoadError(
+            'Signals/queues already loaded. '
+            'load_stuff/configure called more than once?'
+        )
 
     data: dict[str, abc.Iterable[dict[str, Any]]] = {}
 
@@ -73,6 +80,53 @@ def load_stuff(source: str) -> tuple[Any, Any]:
         jsonlib = importlib.import_module(data['jsonlib'])  # type: ignore
         Signal.set_jsonlib(jsonlib)
         Queue.set_jsonlib(jsonlib)
+
+
+def configure(source: str) -> None:
+    '''
+        Init signals and queues from json-file loaded from disk or http request.
+        Unlike :func:`load_stuff`, does not return anything.
+        After calling, signals and queues are accessible via
+        :class:`~microagent.signal.Signal` and :class:`~microagent.queue.Queue`
+        class attributes.
+
+        .. code-block:: python
+
+            from microagent import Signal, Queue, configure
+
+            configure('file://signals.json')
+
+            Signal.user_created  # -> <Signal user_created>
+            Queue.mailer         # -> <Queue mailer>
+
+            @receiver(Signal.user_created)
+            async def handler(self, **kwargs):
+                ...
+
+            @consumer(Queue.mailer)
+            async def consumer(self, **kwargs):
+                ...
+
+        Raises :class:`DoubleLoadError` if signals or queues already loaded.
+    '''
+    _load(source)
+
+
+def load_stuff(source: str) -> tuple[Any, Any]:
+    '''
+        Init signals from json-file loaded from disk or http request.
+        Returns named tuples of signals and queues.
+
+        .. note::
+
+            Use :func:`configure` if you don't need the return values
+            and prefer :class:`~microagent.signal.Signal` /
+            :class:`~microagent.queue.Queue` class attribute access instead.
+
+        Raises :class:`DoubleLoadError` if signals or queues already loaded.
+    '''
+
+    _load(source)
 
     # mypy: https://github.com/python/mypy/issues/848
     SignalList = NamedTuple('signals', [(name, Signal) for name in Signal.get_all().keys()])  # type: ignore

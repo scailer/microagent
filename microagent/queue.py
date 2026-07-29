@@ -22,8 +22,20 @@ class SerializingError(QueueException):
     pass
 
 
+class QueueMeta(type):
+    def __getattr__(cls, name: str) -> 'Queue':
+        queues: dict[str, 'Queue'] = cls.__dict__['_queues']
+        try:
+            return queues[name]
+        except KeyError:
+            raise AttributeError(
+                f"Queue '{name}' is not registered. "
+                f"Known queues: {list(queues) or 'none — did you forget load_stuff()?'}"
+            )
+
+
 @dataclass(frozen=True)
-class Queue:
+class Queue(metaclass=QueueMeta):
     '''
         Dataclass (declaration) for a queue entity with a unique name.
         Each instance registered at creation.
@@ -46,24 +58,21 @@ class Queue:
                 ]
             }
 
-        Manual declaration (not recommended)
+        Manual declaration
 
         .. code-block:: python
 
-            some_queue = Queue(
-                name='some_queue'
-            )
+            mailer = Queue(name='mailer')
+            push = Queue(name='push', exchange='events')
+            topic = Queue(name='topic', exchange='msg', topics=['message.*'])
 
-            else_queue = Queue(
-                name='else_queue',
-                exchange='fanout_exchange'
-            )
+        Attribute access after :func:`~microagent.configure` / :func:`~microagent.load_stuff`
 
-            topic_queue = Queue(
-                name='topic_queue',
-                exchange='topic_exchange',
-                topics=['message.*']
-            )
+        .. code-block:: python
+
+            configure('file://queues.json')
+            Queue.mailer  # -> <Queue mailer>
+            Queue.push1   # -> <Queue push1>
     '''
     name: str
     exchange: str = ''
