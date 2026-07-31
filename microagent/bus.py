@@ -49,6 +49,7 @@ import contextlib
 import logging
 import time
 import uuid
+
 from abc import abstractmethod
 from collections import abc, defaultdict
 from dataclasses import dataclass, field
@@ -106,7 +107,7 @@ class AbstractSignalBus(BusProtocol):
     dsn: str
     uid: str = field(default_factory=lambda: uuid.uuid4().hex)
     prefix: str = 'PUBSUB'
-    log: logging.Logger = logging.getLogger('microagent.bus')
+    log: logging.Logger = field(default=logging.getLogger('microagent.bus'))
 
     receivers: dict[str, list[Receiver]] = field(default_factory=lambda: defaultdict(list))
     _responses: dict[str, IterQueue] = field(default_factory=dict)

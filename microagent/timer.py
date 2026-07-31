@@ -23,12 +23,14 @@ import asyncio
 import inspect
 import re
 import time
+
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, ClassVar, NamedTuple, TypedDict
 
 from .abc import BoundKey, PeriodicFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -37,6 +39,7 @@ if TYPE_CHECKING:
 RANGES = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
 DAYS = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 MAX_DIFF = 2 * 365 * 24 * 60 * 60
+LAST_MONTH = 12
 
 
 class CRON(NamedTuple):
@@ -47,7 +50,7 @@ class CRON(NamedTuple):
     months: list[int]  # 1-12
     weekdays: list[int]  # 0-7
 
-    def next(self) -> datetime:  # noqa A003
+    def next(self) -> datetime:
         return next_moment(self, datetime.now(tz=timezone.utc))
 
     def __str__(self) -> str:
@@ -67,16 +70,16 @@ class PeriodicMixin:
 
     async def call(self) -> None:
         try:
-            response = self.handler()
+            await self._run_handler()
+        except asyncio.TimeoutError:
+            self.agent.log.exception(f'TimeoutError: {self}')
+        except Exception:
+            self.agent.log.exception('Periodic Exception')
 
-            if inspect.isawaitable(response):
-                try:
-                    await asyncio.wait_for(response, self.timeout)
-                except asyncio.TimeoutError:
-                    self.agent.log.exception(f'TimeoutError: {self}')
-
-        except Exception as exc:
-            self.agent.log.exception(f'Periodic Exception: {exc}')
+    async def _run_handler(self) -> None:
+        response = self.handler()
+        if inspect.isawaitable(response):
+            await asyncio.wait_for(response, self.timeout)
 
     def start(self, start_after: float) -> None:
         self._state['timer_handle'] = asyncio.get_running_loop().call_later(
@@ -85,7 +88,8 @@ class PeriodicMixin:
     def cancel(self) -> None:
         if (timer_handle := self._state.get('timer_handle')) is not None:
             timer_handle.cancel()
-        if (running_task := self._state.get('running_task')) is not None and not running_task.done():
+        running_task = self._state.get('running_task')
+        if running_task is not None and not running_task.done():
             running_task.cancel()
 
 
@@ -142,7 +146,8 @@ class CRONTask(PeriodicMixin):
 
 
 def _periodic(task: PeriodicTask | CRONTask) -> asyncio.Task:
-    task._state['timer_handle'] = asyncio.get_running_loop().call_later(task.period, _periodic, task)
+    loop = asyncio.get_running_loop()
+    task._state['timer_handle'] = loop.call_later(task.period, _periodic, task)
     running = asyncio.create_task(task.call())
     task._state['running_task'] = running
     return running
@@ -157,10 +162,10 @@ def cron_parser(spec: str) -> CRON:
     norm_spec = (
         re.sub(  # * -> 0-23/1
             r'^\*$',
-            r'%d-%d/1' % rng,
+            r'%d-%d/1' % rng,  # noqa UP031
             re.sub(  # */2 -> 0-23/2
                 r'^\*(\/.+)$',
-                r'%d-%d\1' % rng,
+                r'%d-%d\1' % rng,  # noqa UP031
                 re.sub(  # 5-20 -> 5-20/1
                     r'^(\d+-\d+)$',
                     r'\1/1',
@@ -195,6 +200,22 @@ def cron_parser(spec: str) -> CRON:
     )
 
 
+def _day_allows(cron: CRON, now: datetime) -> bool:
+    days_all = set(cron.days) == set(range(1, 32))  # run every calendar day
+    wdays_all = set(cron.weekdays) >= set(range(7))  # run every week day
+
+    day_ok = now.day in cron.days  # run today
+    wday_ok = now.weekday() in cron.weekdays  # run today
+
+    if not days_all and not wdays_all:
+        return day_ok or wday_ok  # POSIX: both restricted → OR
+    if not days_all:
+        return day_ok
+    if not wdays_all:
+        return wday_ok
+    return True  # if run every day
+
+
 def next_moment(cron: CRON, now: datetime) -> datetime:
     if abs((datetime.now(tz=timezone.utc) - now).total_seconds()) > MAX_DIFF:
         raise ValueError
@@ -206,30 +227,14 @@ def next_moment(cron: CRON, now: datetime) -> datetime:
             hour=now.hour, minute=now.minute, tzinfo=timezone.utc)
 
     if now.month not in cron.months:
-        if now.month == 12:  # noqa PLR2004
+        if now.month == LAST_MONTH:
             now = datetime(year=now.year + 1, month=1, day=1, tzinfo=timezone.utc)
         else:
             now = datetime(year=now.year, month=now.month + 1, day=1, tzinfo=timezone.utc)
 
         return next_moment(cron, now)
 
-    # calculating whether a task needs to be started on that day
-    days_all = set(cron.days) == set(range(1, 32))  # run every calendar day
-    wdays_all = set(cron.weekdays) >= set(range(7))  # run every week day
-
-    day_ok = now.day in cron.days  # run today
-    wday_ok = now.weekday() in cron.weekdays  # run today
-
-    if not days_all and not wdays_all:
-        ok = day_ok or wday_ok  # POSIX: both restricted → OR
-    elif not days_all:
-        ok = day_ok
-    elif not wdays_all:
-        ok = wday_ok
-    else:  # if run every day
-        ok = True
-
-    if not ok:
+    if not _day_allows(cron, now):
         now += timedelta(days=1)
         now = datetime(year=now.year, month=now.month, day=now.day, tzinfo=timezone.utc)
         return next_moment(cron, now)

@@ -20,7 +20,7 @@ jobs:
           enable-cache: true
 
       - name: Lint with ruff
-        run: uvx ruff check microagent
+        run: uvx ruff --version && uvx ruff check microagent
 
       - name: Lint with mypy
         run: uvx mypy microagent

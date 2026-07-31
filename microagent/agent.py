@@ -80,6 +80,7 @@ Using MicroAgent resources.
 
 import asyncio
 import logging
+
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -92,7 +93,9 @@ from .queue import Consumer
 from .signal import Receiver
 from .timer import CRONTask, PeriodicTask
 
+
 HandlerTypes = TypeVar('HandlerTypes', Receiver, Consumer, PeriodicTask, CRONTask, Hook)
+LOG_TIME_THRESHOLD = 100
 
 
 class MissConfig(Exception):
@@ -227,7 +230,7 @@ class MicroAgent:
         for task in [*periodic_tasks, *cron_tasks]:
             start_after: float = getattr(task, 'start_after', None) or 0.0
 
-            if start_after > 100:  # noqa PLR2004
+            if start_after > LOG_TIME_THRESHOLD:
                 start_at = datetime.now(tz=timezone.utc) + timedelta(seconds=start_after)
                 self.log.debug('Set %s at %s', task, f'{start_at:%H:%M:%S}')
             else:

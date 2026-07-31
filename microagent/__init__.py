@@ -3,6 +3,7 @@ __version__ = '1.9.0'
 import importlib
 import json
 import urllib.request
+
 from collections import abc
 from typing import Any, NamedTuple
 
@@ -15,9 +16,23 @@ from .signal import Receiver, ReceiverArgs, Signal
 from .timer import CRONArgs, CRONTask, PeriodicArgs, PeriodicTask, cron_parser
 from .utils import make_bound_key
 
-__all__ = ['Signal', 'Queue', 'MicroAgent', 'ServerInterrupt', 'receiver', 'consumer',
-           'periodic', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues',
-           'configure', 'DoubleLoadError']
+
+__all__ = [
+    'DoubleLoadError',
+    'MicroAgent',
+    'Queue',
+    'ServerInterrupt',
+    'Signal',
+    'configure',
+    'consumer',
+    'cron',
+    'load_queues',
+    'load_signals',
+    'load_stuff',
+    'on',
+    'periodic',
+    'receiver',
+]
 
 MIN_TIMEOUT_SEC = .001
 JSON_TYPES = {
@@ -129,8 +144,8 @@ def load_stuff(source: str) -> tuple[Any, Any]:
     _load(source)
 
     # mypy: https://github.com/python/mypy/issues/848
-    SignalList = NamedTuple('signals', [(name, Signal) for name in Signal.get_all().keys()])  # type: ignore
-    QueueList = NamedTuple('queues', [(name, Queue) for name in Queue.get_all().keys()])  # type: ignore
+    SignalList = NamedTuple('signals', [(name, Signal) for name in Signal.get_all()])  # type: ignore
+    QueueList = NamedTuple('queues', [(name, Queue) for name in Queue.get_all()])  # type: ignore
 
     return (
         SignalList(*Signal.get_all().values()),
@@ -199,7 +214,7 @@ def load_queues(source: str) -> NamedTuple:
     return load_stuff(source)[1]
 
 
-def periodic(period: int | float, timeout: int | float = 1, start_after: int | float = 0
+def periodic(period: float, timeout: float = 1, start_after: float = 0
         ) -> abc.Callable[[PeriodicFunc], PeriodicFunc]:
     '''
         Run decorated handler periodically.
@@ -238,7 +253,7 @@ def periodic(period: int | float, timeout: int | float = 1, start_after: int | f
     return _decorator
 
 
-def cron(spec: str, timeout: int | float = 1) -> abc.Callable[[PeriodicFunc], PeriodicFunc]:
+def cron(spec: str, timeout: float = 1) -> abc.Callable[[PeriodicFunc], PeriodicFunc]:
     '''
         Run decorated function by schedule (cron)
 

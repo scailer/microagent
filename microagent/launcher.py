@@ -23,10 +23,12 @@ import multiprocessing
 import os
 import signal
 import time
+
 from collections.abc import Iterator
 from functools import partial
 from itertools import chain
 from typing import TYPE_CHECKING, Any
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -38,8 +40,8 @@ CFG_T = tuple[str, dict[str, Any]]
 
 __all__ = (
     'GroupInterrupt',
-    'load_configuration',
     'init_agent',
+    'load_configuration',
     'run'
 )
 
@@ -55,7 +57,6 @@ class GroupInterrupt(SystemExit):
 
 class ServerInterrupt(Exception):
     ''' Graceful server interruption '''
-    pass
 
 
 def load_configuration(config_path: str) -> Iterator[tuple[str, CFG_T]]:
@@ -88,8 +89,8 @@ def init_agent(backend: str, cfg: dict[str, Any]) -> 'MicroAgent':
         initialize it and returns not started MicroAgent instance
     '''
 
-    bus: 'AbstractSignalBus' | None = None
-    broker: 'AbstractQueueBroker' | None = None
+    bus: AbstractSignalBus | None = None
+    broker: AbstractQueueBroker | None = None
     _bus: CFG_T | None = cfg.pop('bus', None)
     _broker: CFG_T | None = cfg.pop('broker', None)
 
@@ -103,8 +104,8 @@ def init_agent(backend: str, cfg: dict[str, Any]) -> 'MicroAgent':
 
 
 def _import(path: str) -> type:
-    mod = importlib.import_module('.'.join(path.split('.')[:-1]))
-    return getattr(mod, path.split('.')[-1])
+    mod = importlib.import_module(path.rsplit('.', 1)[0])
+    return getattr(mod, path.rsplit('.', 1)[-1])
 
 
 def run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
@@ -149,8 +150,8 @@ async def _run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
 
         await asyncio.sleep(.1)
 
-    except Exception as exc:
-        logger.exception('AgentProc[%s]: Catch error %s', name, exc)
+    except Exception:
+        logger.exception('AgentProc[%s]: Catch error', name)
         raise
 
     finally:

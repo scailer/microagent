@@ -3,11 +3,12 @@
 '''
 import asyncio
 import time
+
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
-from redis.asyncio import ConnectionError, Redis, client
+from redis.asyncio import ConnectionError as RedisConnectionError, Redis, client
 
 from ..broker import AbstractQueueBroker
 from ..bus import AbstractSignalBus
@@ -61,8 +62,8 @@ class RedisSignalBus(AbstractSignalBus):
                     if message['type'] in psub.PUBLISH_MESSAGE_TYPES:
                         self.receiver(message['channel'], message['data'])
 
-            except ConnectionError as exc:
-                self.log.exception(exc)
+            except RedisConnectionError:
+                self.log.exception('Bus ConnectionError %s', self)
                 self.log.warning('Resubscribe %s %s', channel, self)
                 self.connection = self.new_connection()
                 await asyncio.sleep(1)

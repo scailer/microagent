@@ -1,9 +1,11 @@
 import json
+
 from dataclasses import dataclass
 from types import ModuleType
 from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from .abc import BoundKey, ReceiverFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -11,7 +13,6 @@ if TYPE_CHECKING:
 
 class SignalException(Exception):
     ''' Base signal exception '''
-    pass
 
 
 class SignalNotFound(SignalException):
@@ -24,14 +25,14 @@ class SerializingError(SignalException):
 
 class SignalMeta(type):
     def __getattr__(cls, name: str) -> 'Signal':
-        signals: dict[str, 'Signal'] = getattr(cls, '_signals', {})
+        signals: dict[str, Signal] = getattr(cls, '_signals', {})
         try:
             return signals[name]
         except KeyError:
             raise AttributeError(
                 f"Signal '{name}' is not registered. "
                 f"Known signals: {list(signals) or 'none — did you forget load_stuff()?'}"
-            )
+            ) from None
 
 
 @dataclass(slots=True, frozen=True)

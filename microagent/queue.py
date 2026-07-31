@@ -1,9 +1,11 @@
 import json
+
 from dataclasses import dataclass, field
 from types import ModuleType
 from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from .abc import BoundKey, ConsumerFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -11,7 +13,6 @@ if TYPE_CHECKING:
 
 class QueueException(Exception):
     ''' Base queue exception '''
-    pass
 
 
 class QueueNotFound(QueueException):
@@ -24,14 +25,14 @@ class SerializingError(QueueException):
 
 class QueueMeta(type):
     def __getattr__(cls, name: str) -> 'Queue':
-        queues: dict[str, 'Queue'] = getattr(cls, '_queues', {})
+        queues: dict[str, Queue] = getattr(cls, '_queues', {})
         try:
             return queues[name]
         except KeyError:
             raise AttributeError(
                 f"Queue '{name}' is not registered. "
                 f"Known queues: {list(queues) or 'none — did you forget load_stuff()?'}"
-            )
+            ) from None
 
 
 @dataclass(frozen=True)
