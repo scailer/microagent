@@ -47,7 +47,7 @@ class AMQPBroker(AbstractQueueBroker):
         .. code-block:: python
 
             class EmailAgent(MicroAgent):
-                @consumer(queues.mailer, autoack=False)
+                @consumer(Queue.mailer, autoack=False)
                 async def example_read_queue(self, amqp, **data):
                     await amqp.channel.basic_client_ack(delivery_tag=amqp.delivery_tag)
 

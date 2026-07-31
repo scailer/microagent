@@ -1,4 +1,4 @@
-__version__ = '1.8.3'
+__version__ = '1.9.0'
 
 import importlib
 import json
@@ -92,7 +92,7 @@ def configure(source: str) -> None:
 
         .. code-block:: python
 
-            from microagent import Signal, Queue, configure
+            from microagent import Queue, Signal, configure, consumer, receiver
 
             configure('file://signals.json')
 
@@ -178,8 +178,8 @@ def load_queues(source: str) -> NamedTuple:
 
             from microagent import load_queues
 
-            signals_from_file = load_signals('file://queues.json')
-            signals_from_web = load_signals('http://example.com/queues.json')
+            queues_from_file = load_queues('file://queues.json')
+            queues_from_web = load_queues('http://example.com/queues.json')
 
 
         Queues declarations (queues.json).

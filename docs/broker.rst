@@ -7,9 +7,6 @@ Queue broker
 .. automodule:: microagent.broker
 
 
-.. autofunction:: microagent.configure
-
-
 .. autofunction:: microagent.load_queues
 
 
@@ -46,5 +43,3 @@ Queue broker
 
 .. autoclass:: microagent.queue.SerializingError
 
-
-.. autoclass:: microagent.DoubleLoadError

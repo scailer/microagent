@@ -13,7 +13,10 @@ Agent declaration.
 
 .. code-block:: python
 
-    from microagent import MicroAgent, receiver, consumer, periodic, cron, on
+    from microagent import (MicroAgent, Queue, Signal, configure,
+                            consumer, cron, on, periodic, receiver)
+
+    configure('file://signals.json')
 
     class Agent(MicroAgent):
 
@@ -25,11 +28,11 @@ Agent declaration.
         async def periodic_handler(self):
             pass
 
-        @receiver(signals.send_mail)
+        @receiver(Signal.send_mail)
         async def send_mail_handler(self, **kwargs):
             pass
 
-        @consumer(queues.mailer)
+        @consumer(Queue.mailer)
         async def mail_handler(self, **kwargs):
             pass
 
@@ -48,7 +51,7 @@ Agent initiation.
     settings = {'secret': 'my_secret'}
 
     # Initialize MicroAgent, all arguments optional
-    agent = Agent(bus=bus, broker=broker, log=logger, settings=settings)
+    agent = Agent(bus=bus, broker=broker, log=log, settings=settings)
 
 
 Manual launching.
@@ -69,7 +72,7 @@ Using MicroAgent resources.
 
         async def setup(self):
             self.log.info('Setup called!')  # write log
-            await self.bus.my_sugnal.send(sender='agent', param=1)  # use bus
+            await self.bus.my_signal.send(sender='agent', param=1)  # use bus
             await self.broker.my_queue.send({'text': 'Hello world!'})  # use broker
             secret = self.settings['secret']  # user settings
             print(self.info())  # serializable dict of agent structure

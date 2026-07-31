@@ -37,7 +37,7 @@ class KafkaBroker(AbstractQueueBroker):
         .. code-block:: python
 
             class EmailAgent(MicroAgent):
-                @consumer(queues.mailer)
+                @consumer(Queue.mailer)
                 async def example_read_queue(self, kafka, **data):
                     # kafka: AIOKafkaConsumer
                     process(data)

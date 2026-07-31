@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from microagent import (DoubleLoadError, MicroAgent, Queue, Signal, __version__,  # noqa
-                        configure, consumer, cron, load_queues, load_signals,
-                        load_stuff, periodic, receiver)
+from microagent import (DoubleLoadError, MicroAgent, Queue, Signal,  # noqa
+                        __version__, configure, consumer, cron, load_queues,
+                        load_signals, load_stuff, periodic, receiver)
 from microagent.tools import mocks
 
 

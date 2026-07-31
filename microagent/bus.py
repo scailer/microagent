@@ -17,10 +17,10 @@ Using SignalBus separately (sending only)
 
 .. code-block:: python
 
-    from microagent import load_signals
+    from microagent import Signal, configure
     from microagent.tools.redis import RedisSignalBus
 
-    signals = load_signals('file://signals.json')
+    configure('file://signals.json')
 
     bus = RedisSignalBus('redis://localhost/7')
     await bus.user_created.send('user_agent', user_id=1)
@@ -30,13 +30,13 @@ Using with MicroAgent
 
 .. code-block:: python
 
-    from microagent import MicroAgent, load_signals
+    from microagent import MicroAgent, Signal, configure, receiver
     from microagent.tools.redis import RedisSignalBus
 
-    signals = load_signals('file://signals.json')
+    configure('file://signals.json')
 
     class UserAgent(MicroAgent):
-        @receiver(signals.user_created)
+        @receiver(Signal.user_created)
         async def example(self, user_id, **kwargs):
             await self.bus.user_created.send('some_signal', user_id=1)
 
@@ -179,7 +179,7 @@ class AbstractSignalBus(BusProtocol):
             .. code-block:: python
 
                 class CommentAgent(MicroAgent):
-                    @receiver(signals.rpc_comments_count)
+                    @receiver(Signal.rpc_comments_count)
                     async def example_rpc_handler(self, user_id, **kwargs):
                         return 1
 

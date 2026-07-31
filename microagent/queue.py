@@ -24,7 +24,7 @@ class SerializingError(QueueException):
 
 class QueueMeta(type):
     def __getattr__(cls, name: str) -> 'Queue':
-        queues: dict[str, 'Queue'] = cls.__dict__['_queues']
+        queues: dict[str, 'Queue'] = getattr(cls, '_queues', {})
         try:
             return queues[name]
         except KeyError:

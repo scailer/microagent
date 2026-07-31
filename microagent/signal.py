@@ -24,7 +24,7 @@ class SerializingError(SignalException):
 
 class SignalMeta(type):
     def __getattr__(cls, name: str) -> 'Signal':
-        signals: dict[str, 'Signal'] = cls.__dict__['_signals']
+        signals: dict[str, 'Signal'] = getattr(cls, '_signals', {})
         try:
             return signals[name]
         except KeyError:

@@ -25,10 +25,10 @@ Using QueueBroker separately (sending only)
 
 .. code-block:: python
 
-    from microagent import load_queues
+    from microagent import Queue, configure
     from microagent.tools.redis import RedisBroker
 
-    queues = load_queues('file://queues.json')
+    configure('file://queues.json')
     broker = RedisBroker('redis://localhost/7')
 
     await broker.user_created.send({'user_id': 1})  # send to queue
@@ -42,13 +42,13 @@ Using with MicroAgent
 
 .. code-block:: python
 
-    from microagent import MicroAgent, load_queues
-    from microagent.tools.redis import RedisSignalBus
+    from microagent import MicroAgent, Queue, configure, consumer
+    from microagent.tools.redis import RedisBroker
 
-    queues = load_queues('file://queues.json')
+    configure('file://queues.json')
 
     class EmailAgent(MicroAgent):
-        @consumer(queues.mailer)
+        @consumer(Queue.mailer)
         async def example_read_queue(self, **kwargs):
             await self.broker.email_sended.send({'user_id': 1})
 

@@ -13,6 +13,11 @@ Decorators details.
     :members: receiver, consumer, periodic, cron, on
 
 
+Loading signals and queues from config-file.
+
+.. autofunction:: microagent.load_stuff
+
+
 .. autoclass:: MicroAgent
     :members:
     :member-order: bysource

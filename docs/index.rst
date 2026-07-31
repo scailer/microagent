@@ -32,7 +32,9 @@ Tool provide features:
 
 .. code-block:: python
 
-    from microagent import MicroAgent, Queue, Signal, configure
+    from microagent import (MicroAgent, Queue, Signal, configure,
+                            consumer, cron, on, periodic, receiver)
+    from microagent.tools.redis import RedisBroker, RedisSignalBus
 
     configure('file://signals.json')
 
@@ -69,7 +71,7 @@ Tool provide features:
 
         # usage bus and broker separate from agent
         await bus.started.send('user_agent')
-        await broker.mailer(data)
+        await broker.mailer.send(data)
 
         agent = Agent(bus=bus, broker=broker)
         await agent.start()

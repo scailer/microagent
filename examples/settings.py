@@ -1,9 +1,8 @@
 import logging
-import sys
 import os
+import sys
 
 from microagent import configure
-
 
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 configure('file://' + os.path.join(cur_dir, 'signals.json'))
