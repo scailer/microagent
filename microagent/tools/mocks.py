@@ -68,14 +68,15 @@ class BrokerMock(MagicMock):
         self._stuff: dict[str, BoundQueueMock] = {}
         self.bind_consumer = AsyncMock()
         self.send = AsyncMock()
+        self.close = AsyncMock()
         self.dsn = ''
         self.uid = ''
 
     def __str__(self) -> str:
-        return f'<BrokerMock id={id(self)}'
+        return f'<BrokerMock id={id(self)}>'
 
     def __getattr__(self, name: str) -> BoundQueueMock:
-        if name.startswith('_') or name in {'bind_consumer', 'send'}:
+        if name.startswith('_') or name in {'bind_consumer', 'send', 'close'}:
             return super().__getattr__(name)
         self._stuff[name] = self._stuff.get(name, BoundQueueMock())
         return self._stuff[name]

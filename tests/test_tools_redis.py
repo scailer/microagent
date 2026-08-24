@@ -142,7 +142,7 @@ async def test_broker_rollback_many_attempts_ok():
     queue = Queue(name='test_queue')
     broker = RedisBroker('redis://localhost')
     broker.send = AsyncMock()
-    broker._rollbacks[str(hash(queue.name)) + str(hash('{}'))] = 4
+    broker._rollbacks[(queue.name, '{}')] = 4
     await broker.rollback(queue.name, '{}')
     broker.send.assert_not_called()
     await asyncio.sleep(.01)

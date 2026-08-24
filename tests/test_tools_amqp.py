@@ -136,6 +136,9 @@ async def test_broker_rebind_ok_already(monkeypatch, channel):
 
     assert not await conn.rebind()
 
+    conn.bind_running = False
+    assert await conn.rebind()
+
 
 async def test_broker_rebind_ok_attempts(monkeypatch, channel):
     queue = Queue(name='test_queue')
@@ -204,8 +207,8 @@ async def test_broker_wrapper_ok_nodata(channel):
 
     await broker._amqp_wrapper(consumer)(message)
 
-    channel.basic_ack.assert_not_called()
-    handler.assert_not_called()
+    channel.basic_ack.assert_called()
+    handler.assert_called_once()
 
 
 async def test_broker_wrapper_ok_type_err(channel):
