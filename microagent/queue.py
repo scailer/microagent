@@ -31,7 +31,7 @@ class QueueMeta(type):
         except KeyError:
             raise AttributeError(
                 f"Queue '{name}' is not registered. "
-                f"Known queues: {list(queues) or 'none — did you forget load_stuff()?'}"
+                f"Known queues: {list(queues) or 'none — did you forget configure()?'}"
             ) from None
 
 

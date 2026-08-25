@@ -31,7 +31,7 @@ class SignalMeta(type):
         except KeyError:
             raise AttributeError(
                 f"Signal '{name}' is not registered. "
-                f"Known signals: {list(signals) or 'none — did you forget load_stuff()?'}"
+                f"Known signals: {list(signals) or 'none — did you forget configure()?'}"
             ) from None
 
 
