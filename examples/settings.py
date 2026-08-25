@@ -4,6 +4,7 @@ import sys
 
 from microagent import configure
 
+
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 configure('file://' + os.path.join(cur_dir, 'signals.json'))
 logging.basicConfig(format=(
@@ -16,7 +17,6 @@ BUS = {
     'redis': {
         'backend': 'microagent.tools.redis.RedisSignalBus',
         'dsn': 'redis://localhost/7',
-        'prefix': 'PREF',
     },
 }
 

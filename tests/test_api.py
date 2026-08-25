@@ -1,11 +1,30 @@
 # mypy: ignore-errors
+import json
+import os
+import tempfile
+
 from pathlib import Path
 
 import pytest
 
-from microagent import (DoubleLoadError, MicroAgent, Queue, Signal,  # noqa
-                        __version__, configure, consumer, cron, load_queues,
-                        load_signals, load_stuff, periodic, receiver)
+import microagent.bus as bus_module
+
+from microagent import (  # noqa
+    DoubleLoadError,
+    MicroAgent,
+    Queue,
+    Signal,
+    __version__,
+    configure,
+    consumer,
+    cron,
+    load_queues,
+    load_signals,
+    load_stuff,
+    periodic,
+    receiver,
+)
+from microagent.bus import AbstractSignalBus
 from microagent.tools import mocks
 
 
@@ -122,3 +141,48 @@ async def test_mock_broker_ok():
     await broker.test_queue.declare()
     broker.test_queue.declare.assert_called()
     assert str(broker)
+
+
+async def test_default_prefix_from_json():
+    from microagent import Signal, Queue
+
+    class TestBus(AbstractSignalBus):
+        async def send(self, channel, message): pass
+        async def bind(self, channel): pass
+
+    # reset default
+    bus_module._DEFAULT_PREFIX = 'PUBSUB'
+
+    source = 'file://' + str(Path(__file__).parent / 'stuff.json')
+    configure(source)
+
+    b1 = TestBus(dsn='redis://localhost')
+    assert b1.prefix == 'PUBSUB'
+
+    # test with default_prefix in json
+    json_content = {
+        'default_prefix': 'MYAPP',
+        'signals': [
+            {'name': 'other_signal', 'providing_args': []}
+        ],
+        'queues': []
+    }
+
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf8') as f:
+        json.dump(json_content, f)
+        f.flush()
+        tmp_path = f.name
+
+    Signal._signals = {}
+    Queue._queues = {}
+    configure('file://' + tmp_path)
+    b2 = TestBus(dsn='redis://localhost')
+    assert b2.prefix == 'MYAPP'
+
+    # explicit prefix overrides
+    b3 = TestBus(dsn='redis://localhost', prefix='EXPLICIT')
+    assert b3.prefix == 'EXPLICIT'
+
+    # cleanup
+    os.unlink(tmp_path)
+    bus_module._DEFAULT_PREFIX = 'PUBSUB'

@@ -15,6 +15,10 @@ Decorators details.
 
 Loading signals and queues from config-file.
 
+.. autofunction:: microagent.configure
+    :noindex:
+
+
 .. autofunction:: microagent.load_stuff
 
 

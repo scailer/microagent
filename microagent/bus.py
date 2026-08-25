@@ -60,6 +60,9 @@ from .signal import Receiver, SerializingError, Signal
 from .utils import IterQueue, raise_timeout
 
 
+_DEFAULT_PREFIX = 'PUBSUB'
+
+
 @dataclass(slots=True)
 class AbstractSignalBus(BusProtocol):
     '''
@@ -106,7 +109,7 @@ class AbstractSignalBus(BusProtocol):
 
     dsn: str
     uid: str = field(default_factory=lambda: uuid.uuid4().hex)
-    prefix: str = 'PUBSUB'
+    prefix: str = field(default_factory=lambda: _DEFAULT_PREFIX)
     log: logging.Logger = field(default=logging.getLogger('microagent.bus'))
 
     receivers: dict[str, list[Receiver]] = field(default_factory=lambda: defaultdict(list))

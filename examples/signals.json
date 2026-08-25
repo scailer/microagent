@@ -1,5 +1,6 @@
 {
     "version": 2,
+    "default_prefix": "EXAMPLES",
     "signals": [
         {"name": "started", "providing_args": []},
         {"name": "user_created", "providing_args": ["user_id"]},

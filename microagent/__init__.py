@@ -1,4 +1,4 @@
-__version__ = '1.9.0'
+__version__ = '1.9.0rc1'
 
 import importlib
 import json
@@ -7,8 +7,10 @@ import urllib.request
 from collections import abc
 from typing import Any, NamedTuple
 
+from . import bus
 from .abc import ConsumerFunc, HookFunc, PeriodicFunc, ReceiverFunc
 from .agent import MicroAgent
+from .bus import _DEFAULT_PREFIX  # noqa: F401
 from .hooks import Hook, HookArgs
 from .launcher import ServerInterrupt
 from .queue import Consumer, ConsumerArgs, Queue
@@ -62,7 +64,7 @@ def _load(source: str) -> None:
             'load_stuff/configure called more than once?'
         )
 
-    data: dict[str, abc.Iterable[dict[str, Any]]] = {}
+    data: dict[str, Any] = {}
 
     if source.startswith('file://'):
         with open(source.replace('file://', ''), encoding='utf8') as f:
@@ -92,9 +94,12 @@ def _load(source: str) -> None:
         )
 
     if data.get('jsonlib'):
-        jsonlib = importlib.import_module(data['jsonlib'])  # type: ignore
+        jsonlib = importlib.import_module(data['jsonlib'])
         Signal.set_jsonlib(jsonlib)
         Queue.set_jsonlib(jsonlib)
+
+    if 'default_prefix' in data:
+        bus._DEFAULT_PREFIX = data['default_prefix']
 
 
 def configure(source: str) -> None:
