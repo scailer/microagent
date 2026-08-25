@@ -7,8 +7,6 @@ from pathlib import Path
 
 import pytest
 
-import microagent.bus as bus_module
-
 from microagent import (  # noqa
     DoubleLoadError,
     MicroAgent,
@@ -150,9 +148,6 @@ async def test_default_prefix_from_json():
         async def send(self, channel, message): pass
         async def bind(self, channel): pass
 
-    # reset default
-    bus_module._DEFAULT_PREFIX = 'PUBSUB'
-
     source = 'file://' + str(Path(__file__).parent / 'stuff.json')
     configure(source)
 
@@ -183,6 +178,4 @@ async def test_default_prefix_from_json():
     b3 = TestBus(dsn='redis://localhost', prefix='EXPLICIT')
     assert b3.prefix == 'EXPLICIT'
 
-    # cleanup
     os.unlink(tmp_path)
-    bus_module._DEFAULT_PREFIX = 'PUBSUB'

@@ -44,9 +44,7 @@ class BusMock(MagicMock):
         return f'<BusMock id={id(self)}>'
 
     def __getattr__(self, name: str) -> BoundSignalMock:
-        if name.startswith('_') or name in {
-            'bind_receiver', 'bind_signal', 'send', 'call', 'close'
-        }:
+        if name.startswith('_'):
             return super().__getattr__(name)
         self._stuff[name] = self._stuff.get(name, BoundSignalMock())
         return self._stuff[name]
@@ -77,7 +75,7 @@ class BrokerMock(MagicMock):
         return f'<BrokerMock id={id(self)}>'
 
     def __getattr__(self, name: str) -> BoundQueueMock:
-        if name.startswith('_') or name in {'bind_consumer', 'send', 'close'}:
+        if name.startswith('_'):
             return super().__getattr__(name)
         self._stuff[name] = self._stuff.get(name, BoundQueueMock())
         return self._stuff[name]
