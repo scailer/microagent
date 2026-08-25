@@ -64,9 +64,27 @@ def load_configuration(config_path: str) -> Iterator[tuple[str, CFG_T]]:
         Load configuration from module and prepare it for initializing agents.
         Returns list of unfolded configs for each agent.
 
+        The configuration module may contain optional ``CONFIG`` variable with
+        a path to the signals/queues JSON file (e.g. ``'file://signals.json'``).
+        When present, ``configure()`` is called automatically to load signals
+        and queues before processing BUS, BROKER and AGENT dictionaries.
+
+        .. code-block:: python
+
+            CONFIG = 'file://signals.json'
+
+            BUS = { ... }
+            BROKER = { ... }
+            AGENT = { ... }
+
     '''
 
     mod = importlib.import_module(config_path)
+
+    config = getattr(mod, 'CONFIG', None)
+    if isinstance(config, str):
+        from . import configure as _configure  # noqa: PLC0415 circular import
+        _configure(config)
 
     _buses = dict(_configuration(getattr(mod, 'BUS', {})))
     _brokers = dict(_configuration(getattr(mod, 'BROKER', {})))

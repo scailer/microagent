@@ -14,6 +14,13 @@ the global channel prefix for all buses and brokers.
 Configuration Python file
 -------------------------
 
+Signals and queues can be loaded via the ``CONFIG`` variable. When present,
+the launcher calls ``configure()`` automatically before processing BUS, BROKER
+and AGENT dictionaries.
+
+.. include:: ../examples/settings_config.py
+   :code: python
+
 .. automodule:: microagent.launcher
 
 
