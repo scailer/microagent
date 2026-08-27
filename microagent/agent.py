@@ -13,7 +13,10 @@ Agent declaration.
 
 .. code-block:: python
 
-    from microagent import MicroAgent, receiver, consumer, periodic, cron, on
+    from microagent import (MicroAgent, Queue, Signal, configure,
+                            consumer, cron, on, periodic, receiver)
+
+    configure('file://signals.json')
 
     class Agent(MicroAgent):
 
@@ -25,11 +28,11 @@ Agent declaration.
         async def periodic_handler(self):
             pass
 
-        @receiver(signals.send_mail)
+        @receiver(Signal.send_mail)
         async def send_mail_handler(self, **kwargs):
             pass
 
-        @consumer(queues.mailer)
+        @consumer(Queue.mailer)
         async def mail_handler(self, **kwargs):
             pass
 
@@ -48,7 +51,7 @@ Agent initiation.
     settings = {'secret': 'my_secret'}
 
     # Initialize MicroAgent, all arguments optional
-    agent = Agent(bus=bus, broker=broker, log=logger, settings=settings)
+    agent = Agent(bus=bus, broker=broker, log=log, settings=settings)
 
 
 Manual launching.
@@ -69,7 +72,7 @@ Using MicroAgent resources.
 
         async def setup(self):
             self.log.info('Setup called!')  # write log
-            await self.bus.my_sugnal.send(sender='agent', param=1)  # use bus
+            await self.bus.my_signal.send(sender='agent', param=1)  # use bus
             await self.broker.my_queue.send({'text': 'Hello world!'})  # use broker
             secret = self.settings['secret']  # user settings
             print(self.info())  # serializable dict of agent structure
@@ -77,6 +80,7 @@ Using MicroAgent resources.
 
 import asyncio
 import logging
+
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -89,7 +93,9 @@ from .queue import Consumer
 from .signal import Receiver
 from .timer import CRONTask, PeriodicTask
 
+
 HandlerTypes = TypeVar('HandlerTypes', Receiver, Consumer, PeriodicTask, CRONTask, Hook)
+LOG_TIME_THRESHOLD = 100
 
 
 class MissConfig(Exception):
@@ -224,7 +230,7 @@ class MicroAgent:
         for task in [*periodic_tasks, *cron_tasks]:
             start_after: float = getattr(task, 'start_after', None) or 0.0
 
-            if start_after > 100:  # noqa PLR2004
+            if start_after > LOG_TIME_THRESHOLD:
                 start_at = datetime.now(tz=timezone.utc) + timedelta(seconds=start_after)
                 self.log.debug('Set %s at %s', task, f'{start_at:%H:%M:%S}')
             else:

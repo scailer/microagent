@@ -4,16 +4,17 @@
 import asyncio
 import logging
 import time
+
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from aiormq import Connection
-from aiormq.abc import (AbstractChannel, AbstractConnection, Basic,
-                        DeliveredMessage, ExceptionType)
+from aiormq.abc import AbstractChannel, AbstractConnection, Basic, DeliveredMessage, ExceptionType
 from aiormq.exceptions import AMQPError, ConnectionClosed
 
 from ..broker import AbstractQueueBroker, Consumer
+
 
 log = logging.getLogger('microagent.amqp')
 ConnectionClosedDefault = ConnectionClosed(0, 'normal closed')
@@ -47,7 +48,7 @@ class AMQPBroker(AbstractQueueBroker):
         .. code-block:: python
 
             class EmailAgent(MicroAgent):
-                @consumer(queues.mailer, autoack=False)
+                @consumer(Queue.mailer, autoack=False)
                 async def example_read_queue(self, amqp, **data):
                     await amqp.channel.basic_client_ack(delivery_tag=amqp.delivery_tag)
 
@@ -222,7 +223,9 @@ class ManagedConnection:
         if topics:  # topics
             await self._channel.exchange_declare(exchange=exchange_name, exchange_type='topic')
             for topic in topics:
-                await self._channel.queue_bind(queue=queue_name, exchange=exchange_name, routing_key=topic)
+                await self._channel.queue_bind(
+                    queue=queue_name, exchange=exchange_name, routing_key=topic
+                )
         elif exchange_name:  # fanout
             await self._channel.exchange_declare(exchange=exchange_name, exchange_type='fanout')
             await self._channel.queue_bind(queue=queue_name, exchange=exchange_name)
@@ -255,8 +258,8 @@ class ManagedConnection:
             self.bind_attempts = 0
             return True
 
-        except (AMQPError, OSError) as exc:
-            log.exception('Failed rebind queue "%s": %s', self.consumer.queue.name, exc)
+        except (AMQPError, OSError):
+            log.exception('Failed rebind queue "%s"', self.consumer.queue.name)
             asyncio.create_task(self.rebind())
             return False
 

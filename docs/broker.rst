@@ -42,3 +42,4 @@ Queue broker
 
 
 .. autoclass:: microagent.queue.SerializingError
+

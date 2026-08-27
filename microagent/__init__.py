@@ -1,13 +1,16 @@
-__version__ = '1.8.3'
+__version__ = '1.9.0'
 
 import importlib
 import json
 import urllib.request
+
 from collections import abc
 from typing import Any, NamedTuple
 
+from . import bus
 from .abc import ConsumerFunc, HookFunc, PeriodicFunc, ReceiverFunc
 from .agent import MicroAgent
+from .bus import _DEFAULT_PREFIX  # noqa: F401
 from .hooks import Hook, HookArgs
 from .launcher import ServerInterrupt
 from .queue import Consumer, ConsumerArgs, Queue
@@ -15,8 +18,23 @@ from .signal import Receiver, ReceiverArgs, Signal
 from .timer import CRONArgs, CRONTask, PeriodicArgs, PeriodicTask, cron_parser
 from .utils import make_bound_key
 
-__all__ = ['Signal', 'Queue', 'MicroAgent', 'ServerInterrupt', 'receiver', 'consumer',
-           'periodic', 'cron', 'on', 'load_stuff', 'load_signals', 'load_queues']
+
+__all__ = [
+    'DoubleLoadError',
+    'MicroAgent',
+    'Queue',
+    'ServerInterrupt',
+    'Signal',
+    'configure',
+    'consumer',
+    'cron',
+    'load_queues',
+    'load_signals',
+    'load_stuff',
+    'on',
+    'periodic',
+    'receiver',
+]
 
 MIN_TIMEOUT_SEC = .001
 JSON_TYPES = {
@@ -35,12 +53,18 @@ def get_types(value: str | list[str]) -> tuple[type, ...]:
     return tuple(JSON_TYPES[x] for x in value)
 
 
-def load_stuff(source: str) -> tuple[Any, Any]:
-    '''
-        Init signals from json-file loaded from disk or http request
-    '''
+class DoubleLoadError(RuntimeError):
+    ''' Raised when :func:`configure` or :func:`load_stuff` called more than once '''
 
-    data: dict[str, abc.Iterable[dict[str, Any]]] = {}
+
+def _load(source: str) -> None:
+    if Signal._signals or Queue._queues:
+        raise DoubleLoadError(
+            'Signals/queues already loaded. '
+            'load_stuff/configure called more than once?'
+        )
+
+    data: dict[str, Any] = {}
 
     if source.startswith('file://'):
         with open(source.replace('file://', ''), encoding='utf8') as f:
@@ -70,13 +94,63 @@ def load_stuff(source: str) -> tuple[Any, Any]:
         )
 
     if data.get('jsonlib'):
-        jsonlib = importlib.import_module(data['jsonlib'])  # type: ignore
+        jsonlib = importlib.import_module(data['jsonlib'])
         Signal.set_jsonlib(jsonlib)
         Queue.set_jsonlib(jsonlib)
 
+    if 'default_prefix' in data:
+        bus._DEFAULT_PREFIX = data['default_prefix']
+
+
+def configure(source: str) -> None:
+    '''
+        Init signals and queues from json-file loaded from disk or http request.
+        Unlike :func:`load_stuff`, does not return anything.
+        After calling, signals and queues are accessible via
+        :class:`~microagent.signal.Signal` and :class:`~microagent.queue.Queue`
+        class attributes.
+
+        .. code-block:: python
+
+            from microagent import Queue, Signal, configure, consumer, receiver
+
+            configure('file://signals.json')
+
+            Signal.user_created  # -> <Signal user_created>
+            Queue.mailer         # -> <Queue mailer>
+
+            @receiver(Signal.user_created)
+            async def handler(self, **kwargs):
+                ...
+
+            @consumer(Queue.mailer)
+            async def consumer(self, **kwargs):
+                ...
+
+        Raises :class:`DoubleLoadError` if signals or queues already loaded.
+    '''
+    _load(source)
+
+
+def load_stuff(source: str) -> tuple[Any, Any]:
+    '''
+        Init signals from json-file loaded from disk or http request.
+        Returns named tuples of signals and queues.
+
+        .. note::
+
+            Use :func:`configure` if you don't need the return values
+            and prefer :class:`~microagent.signal.Signal` /
+            :class:`~microagent.queue.Queue` class attribute access instead.
+
+        Raises :class:`DoubleLoadError` if signals or queues already loaded.
+    '''
+
+    _load(source)
+
     # mypy: https://github.com/python/mypy/issues/848
-    SignalList = NamedTuple('signals', [(name, Signal) for name in Signal.get_all().keys()])  # type: ignore
-    QueueList = NamedTuple('queues', [(name, Queue) for name in Queue.get_all().keys()])  # type: ignore
+    SignalList = NamedTuple('signals', [(name, Signal) for name in Signal.get_all()])  # type: ignore
+    QueueList = NamedTuple('queues', [(name, Queue) for name in Queue.get_all()])  # type: ignore
 
     return (
         SignalList(*Signal.get_all().values()),
@@ -124,8 +198,8 @@ def load_queues(source: str) -> NamedTuple:
 
             from microagent import load_queues
 
-            signals_from_file = load_signals('file://queues.json')
-            signals_from_web = load_signals('http://example.com/queues.json')
+            queues_from_file = load_queues('file://queues.json')
+            queues_from_web = load_queues('http://example.com/queues.json')
 
 
         Queues declarations (queues.json).
@@ -145,7 +219,7 @@ def load_queues(source: str) -> NamedTuple:
     return load_stuff(source)[1]
 
 
-def periodic(period: int | float, timeout: int | float = 1, start_after: int | float = 0
+def periodic(period: float, timeout: float = 1, start_after: float = 0
         ) -> abc.Callable[[PeriodicFunc], PeriodicFunc]:
     '''
         Run decorated handler periodically.
@@ -184,7 +258,7 @@ def periodic(period: int | float, timeout: int | float = 1, start_after: int | f
     return _decorator
 
 
-def cron(spec: str, timeout: int | float = 1) -> abc.Callable[[PeriodicFunc], PeriodicFunc]:
+def cron(spec: str, timeout: float = 1) -> abc.Callable[[PeriodicFunc], PeriodicFunc]:
     '''
         Run decorated function by schedule (cron)
 

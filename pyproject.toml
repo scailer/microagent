@@ -77,10 +77,12 @@ exclude_lines = [
     '    \.\.\.'
 ]
 
-[tool.lint.ruff]
+[tool.ruff]
 line-length = 100
 target-version = 'py310'
 preview = true
+
+[tool.ruff.lint]
 select = [
     'E', 'W', 'PL', 'C90', 'N', 'UP', 'I',
     # pep8-errors, pep8-warn, pylint, mccabe, pep8-naming, pyupgrade, isort
@@ -93,35 +95,33 @@ ignore = [
     'PLR6301',  # no-self-use
     'PLR0913',  # too-many-arguments
     'PLR0917',  # too many positional arguments
-    'ANN101',  # missing-type-self
-    'ANN102',  # missing-type-cls
     'N805',  # First argument of a method should be named self, pydantic validators
     'N818',  # Checks for custom exception definitions that omit the Error suffix.
 ]
 
-[tool.lint.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 'microagent/tools/mocks.py' = ['PLC2701']
 'tests/*' = ['PLR2004']
 'tests/test_launcher.py' = ['N806']  # Variable `A` in function should be lowercase
 
-[tool.lint.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 10
 
-[tool.lint.ruff.isort]
+[tool.ruff.lint.isort]
 case-sensitive = true
 combine-as-imports = true
 lines-after-imports = 2
 lines-between-types = 1
 split-on-trailing-comma = false
 
-[tool.lint.ruff.pep8-naming]
+[tool.ruff.lint.pep8-naming]
 extend-ignore-names = ['test_*']
 
-[tool.lint.ruff.flake8-annotations]
+[tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = true
 ignore-fully-untyped = true  # temp, legacy code
 
-[tool.lint.ruff.flake8-quotes]
+[tool.ruff.lint.flake8-quotes]
 inline-quotes = 'single'
 docstring-quotes = 'single'
 multiline-quotes = 'single'

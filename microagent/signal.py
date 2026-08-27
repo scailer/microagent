@@ -1,9 +1,11 @@
 import json
+
 from dataclasses import dataclass
 from types import ModuleType
 from typing import TYPE_CHECKING, ClassVar, TypedDict
 
 from .abc import BoundKey, ReceiverFunc
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -11,7 +13,6 @@ if TYPE_CHECKING:
 
 class SignalException(Exception):
     ''' Base signal exception '''
-    pass
 
 
 class SignalNotFound(SignalException):
@@ -22,8 +23,20 @@ class SerializingError(SignalException):
     pass
 
 
+class SignalMeta(type):
+    def __getattr__(cls, name: str) -> 'Signal':
+        signals: dict[str, Signal] = getattr(cls, '_signals', {})
+        try:
+            return signals[name]
+        except KeyError:
+            raise AttributeError(
+                f"Signal '{name}' is not registered. "
+                f"Known signals: {list(signals) or 'none — did you forget configure()?'}"
+            ) from None
+
+
 @dataclass(slots=True, frozen=True)
-class Signal:
+class Signal(metaclass=SignalMeta):
     '''
         Dataclass (declaration) for a signal entity with a unique name.
         Each instance registered at creation.
@@ -60,14 +73,20 @@ class Signal:
                 ]
             }
 
-        Manual declaration (not recommended)
+        Manual declaration
 
         .. code-block:: python
 
-            some_signal = Signal(
-                name='some_signal',
-                providing_args=['some_arg']
-            )
+            started = Signal(name='started', providing_args=[])
+            user_created = Signal(name='user_created', providing_args=['user_id'])
+
+        Attribute access after :func:`~microagent.configure` / :func:`~microagent.load_stuff`
+
+        .. code-block:: python
+
+            configure('file://signals.json')
+            Signal.started       # -> <Signal started>
+            Signal.user_created  # -> <Signal user_created>
     '''
 
     name: str
@@ -89,7 +108,7 @@ class Signal:
         return self.name == other.name
 
     def __hash__(self) -> int:
-        return id(self.name)
+        return hash(self.name)
 
     @classmethod
     def set_jsonlib(cls, jsonlib: ModuleType) -> None:

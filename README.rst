@@ -52,6 +52,12 @@ See MicroAgent documentation_.
 
 .. code-block:: python
 
+    from microagent import (MicroAgent, Queue, Signal, configure,
+                            consumer, cron, on, periodic, receiver)
+    from microagent.tools.redis import RedisBroker, RedisSignalBus
+
+    configure('file://signals.json')
+
     class Agent(MicroAgent):
 
         @on('pre_start')
@@ -67,13 +73,13 @@ See MicroAgent documentation_.
             pass  # do something by schedule
 
         # subscribe to signals (events)
-        @receiver(signals.user_updated, signals.user_deleted)
+        @receiver(Signal.user_updated, Signal.user_deleted)
         async def send_notification(self, **kwargs):
             # send signal (event) to bus
             await self.bus.check_something.send(sender='agent', **kwargs)
 
         # message consumer from queue
-        @consumer(queues.mailer)
+        @consumer(Queue.mailer)
         async def send_emails(self, **kwargs):
             # send message to queue
             await self.broker.statistic_collector.send(kwargs)
@@ -85,7 +91,7 @@ See MicroAgent documentation_.
 
         # usage bus and broker separate from agent
         await bus.started.send('user_agent')
-        await broker.mailer(data)
+        await broker.mailer.send(data)
 
         agent = Agent(bus=bus, broker=broker)
         await agent.start()

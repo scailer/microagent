@@ -23,10 +23,12 @@ import multiprocessing
 import os
 import signal
 import time
+
 from collections.abc import Iterator
 from functools import partial
 from itertools import chain
 from typing import TYPE_CHECKING, Any
+
 
 if TYPE_CHECKING:
     from .agent import MicroAgent
@@ -38,8 +40,8 @@ CFG_T = tuple[str, dict[str, Any]]
 
 __all__ = (
     'GroupInterrupt',
-    'load_configuration',
     'init_agent',
+    'load_configuration',
     'run'
 )
 
@@ -55,7 +57,6 @@ class GroupInterrupt(SystemExit):
 
 class ServerInterrupt(Exception):
     ''' Graceful server interruption '''
-    pass
 
 
 def load_configuration(config_path: str) -> Iterator[tuple[str, CFG_T]]:
@@ -63,9 +64,27 @@ def load_configuration(config_path: str) -> Iterator[tuple[str, CFG_T]]:
         Load configuration from module and prepare it for initializing agents.
         Returns list of unfolded configs for each agent.
 
+        The configuration module may contain optional ``CONFIG`` variable with
+        a path to the signals/queues JSON file (e.g. ``'file://signals.json'``).
+        When present, ``configure()`` is called automatically to load signals
+        and queues before processing BUS, BROKER and AGENT dictionaries.
+
+        .. code-block:: python
+
+            CONFIG = 'file://signals.json'
+
+            BUS = { ... }
+            BROKER = { ... }
+            AGENT = { ... }
+
     '''
 
     mod = importlib.import_module(config_path)
+
+    config = getattr(mod, 'CONFIG', None)
+    if isinstance(config, str):
+        from . import configure as _configure  # noqa: PLC0415 circular import
+        _configure(config)
 
     _buses = dict(_configuration(getattr(mod, 'BUS', {})))
     _brokers = dict(_configuration(getattr(mod, 'BROKER', {})))
@@ -88,8 +107,8 @@ def init_agent(backend: str, cfg: dict[str, Any]) -> 'MicroAgent':
         initialize it and returns not started MicroAgent instance
     '''
 
-    bus: 'AbstractSignalBus' | None = None
-    broker: 'AbstractQueueBroker' | None = None
+    bus: AbstractSignalBus | None = None
+    broker: AbstractQueueBroker | None = None
     _bus: CFG_T | None = cfg.pop('bus', None)
     _broker: CFG_T | None = cfg.pop('broker', None)
 
@@ -103,8 +122,8 @@ def init_agent(backend: str, cfg: dict[str, Any]) -> 'MicroAgent':
 
 
 def _import(path: str) -> type:
-    mod = importlib.import_module('.'.join(path.split('.')[:-1]))
-    return getattr(mod, path.split('.')[-1])
+    mod = importlib.import_module(path.rsplit('.', 1)[0])
+    return getattr(mod, path.rsplit('.', 1)[-1])
 
 
 def run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
@@ -149,8 +168,8 @@ async def _run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
 
         await asyncio.sleep(.1)
 
-    except Exception as exc:
-        logger.exception('AgentProc[%s]: Catch error %s', name, exc)
+    except Exception:
+        logger.exception('AgentProc[%s]: Catch error', name)
         raise
 
     finally:

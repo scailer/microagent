@@ -1,4 +1,4 @@
-'''
+r'''
 The data-driven architecture is based on unidirectional message flows between agents.
 Here we assume that messages are exchanged through an intermediary, not directly.
 
@@ -11,7 +11,7 @@ The broker supports three types of architecture:
 
 -   **Simple:** messages are delivered to a single queue.
 -   **Branching:** a message is sent to an exchange, from which it is copied to multiple queues.
--   **Topics:** a message is sent to an exchange and, based on the topic, \ 
+-   **Topics:** a message is sent to an exchange and, based on the topic,
     is routed to queues subscribed to that topic.
 
 Implementations:
@@ -25,10 +25,10 @@ Using QueueBroker separately (sending only)
 
 .. code-block:: python
 
-    from microagent import load_queues
+    from microagent import Queue, configure
     from microagent.tools.redis import RedisBroker
 
-    queues = load_queues('file://queues.json')
+    configure('file://queues.json')
     broker = RedisBroker('redis://localhost/7')
 
     await broker.user_created.send({'user_id': 1})  # send to queue
@@ -42,13 +42,13 @@ Using with MicroAgent
 
 .. code-block:: python
 
-    from microagent import MicroAgent, load_queues
-    from microagent.tools.redis import RedisSignalBus
+    from microagent import MicroAgent, Queue, configure, consumer
+    from microagent.tools.redis import RedisBroker
 
-    queues = load_queues('file://queues.json')
+    configure('file://queues.json')
 
     class EmailAgent(MicroAgent):
-        @consumer(queues.mailer)
+        @consumer(Queue.mailer)
         async def example_read_queue(self, **kwargs):
             await self.broker.email_sended.send({'user_id': 1})
 
@@ -59,6 +59,7 @@ Using with MicroAgent
 import asyncio
 import logging
 import uuid
+
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
@@ -106,7 +107,7 @@ class AbstractQueueBroker(BrokerProtocol):
 
     dsn: str
     uid: str = field(default_factory=lambda: uuid.uuid4().hex)
-    log: logging.Logger = logging.getLogger('microagent.broker')
+    log: logging.Logger = field(default=logging.getLogger('microagent.broker'))
 
     _bindings: dict[str, Consumer] = field(default_factory=dict)
     _background_tasks: set[asyncio.Task] = field(default_factory=set)

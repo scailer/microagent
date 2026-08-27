@@ -1,10 +1,11 @@
 # mypy: ignore-errors
-import os
+from microagent import MicroAgent, Queue, consumer, on
 
-from microagent import MicroAgent, consumer, load_stuff, on
-
-cur_dir = os.path.dirname(os.path.realpath(__file__))
-signals, queues = load_stuff('file://' + os.path.join(cur_dir, 'signals.json'))
+# single-run
+# import os
+# from microagent import configure
+# cur_dir = os.path.dirname(os.path.realpath(__file__))
+# configure('file://' + os.path.join(cur_dir, 'signals.json'))
 
 
 class EmailAgent(MicroAgent):
@@ -12,6 +13,6 @@ class EmailAgent(MicroAgent):
     async def setup(self):
         self.log.info('Run ...\n %s', self.info())
 
-    @consumer(queues.mailer)
+    @consumer(Queue.mailer)
     async def example_read_queue(self, **kwargs):
         self.log.info('Catch emailer %s', kwargs)

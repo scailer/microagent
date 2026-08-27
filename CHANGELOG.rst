@@ -3,6 +3,15 @@ Changelog
 =========
 
 
+1.9.0 (2026-07-29)
+==================
+
+- New ``configure()`` for loading signals and queues
+- ``Signal`` and ``Queue`` class attribute access
+- ``DoubleLoadError`` for duplicate loading
+- Docs and examples update
+
+
 1.8.3 (2026-06-18)
 ==================
 

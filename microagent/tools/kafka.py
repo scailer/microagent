@@ -3,6 +3,7 @@
 '''
 import asyncio
 import time
+
 from dataclasses import dataclass, field
 from typing import Any
 from urllib import parse
@@ -37,7 +38,7 @@ class KafkaBroker(AbstractQueueBroker):
         .. code-block:: python
 
             class EmailAgent(MicroAgent):
-                @consumer(queues.mailer)
+                @consumer(Queue.mailer)
                 async def example_read_queue(self, kafka, **data):
                     # kafka: AIOKafkaConsumer
                     process(data)
@@ -92,5 +93,5 @@ class KafkaBroker(AbstractQueueBroker):
         except asyncio.TimeoutError:
             self.log.error('TimeoutError: %s %.2f', consumer, time.monotonic() - timer)
 
-    async def queue_length(self, name: str, **options: Any) -> int:  # noqa
+    async def queue_length(self, name: str, **options: Any) -> int:
         return 0

@@ -17,10 +17,10 @@ Using SignalBus separately (sending only)
 
 .. code-block:: python
 
-    from microagent import load_signals
+    from microagent import Signal, configure
     from microagent.tools.redis import RedisSignalBus
 
-    signals = load_signals('file://signals.json')
+    configure('file://signals.json')
 
     bus = RedisSignalBus('redis://localhost/7')
     await bus.user_created.send('user_agent', user_id=1)
@@ -30,13 +30,13 @@ Using with MicroAgent
 
 .. code-block:: python
 
-    from microagent import MicroAgent, load_signals
+    from microagent import MicroAgent, Signal, configure, receiver
     from microagent.tools.redis import RedisSignalBus
 
-    signals = load_signals('file://signals.json')
+    configure('file://signals.json')
 
     class UserAgent(MicroAgent):
-        @receiver(signals.user_created)
+        @receiver(Signal.user_created)
         async def example(self, user_id, **kwargs):
             await self.bus.user_created.send('some_signal', user_id=1)
 
@@ -49,6 +49,7 @@ import contextlib
 import logging
 import time
 import uuid
+
 from abc import abstractmethod
 from collections import abc, defaultdict
 from dataclasses import dataclass, field
@@ -57,6 +58,9 @@ from typing import Any
 from .abc import BusProtocol, SignalProtocol
 from .signal import Receiver, SerializingError, Signal
 from .utils import IterQueue, raise_timeout
+
+
+_DEFAULT_PREFIX = 'PUBSUB'
 
 
 @dataclass(slots=True)
@@ -105,8 +109,8 @@ class AbstractSignalBus(BusProtocol):
 
     dsn: str
     uid: str = field(default_factory=lambda: uuid.uuid4().hex)
-    prefix: str = 'PUBSUB'
-    log: logging.Logger = logging.getLogger('microagent.bus')
+    prefix: str = field(default_factory=lambda: _DEFAULT_PREFIX)
+    log: logging.Logger = field(default=logging.getLogger('microagent.bus'))
 
     receivers: dict[str, list[Receiver]] = field(default_factory=lambda: defaultdict(list))
     _responses: dict[str, IterQueue] = field(default_factory=dict)
@@ -179,7 +183,7 @@ class AbstractSignalBus(BusProtocol):
             .. code-block:: python
 
                 class CommentAgent(MicroAgent):
-                    @receiver(signals.rpc_comments_count)
+                    @receiver(Signal.rpc_comments_count)
                     async def example_rpc_handler(self, user_id, **kwargs):
                         return 1
 
