@@ -1,6 +1,7 @@
 # mypy: ignore-errors
 from microagent import MicroAgent, Queue, consumer, on
 
+
 # single-run
 # import os
 # from microagent import configure

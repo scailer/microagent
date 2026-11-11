@@ -3,13 +3,14 @@ import asyncio
 import json
 import logging
 import uuid
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from microagent.bus import AbstractSignalBus
-from microagent.signal import (Receiver, SerializingError,  # , LookupKey
-                               Signal, SignalException)
+from microagent.signal import Receiver, SerializingError, Signal, SignalException  # , LookupKey
+
 
 DSN = 'redis://localhost'
 
@@ -453,3 +454,35 @@ async def test_Bus_close_cancels_receiver_task(bus, test_signal):
     await bus.close()
 
     assert not bus._tasks
+
+
+async def test_Bus_waiter_external_cancel_propagates(bus, test_signal):
+    # Внешняя отмена корутины с waiter (graceful shutdown) не должна глотаться
+    async def interrupted():
+        async with bus.test_signal.waiter(sender='name', a=1, timeout=60) as queue:
+            async for _x in queue:
+                pass
+
+    task = asyncio.get_running_loop().create_task(interrupted())
+    await asyncio.sleep(0.01)
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert not bus._responses  # очередь ответов убрана из реестра
+
+
+async def test_Bus_call_external_cancel_propagates(bus, test_signal):
+    # Внешняя отмена корутины с call не должна превращаться в пустой ответ
+    async def interrupted():
+        return await bus.test_signal.call(sender='test', uuid=1)
+
+    task = asyncio.get_running_loop().create_task(interrupted())
+    await asyncio.sleep(0.01)
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert not bus._responses  # очередь ответов убрана из реестра

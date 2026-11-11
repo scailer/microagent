@@ -127,7 +127,7 @@ class AbstractQueueBroker(BrokerProtocol):
 
     @abstractmethod
     async def send(self, name: str, message: str, **kwargs: Any) -> None:
-        '''
+        r'''
             Write a raw message to queue.
 
             :param name: string, queue name
@@ -168,7 +168,7 @@ class AbstractQueueBroker(BrokerProtocol):
 
     @abstractmethod
     async def queue_length(self, name: str, **options: Any) -> int:
-        '''
+        r'''
             Get the current queue length.
 
             :param name: string, queue name

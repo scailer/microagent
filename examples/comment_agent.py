@@ -1,8 +1,10 @@
 # mypy: ignore-errors
 import asyncio
+
 from collections import defaultdict
 
 from microagent import MicroAgent, Signal, on, receiver
+
 
 # single-run
 # import os

@@ -1,6 +1,7 @@
 # mypy: ignore-errors
 from microagent import MicroAgent, Signal, cron, on, periodic, receiver
 
+
 # single-run
 # import os
 # from microagent import configure

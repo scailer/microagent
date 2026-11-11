@@ -162,7 +162,8 @@ class AbstractSignalBus(BusProtocol):
         self.receivers[receiver.signal.name].append(receiver)
 
     @contextlib.asynccontextmanager
-    async def call(self, channel: str, message: str, timeout: int) -> abc.AsyncIterator[IterQueue]:
+    async def call(self, channel: str, message: str, timeout: int
+        ) -> abc.AsyncGenerator[IterQueue, None]:
         '''
             RPC over pub/sub. Pair of signals - sending and responsing. Response-signal
             is an internal construction enabled by default. When we call `call` we send
@@ -202,10 +203,11 @@ class AbstractSignalBus(BusProtocol):
 
         await self.send(f'{channel}#{request_id}', message)
 
+        timer = raise_timeout(timeout, queue)
         try:
-            raise_timeout(timeout)
             yield queue
         finally:
+            timer.cancel()
             self._responses.pop(request_id, None)
 
     def receiver(self, channel: str, message: str) -> None:

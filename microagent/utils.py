@@ -3,31 +3,56 @@ import asyncio
 from collections.abc import Callable
 
 
+class _Closed:
+    ''' Sentinel for closing IterQueue '''
+
+    def __repr__(self) -> str:
+        return '<closed>'
+
+
+_CLOSE = _Closed()
+
+
 class IterQueue(asyncio.Queue):
     ''' Queue as async generator '''
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._closed = False
+
+    def close(self) -> None:
+        ''' Close queue and interrupt waiting getter with StopAsyncIteration '''
+        self._closed = True
+        self.put_nowait(_CLOSE)
 
     def __aiter__(self) -> 'IterQueue':
         return self
 
     async def __anext__(self) -> dict[str, int | str | None]:
-        try:
-            value = await self.get()
-            self.task_done()
-            return value
+        if self._closed:
+            raise StopAsyncIteration
 
-        except asyncio.CancelledError as err:
-            raise StopAsyncIteration from err
+        # External cancellation (graceful shutdown, wait_for) must propagate,
+        # it is converted to StopAsyncIteration only by closing the queue
+        value = await self.get()
+
+        if value is _CLOSE:
+            self.task_done()
+            raise StopAsyncIteration
+
+        self.task_done()
+        return value
 
 
 def make_bound_key(func: Callable) -> tuple[str, ...]:
     return func.__module__, *func.__qualname__.split('.')
 
 
-def raise_timeout(timeout: float) -> None:
-    ''' Interupt current corutine by timer '''
+def raise_timeout(timeout: float, queue: IterQueue) -> asyncio.TimerHandle:
+    ''' Interrupt waiting for responses by timer (close the queue) '''
 
-    def _timeout(task: asyncio.Task) -> None:
-        if task._fut_waiter and not task._fut_waiter.cancelled():  # type: ignore[attr-defined]
-            task.cancel()
+    def _timeout(q: IterQueue) -> None:
+        q.close()
 
-    asyncio.get_event_loop().call_later(timeout, _timeout, asyncio.current_task())  # type: ignore[arg-type]
+    loop = asyncio.get_running_loop()
+    return loop.call_later(timeout, _timeout, queue)

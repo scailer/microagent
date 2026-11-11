@@ -142,8 +142,6 @@ async def test_mock_broker_ok():
 
 
 async def test_default_prefix_from_json():
-    from microagent import Signal, Queue
-
     class TestBus(AbstractSignalBus):
         async def send(self, channel, message): pass
         async def bind(self, channel): pass
