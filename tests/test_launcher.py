@@ -1,8 +1,16 @@
 # mypy: ignore-errors
 import importlib
-from unittest.mock import MagicMock, Mock
 
-from microagent.launcher import init_agent, load_configuration
+from unittest.mock import AsyncMock, MagicMock, Mock
+
+import pytest
+
+from microagent.launcher import (
+    GroupInterrupt,
+    _run_agent,  # noqa: PLC2701
+    init_agent,
+    load_configuration,
+)
 
 
 def test_load_configuration_ok(monkeypatch):
@@ -99,3 +107,33 @@ def test_init_agent_ok(monkeypatch):
     AppAgent.assert_called_once()
 
     assert init_agent('app.mod.AppAgent', {}) is agent
+
+
+async def test_run_agent_exit_code_on_error(monkeypatch):
+    # Ошибка агента не должна глушиться SystemExit(0) — процесс обязан упасть с кодом 1
+    agent = MagicMock()
+    agent.start = AsyncMock(side_effect=RuntimeError('boom'))
+    agent.stop = AsyncMock()
+    monkeypatch.setattr(
+        'microagent.launcher.init_agent', Mock(return_value=agent))
+
+    with pytest.raises(SystemExit) as exc_info:
+        await _run_agent('agent1', 'app.mod.AppAgent', {})
+
+    assert exc_info.value.code == 1
+    agent.stop.assert_awaited_once()
+
+
+async def test_run_agent_exit_code_on_interrupt(monkeypatch):
+    # Штатное прерывание (сигнал мастера) — выход с кодом 0
+    agent = MagicMock()
+    agent.start = AsyncMock(side_effect=GroupInterrupt('TERM'))
+    agent.stop = AsyncMock()
+    monkeypatch.setattr(
+        'microagent.launcher.init_agent', Mock(return_value=agent))
+
+    with pytest.raises(SystemExit) as exc_info:
+        await _run_agent('agent1', 'app.mod.AppAgent', {})
+
+    assert exc_info.value.code == 0
+    agent.stop.assert_awaited_once()

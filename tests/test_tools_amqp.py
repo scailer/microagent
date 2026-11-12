@@ -1,5 +1,6 @@
 # mypy: ignore-errors
 import asyncio
+
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import aiormq
@@ -7,8 +8,7 @@ import pytest
 
 from microagent.queue import Consumer, Queue
 from microagent.tools import amqp
-from microagent.tools.amqp import (AMQPBroker, Connection, ManagedConnection,
-                                   ReConnection)
+from microagent.tools.amqp import AMQPBroker, Connection, ManagedConnection, ReConnection
 
 
 @pytest.fixture()
@@ -65,7 +65,7 @@ async def test_broker_send_ok(channel):
 async def test_broker_send_ok_topic(channel):
     Queue(name='test_queue', exchange='ex', topics=['*'])
     broker = AMQPBroker('amqp://localhost')
-    await broker.ex.send({"a":1}, topic='a')
+    await broker.ex.send({'a': 1}, topic='a')
 
     channel.basic_publish.assert_called_once_with(
         b'{"a": 1}', routing_key='a', exchange='ex', properties=None)
@@ -220,7 +220,10 @@ async def test_broker_wrapper_ok_type_err(channel):
 
     await broker._amqp_wrapper(consumer)(message)
 
+    # Сообщение остается в очереди (unacked) — ни ack, ни nack,
+    # после исправления ошибки очередь будет перечитана
     channel.basic_ack.assert_not_called()
+    channel.basic_nack.assert_not_called()
     handler.assert_called()
 
 
@@ -234,6 +237,43 @@ async def test_broker_wrapper_ok_timeout(channel):
     await broker._amqp_wrapper(consumer)(message)
 
     channel.basic_ack.assert_not_called()
+    channel.basic_nack.assert_called_once_with(delivery_tag='123')
+    handler.assert_called()
+
+
+async def test_broker_wrapper_ok_handler_error(channel):
+    # Ошибка в коде хендлера — сообщение остается в очереди (unacked),
+    # ни ack, ни nack — после исправления ошибки очередь будет перечитана
+    handler = AsyncMock(side_effect=ValueError('unexpected'))
+    queue = Queue(name='test_queue')
+    consumer = Consumer(agent=None, handler=handler, queue=queue, timeout=1, options={})
+    broker = AMQPBroker('amqp://localhost')
+    message = MagicMock(body=b'{"a":1}', delivery_tag='123', channel=channel)
+
+    await broker._amqp_wrapper(consumer)(message)
+
+    channel.basic_ack.assert_not_called()
+    channel.basic_nack.assert_not_called()
+    handler.assert_called()
+
+    handler.side_effect = None  # ошибка «исправлена»
+    await broker._amqp_wrapper(consumer)(message)  # перечитано после исправления
+
+    channel.basic_ack.assert_called()  # успешный повтор обрабатывает сообщение
+
+
+async def test_broker_wrapper_error_no_delivery_tag(channel):
+    # Без delivery_tag (no-ack канал) при ошибке хендлера просто логируем
+    handler = AsyncMock(side_effect=ValueError('unexpected'))
+    queue = Queue(name='test_queue')
+    consumer = Consumer(agent=None, handler=handler, queue=queue, timeout=1, options={})
+    broker = AMQPBroker('amqp://localhost')
+    message = MagicMock(body=b'{"a":1}', delivery_tag=None, channel=channel)
+
+    await broker._amqp_wrapper(consumer)(message)
+
+    channel.basic_ack.assert_not_called()
+    channel.basic_nack.assert_not_called()
     handler.assert_called()
 
 

@@ -149,6 +149,7 @@ async def _run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
     watcher_handle = loop.call_later(MASTER_WATCHER_PERIOD, _master_watcher, name)
 
     agent: MicroAgent | None = None
+    exit_code = 0
 
     try:
         agent = init_agent(backend, cfg)
@@ -159,7 +160,7 @@ async def _run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
             await asyncio.sleep(3600)
 
     except (KeyboardInterrupt, GroupInterrupt, ServerInterrupt) as exc:
-        logger.warning('AgentProc[%s]: Catch interrupt %s', name, exc)
+        logger.info('AgentProc[%s]: Catch interrupt %s', name, exc)
 
         current = asyncio.current_task()
         for t in asyncio.all_tasks():
@@ -170,17 +171,17 @@ async def _run_agent(name: str, backend: str, cfg: dict[str, Any]) -> None:
 
     except Exception:
         logger.exception('AgentProc[%s]: Catch error', name)
-        raise
+        exit_code = 1  # failed agent must exit with failure code
 
     finally:
         watcher_handle.cancel()
         if agent is not None:
             await agent.stop()
-        raise SystemExit()
+        raise SystemExit(exit_code)
 
 
 def _interrupter(name: str, sig: str) -> None:
-    logger.warning('AgentProc[%s]: catch %s signal', name, sig)
+    logger.info('AgentProc[%s]: catch %s signal', name, sig)
     raise GroupInterrupt(sig)
 
 
@@ -221,7 +222,7 @@ class AgentsManager:
 
     def _signal_cb(self, signum: int, *args: Any) -> None:
         signame = {2: 'INT', 15: 'TERM'}.get(signum, signum)
-        logger.warning('AgentsManager: catch %s', signame)
+        logger.info('AgentsManager: catch %s', signame)
         self.running = False
 
     def start(self) -> None:
@@ -252,7 +253,7 @@ class AgentsManager:
     def close(self) -> None:
         ''' Terminating dependent processes '''
 
-        logger.warning('AgentsManager: force kill processes\n%s', self._get_state())
+        logger.info('AgentsManager: force kill processes\n%s', self._get_state())
 
         for process in self.processes.values():
             logger.info('AgentsManager: terminate %s [%s]', process.name, process.pid)

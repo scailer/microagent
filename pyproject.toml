@@ -1,5 +1,5 @@
 [build-system]
-requires = ['setuptools', 'setuptools-scm']
+requires = ['setuptools']
 build-backend = 'setuptools.build_meta'
 
 [project]
@@ -9,14 +9,14 @@ authors = [
 ]
 readme = 'README.rst'
 requires-python = '>=3.10'
-license = {file = 'LICENSE.md'}
+license = 'MIT'
+license-files = ['LICENSE.md']
 description = 'Tool for agent ecosystem'
 keywords = ['async', 'pubsub', 'queue', 'agent', 'periodic', 'cron']
 classifiers = [
     'Development Status :: 5 - Production/Stable',
     'Environment :: Plugins',
     'Intended Audience :: Developers',
-    'License :: OSI Approved :: MIT License',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
     'Programming Language :: Python :: 3.10',
@@ -103,6 +103,7 @@ ignore = [
 'microagent/tools/mocks.py' = ['PLC2701']
 'tests/*' = ['PLR2004']
 'tests/test_launcher.py' = ['N806']  # Variable `A` in function should be lowercase
+'examples/*' = ['ASYNC110']
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

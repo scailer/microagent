@@ -3,6 +3,16 @@ Changelog
 =========
 
 
+1.9.1 (2026-11-11)
+==================
+
+- Fix exit code of failed agent in launcher (SystemExit(1) instead of 0)
+- Fix swallowing of external cancellation in RPC (call/waiter) on graceful shutdown
+- RPC timeout now closes the response queue instead of canceling the caller task
+- AMQP: log all handler errors with traceback (including TypeError)
+- AMQP: fix rebind attempts off-by-one (3 attempts as documented)
+
+
 1.9.0 (2026-07-29)
 ==================
 

@@ -1,12 +1,12 @@
 # mypy: ignore-errors
 import asyncio
 import unittest
+
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
-from microagent import (MicroAgent, Queue, Signal, consumer, cron, on,
-                        periodic, receiver)
+from microagent import MicroAgent, Queue, Signal, consumer, cron, on, periodic, receiver
 from microagent.agent import MissConfig
 from microagent.tools.mocks import BrokerMock, BusMock
 

@@ -9,6 +9,7 @@ from user_agent import UserAgent
 
 from microagent.tools.redis import RedisBroker, RedisSignalBus
 
+
 logging.basicConfig(format=(
     '%(levelname)-8s [pid#%(process)d] %(asctime)s %(name)s '
     '%(filename)s:%(lineno)d %(message)s'

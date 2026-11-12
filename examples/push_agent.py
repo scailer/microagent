@@ -7,6 +7,7 @@ import sys
 from microagent import MicroAgent, Queue, configure, consumer, on, periodic
 from microagent.tools import amqp, redis
 
+
 logging.basicConfig(format=(
     '%(levelname)-8s [pid#%(process)d] %(asctime)s %(name)s '
     '%(filename)s:%(lineno)d %(message)s'
@@ -47,7 +48,7 @@ class UserAgent(MicroAgent):
 async def main():
     bus = redis.RedisSignalBus('redis://localhost/7')
     broker = amqp.AMQPBroker('amqp://guest:guest@localhost:5672/')
-    await broker.push3.send({'q':1}, topic='msg.android')
+    await broker.push3.send({'q': 1}, topic='msg.android')
 
     agent = UserAgent(bus=bus, broker=broker)
     await agent.start()

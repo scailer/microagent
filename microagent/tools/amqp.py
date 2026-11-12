@@ -99,7 +99,7 @@ class AMQPBroker(AbstractQueueBroker):
 
     async def send(self, name: str, message: str, exchange: str = '', topic: str | None = None,
             properties: dict | None = None, **kwargs: Any) -> None:
-        '''
+        r'''
             Raw message sending.
 
             :param name: string, target queue name (routing_key)
@@ -150,6 +150,9 @@ class AMQPBroker(AbstractQueueBroker):
 
                 if message.delivery_tag:
                     await message.channel.basic_nack(delivery_tag=message.delivery_tag)
+
+            except Exception:  # handler bug — stay data in queue, do not ack/nack
+                log.exception('Call %s failed', consumer)
 
         return _wrapper
 
@@ -215,7 +218,7 @@ class ManagedConnection:
         exchange_name = self.consumer.queue.exchange
         topics = self.consumer.queue.topics
 
-        log.warning('Declare queue "%s" with exchange_name "%s" topics "%s"',
+        log.info('Declare queue "%s" with exchange_name "%s" topics "%s"',
             queue_name, exchange_name, topics)
 
         await self._channel.queue_declare(queue_name)
@@ -243,7 +246,7 @@ class ManagedConnection:
             log.warning('Already rebinding queue "%s"', self.consumer.queue.name)
             return False
 
-        if self.bind_attempts > REBIND_ATTEMPTS:
+        if self.bind_attempts >= REBIND_ATTEMPTS:
             log.error('Failed all attempts to rebind queue "%s"', self.consumer.queue.name)
             return False
 
