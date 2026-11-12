@@ -317,8 +317,9 @@ async def test_start_hook_start_agent_ok(dummy_hook):
 
 
 async def test_start_hook_stop_agent_ok(dummy_hook):
-    dummy_hook.hook = MagicMock(pre_stop=AsyncMock())
+    dummy_hook.hook = MagicMock(pre_stop=AsyncMock(), post_stop=AsyncMock())
 
     await dummy_hook.stop()
 
     dummy_hook.hook.pre_stop.assert_called_once()
+    dummy_hook.hook.post_stop.assert_called_once()

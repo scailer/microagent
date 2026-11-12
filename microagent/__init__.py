@@ -370,12 +370,12 @@ def consumer(queue: Queue, timeout: int = 60, dto_class: type | None = None,
 
 def on(label: str) -> abc.Callable[[HookFunc], HookFunc]:
     '''
-        Hooks for internal events *(pre_start, post_start, pre_stop)*
+        Hooks for internal events *(pre_start, post_start, pre_stop, post_stop)*
         or running forever servers *(server)*.
 
         Server-function will be call as run-forever asyncio task.
 
-        :param label: Hook type label string *(pre_start, post_start, pre_stop, server)*
+        :param label: Hook type label string *(pre_start, post_start, pre_stop, post_stop, server)*
 
         .. code-block:: python
 
@@ -391,12 +391,16 @@ def on(label: str) -> abc.Callable[[HookFunc], HookFunc]:
             async def handler_3(self):
                 log.info('Called handler 3')
 
+            @on('post_stop')
+            async def handler_4(self):
+                log.info('Called handler 4')
+
             @on('server')
             async def run_server(self):
                 await Server().start()  # run forever
                 raise ServerInterrupt('Exit')  # graceful exit
     '''
-    assert label in {'pre_start', 'post_start', 'pre_stop', 'server'}, 'Bad label'
+    assert label in {'pre_start', 'post_start', 'pre_stop', 'post_stop', 'server'}, 'Bad label'
 
     def _decorator(func: HookFunc) -> HookFunc:
         Hook._register[make_bound_key(func)] = HookArgs(label=label)

@@ -37,7 +37,6 @@ if TYPE_CHECKING:
 
 
 RANGES = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
-DAYS = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 MAX_DIFF = 2 * 365 * 24 * 60 * 60
 LAST_MONTH = 12
 
@@ -176,16 +175,12 @@ def cron_parser(spec: str) -> CRON:
         for rng, val in zip(RANGES, spec.split(), strict=True)
     )
 
-    for i, val in enumerate(norm_spec):
+    for val in norm_spec:
         match = re.search(r'^([^-]+)-([^-/]+)/(\d+)?$', val)
 
-        if match:  # 0-23/5 -> [0, 5, 10, 15, 20]
+        if match:  # 0-23/5 -> [0, 5, 10, 15, 20] (POSIX: step from range start)
             _min, _max, _step = map(int, match.groups())
-
-            if i in {2, 3} and _min == 1:
-                values.append([x for x in range(_min - 1, _max + 1) if x and not x % _step])
-            else:
-                values.append([x for x in range(_min, _max + 1) if not x % _step])
+            values.append(list(range(_min, _max + 1, _step)))
 
         else:  # 4,7,12 -> [4, 7, 12]
             values.append([int(x) for x in val.split(',')])

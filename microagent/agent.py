@@ -210,6 +210,9 @@ class MicroAgent:
             await self.run_servers(self.hook.servers)
 
     async def stop(self) -> None:
+        # pre_stop runs before transport shutdown, so hooks still can use bus/broker
+        await self.hook.pre_stop()
+
         for periodic_task in self.periodic_tasks:
             periodic_task.cancel()
         for cron_task in self.cron_tasks:
@@ -218,7 +221,8 @@ class MicroAgent:
             await self.bus.close()
         if self.broker:
             await self.broker.close()
-        await self.hook.pre_stop()
+
+        await self.hook.post_stop()
 
     @staticmethod
     async def run_servers(servers: Iterable[Callable]) -> None:

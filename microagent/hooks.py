@@ -1,7 +1,7 @@
 '''
 In practice, it is useful to be able to perform some actions before the microagent
 starts working or after it stops. For this aim there are internal hooks that allow
-you to run methods on pre_start, post_start, and pre_stop.
+you to run methods on pre_start, post_start, pre_stop, and post_stop.
 
 **pre_start** - is called before the microagent is ready to accept events and
 consume messages. This ensures that handlers will be called when already
@@ -13,6 +13,9 @@ messages. It is can be useful for sending notifications to monitoring service an
 
 **pre_stop** - called when the microagent go shutdown. It can be useful for sending
 notifications to the monitoring service, and so on.
+
+**post_stop** - called after the microagent has stopped and transports are closed.
+It can be useful for final cleanup actions.
 
 **server** - "run forever" handler. If it crashes with exception microagent will be stopped.
 If you are using a launcher from the library and server run forever,
@@ -74,6 +77,9 @@ class Hooks:
 
     def pre_stop(self) -> abc.Awaitable:
         return self.call('pre_stop')
+
+    def post_stop(self) -> abc.Awaitable:
+        return self.call('post_stop')
 
     async def call(self, label: str) -> None:
         for hook in self.binds[label]:

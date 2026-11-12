@@ -3,6 +3,13 @@ Changelog
 =========
 
 
+1.9.2 (2026-11-12)
+==================
+
+- CRON: POSIX semantics for range steps in all fields (breaking change for schedules with day/month)
+- Agent hooks: run ``pre_stop`` hooks before transport shutdown ``post_stop`` after
+
+
 1.9.1 (2026-11-11)
 ==================
 
