@@ -8,7 +8,7 @@ authors = [
     {name = 'Dmitriy Vlasov', email = 'scailer@yandex.ru'},
 ]
 readme = 'README.rst'
-requires-python = '>=3.10'
+requires-python = '>=3.11'
 license = 'MIT'
 license-files = ['LICENSE.md']
 description = 'Tool for agent ecosystem'
@@ -19,11 +19,11 @@ classifiers = [
     'Intended Audience :: Developers',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
     'Programming Language :: Python :: 3.14',
+    'Programming Language :: Python :: 3.15',
     'Topic :: Software Development :: Libraries :: Python Modules',
     'Framework :: AsyncIO'
 ]
@@ -79,7 +79,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 100
-target-version = 'py310'
+target-version = 'py311'
 preview = true
 
 [tool.ruff.lint]
@@ -97,6 +97,7 @@ ignore = [
     'PLR0917',  # too many positional arguments
     'N805',  # First argument of a method should be named self, pydantic validators
     'N818',  # Checks for custom exception definitions that omit the Error suffix.
+    'ASYNC109',  # `timeout` argument is part of public API, asyncio.timeout is not a drop-in
 ]
 
 [tool.ruff.lint.per-file-ignores]

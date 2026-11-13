@@ -145,7 +145,7 @@ class AMQPBroker(AbstractQueueBroker):
             except TypeError:  # when data mismatch handler args (stay data in queue)
                 log.exception('Call %s failed', consumer)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.fatal('TimeoutError: %s %.2f', consumer, time.monotonic() - timer)
 
                 if message.delivery_tag:

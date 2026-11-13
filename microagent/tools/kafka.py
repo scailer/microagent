@@ -90,7 +90,7 @@ class KafkaBroker(AbstractQueueBroker):
             await asyncio.wait_for(consumer.handler(**data), consumer.timeout)
         except TypeError:
             self.log.exception('Call %s failed', consumer)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.log.error('TimeoutError: %s %.2f', consumer, time.monotonic() - timer)
 
     async def queue_length(self, name: str, **options: Any) -> int:

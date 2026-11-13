@@ -83,7 +83,7 @@ import logging
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TypeVar
 
 from .broker import AbstractQueueBroker
@@ -235,7 +235,7 @@ class MicroAgent:
             start_after: float = getattr(task, 'start_after', None) or 0.0
 
             if start_after > LOG_TIME_THRESHOLD:
-                start_at = datetime.now(tz=timezone.utc) + timedelta(seconds=start_after)
+                start_at = datetime.now(tz=UTC) + timedelta(seconds=start_after)
                 self.log.debug('Set %s at %s', task, f'{start_at:%H:%M:%S}')
             else:
                 self.log.debug('Set %s after %s sec', task, start_after)

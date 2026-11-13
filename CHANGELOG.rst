@@ -3,9 +3,10 @@ Changelog
 =========
 
 
-1.9.2 (2026-11-12)
-==================
+1.10.0 (2026-11-12)
+===================
 
+- Drop support python 3.10, add python 3.15
 - CRON: POSIX semantics for range steps in all fields (breaking change for schedules with day/month)
 - Agent hooks: run ``pre_stop`` hooks before transport shutdown ``post_stop`` after
 

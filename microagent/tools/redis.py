@@ -155,7 +155,7 @@ class RedisBroker(AbstractQueueBroker):
 
         try:
             await asyncio.wait_for(consumer.handler(**_data), consumer.timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.log.error('TimeoutError: %s %.2f', consumer, time.monotonic() - timer)
             await self.rollback(name, data)
         except Exception:

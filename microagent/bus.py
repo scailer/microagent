@@ -298,7 +298,7 @@ class AbstractSignalBus(BusProtocol):
             if isinstance(response, int | str):
                 return response
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.log.error(
                 'TimeoutError: %s %.2f', receiver.handler, time.monotonic() - timer)
 
