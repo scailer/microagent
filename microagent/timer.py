@@ -26,7 +26,7 @@ import time
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, ClassVar, NamedTuple, TypedDict
 
 from .abc import BoundKey, PeriodicFunc
@@ -37,7 +37,6 @@ if TYPE_CHECKING:
 
 
 RANGES = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
-DAYS = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 MAX_DIFF = 2 * 365 * 24 * 60 * 60
 LAST_MONTH = 12
 
@@ -51,7 +50,7 @@ class CRON(NamedTuple):
     weekdays: list[int]  # 0-7
 
     def next(self) -> datetime:
-        return next_moment(self, datetime.now(tz=timezone.utc))
+        return next_moment(self, datetime.now(tz=UTC))
 
     def __str__(self) -> str:
         return f'[{self.spec}]'
@@ -71,7 +70,7 @@ class PeriodicMixin:
     async def call(self) -> None:
         try:
             await self._run_handler()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.agent.log.exception(f'TimeoutError: {self}')
         except Exception:
             self.agent.log.exception('Periodic Exception')
@@ -176,16 +175,12 @@ def cron_parser(spec: str) -> CRON:
         for rng, val in zip(RANGES, spec.split(), strict=True)
     )
 
-    for i, val in enumerate(norm_spec):
+    for val in norm_spec:
         match = re.search(r'^([^-]+)-([^-/]+)/(\d+)?$', val)
 
-        if match:  # 0-23/5 -> [0, 5, 10, 15, 20]
+        if match:  # 0-23/5 -> [0, 5, 10, 15, 20] (POSIX: step from range start)
             _min, _max, _step = map(int, match.groups())
-
-            if i in {2, 3} and _min == 1:
-                values.append([x for x in range(_min - 1, _max + 1) if x and not x % _step])
-            else:
-                values.append([x for x in range(_min, _max + 1) if not x % _step])
+            values.append(list(range(_min, _max + 1, _step)))
 
         else:  # 4,7,12 -> [4, 7, 12]
             values.append([int(x) for x in val.split(',')])
@@ -217,32 +212,32 @@ def _day_allows(cron: CRON, now: datetime) -> bool:
 
 
 def next_moment(cron: CRON, now: datetime) -> datetime:
-    if abs((datetime.now(tz=timezone.utc) - now).total_seconds()) > MAX_DIFF:
+    if abs((datetime.now(tz=UTC) - now).total_seconds()) > MAX_DIFF:
         raise ValueError
 
     if now.second or now.microsecond:
         # if moment passed several seconds ago, go to next minute
         now += timedelta(minutes=1)
         now = datetime(year=now.year, month=now.month, day=now.day,
-            hour=now.hour, minute=now.minute, tzinfo=timezone.utc)
+            hour=now.hour, minute=now.minute, tzinfo=UTC)
 
     if now.month not in cron.months:
         if now.month == LAST_MONTH:
-            now = datetime(year=now.year + 1, month=1, day=1, tzinfo=timezone.utc)
+            now = datetime(year=now.year + 1, month=1, day=1, tzinfo=UTC)
         else:
-            now = datetime(year=now.year, month=now.month + 1, day=1, tzinfo=timezone.utc)
+            now = datetime(year=now.year, month=now.month + 1, day=1, tzinfo=UTC)
 
         return next_moment(cron, now)
 
     if not _day_allows(cron, now):
         now += timedelta(days=1)
-        now = datetime(year=now.year, month=now.month, day=now.day, tzinfo=timezone.utc)
+        now = datetime(year=now.year, month=now.month, day=now.day, tzinfo=UTC)
         return next_moment(cron, now)
 
     if now.hour not in cron.hours:
         now += timedelta(hours=1)
         now = datetime(year=now.year, month=now.month, day=now.day, hour=now.hour,
-            tzinfo=timezone.utc)
+            tzinfo=UTC)
         return next_moment(cron, now)
 
     if now.minute not in cron.minutes:
@@ -250,4 +245,4 @@ def next_moment(cron: CRON, now: datetime) -> datetime:
         return next_moment(cron, now)
 
     return datetime(year=now.year, month=now.month, day=now.day,
-        hour=now.hour, minute=now.minute, tzinfo=timezone.utc)
+        hour=now.hour, minute=now.minute, tzinfo=UTC)

@@ -15,6 +15,8 @@ def hooks():
         Hook(agent=None, handler=Mock(), label='post_start'),
         Hook(agent=None, handler=AsyncMock(), label='pre_stop'),
         Hook(agent=None, handler=Mock(), label='pre_stop'),
+        Hook(agent=None, handler=AsyncMock(), label='post_stop'),
+        Hook(agent=None, handler=Mock(), label='post_stop'),
         Hook(agent=None, handler=AsyncMock(), label='server'),
     )
 
@@ -38,6 +40,14 @@ async def test_pre_stop_ok(hooks):
     hooks[4].handler.assert_called_once()
     hooks[5].handler.assert_called_once()
     hooks[0].handler.assert_not_called()
+    hooks[6].handler.assert_not_called()
+
+
+async def test_post_stop_ok(hooks):
+    await Hooks(hooks).post_stop()
+    hooks[6].handler.assert_called_once()
+    hooks[7].handler.assert_called_once()
+    hooks[4].handler.assert_not_called()
 
 
 async def test_server_ok(hooks):

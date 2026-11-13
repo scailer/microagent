@@ -83,7 +83,7 @@ import logging
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TypeVar
 
 from .broker import AbstractQueueBroker
@@ -210,6 +210,9 @@ class MicroAgent:
             await self.run_servers(self.hook.servers)
 
     async def stop(self) -> None:
+        # pre_stop runs before transport shutdown, so hooks still can use bus/broker
+        await self.hook.pre_stop()
+
         for periodic_task in self.periodic_tasks:
             periodic_task.cancel()
         for cron_task in self.cron_tasks:
@@ -218,7 +221,8 @@ class MicroAgent:
             await self.bus.close()
         if self.broker:
             await self.broker.close()
-        await self.hook.pre_stop()
+
+        await self.hook.post_stop()
 
     @staticmethod
     async def run_servers(servers: Iterable[Callable]) -> None:
@@ -231,7 +235,7 @@ class MicroAgent:
             start_after: float = getattr(task, 'start_after', None) or 0.0
 
             if start_after > LOG_TIME_THRESHOLD:
-                start_at = datetime.now(tz=timezone.utc) + timedelta(seconds=start_after)
+                start_at = datetime.now(tz=UTC) + timedelta(seconds=start_after)
                 self.log.debug('Set %s at %s', task, f'{start_at:%H:%M:%S}')
             else:
                 self.log.debug('Set %s after %s sec', task, start_after)

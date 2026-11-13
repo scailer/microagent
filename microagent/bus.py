@@ -117,6 +117,8 @@ class AbstractSignalBus(BusProtocol):
     _tasks: set[asyncio.Task] = field(default_factory=set)
 
     def __post_init__(self) -> None:
+        # Дизайн-решение: биндим response-канал сразу в конструкторе,
+        # поэтому создание шины требует работающего event loop (внутри корутины)
         response_signal = Signal(name='response', providing_args=[])
         task = asyncio.create_task(
             self.bind(response_signal.make_channel_name(self.prefix))
@@ -129,6 +131,9 @@ class AbstractSignalBus(BusProtocol):
         return f'<Bus {self.__class__.__name__} {self.dsn} {self.prefix}#{self.uid}>'
 
     def __getattr__(self, name: str) -> 'BoundSignal':
+        # Дизайн-решение: бросаем SignalNotFound, а не AttributeError —
+        # опечатка в имени сигнала должна падать громко, а не проходить молча
+        # через hasattr/getattr с default
         signal = Signal.get(name)
         return BoundSignal(self, signal)
 
@@ -293,7 +298,7 @@ class AbstractSignalBus(BusProtocol):
             if isinstance(response, int | str):
                 return response
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.log.error(
                 'TimeoutError: %s %.2f', receiver.handler, time.monotonic() - timer)
 

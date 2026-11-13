@@ -123,6 +123,9 @@ class AbstractQueueBroker(BrokerProtocol):
             await asyncio.wait(tasks)
 
     def __getattr__(self, name: str) -> 'BoundQueue':
+        # Дизайн-решение (review #4): бросаем QueueNotFound, а не AttributeError —
+        # опечатка в имени очереди должна падать громко, а не проходить молча
+        # через hasattr/getattr с default
         return BoundQueue(self, Queue.get(name))
 
     @abstractmethod

@@ -1,12 +1,13 @@
 # mypy: ignore-errors
 import asyncio
+import calendar
 
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from microagent.timer import DAYS, CRONTask, PeriodicTask, cron_parser, next_moment
+from microagent.timer import CRONTask, PeriodicTask, cron_parser, next_moment
 
 
 YEAR = datetime.now(tz=timezone.utc).year
@@ -83,9 +84,11 @@ async def test_cron_parser_ok():
     assert cron_parser('15-45/5 * * * *').minutes == [15, 20, 25, 30, 35, 40, 45]
     assert cron_parser('*/15 * * * *').minutes == [0, 15, 30, 45]
     assert cron_parser('* */3 * * *').hours == [0, 3, 6, 9, 12, 15, 18, 21]
-    assert cron_parser('* * 6-20/5 * *').days == [10, 15, 20]
-    assert cron_parser('* * 6-19/5 * *').days == [10, 15]
-    assert cron_parser('* * * */3 *').months == [3, 6, 9, 12]
+    # POSIX: шаг считается от начала диапазона для всех полей
+    assert cron_parser('* * 6-20/5 * *').days == [6, 11, 16]
+    assert cron_parser('* * 6-19/5 * *').days == [6, 11, 16]
+    assert cron_parser('* * * 6-20/5 *').months == [6, 11, 16]
+    assert cron_parser('* * * */3 *').months == [1, 4, 7, 10]
 
 
 async def test_next_moment_ok_list():
@@ -178,9 +181,11 @@ async def test_next_moment_fail():
 
 
 async def test_next_moment_ok_latest_day():
-    for m, d in enumerate(DAYS[:11], 1):
-        assert next_moment(cron_parser('0 0 1 * *'), datetime(year=YEAR, month=m, day=d,
-            tzinfo=timezone.utc)) == datetime(year=YEAR, month=m + 1, day=1, tzinfo=timezone.utc)
+    for m in range(1, 12):
+        last_day = calendar.monthrange(YEAR, m)[1]
+        assert next_moment(cron_parser('0 0 1 * *'), datetime(year=YEAR, month=m,
+            day=last_day, tzinfo=timezone.utc)) == datetime(
+            year=YEAR, month=m + 1, day=1, tzinfo=timezone.utc)
 
     assert next_moment(cron_parser('0 0 1 * *'), datetime(year=YEAR, month=12, day=31,
         tzinfo=timezone.utc)) == datetime(year=YEAR + 1, month=1, day=1, tzinfo=timezone.utc)
